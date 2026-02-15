@@ -49,13 +49,16 @@
       const s = skills[key];
       const level = (s && s.level) != null ? s.level : '—';
       const xp = (s && (s.xp != null ? s.xp : s.experience)) != null ? (s.xp != null ? s.xp : s.experience) : 0;
-      const xpToNext = (s && s.xpToNext != null) ? s.xpToNext : '—';
+      let xpToNextDisplay = '—';
+      if (s && s.xpToNext != null && typeof s.xpToNext === 'number') {
+        xpToNextDisplay = s.xpToNext === 0 ? 'Max' : formatNum(s.xpToNext);
+      }
       const rank = (s && s.rank != null) ? s.rank : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2 font-medium">${skillLabel(key)}</td>
         <td class="px-4 py-2 text-right">${level}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(xp)}</td>
-        <td class="px-4 py-2 text-right font-mono">${typeof xpToNext === 'number' ? formatNum(xpToNext) : xpToNext}</td>
+        <td class="px-4 py-2 text-right font-mono">${xpToNextDisplay}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
       </tr>`;
     }).join('');

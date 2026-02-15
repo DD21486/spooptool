@@ -10,12 +10,55 @@
   </script>
   <style>
     body { background-color: #0f172a; }
+    #ascii-title {
+      font-family: ui-monospace, monospace;
+      font-size: clamp(0.35rem, 1.5vw, 0.6rem);
+      line-height: 1.2;
+      color: #94a3b8;
+      white-space: pre;
+      overflow-x: auto;
+      text-align: center;
+    }
+    #ascii-title .ascii-char {
+      opacity: 0;
+      animation: ascii-fade-in 0.08s ease-out forwards;
+    }
+    @keyframes ascii-fade-in {
+      to { opacity: 1; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
   <div class="max-w-7xl mx-auto px-4 py-6">
+    <div class="flex justify-center mb-6">
+      <pre id="ascii-title" class="m-0" aria-hidden="true"><!-- filled by script --></pre>
+    </div>
+    <script>
+      (function () {
+        var art = [
+          '  /$$$$$$  /$$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$$  /$$$$$$$$ /$$$$$$   /$$$$$$  /$$            ',
+          ' /$$__  $$| $$__  $$ /$$__  $$ /$$__  $$| $$__  $$|__  $$__//$$__  $$ /$$__  $$| $$            ',
+          '| $$  \\__/| $$  \\ $$| $$  \\ $$| $$  \\ $$| $$  \\ $$   | $$  | $$  \\ $$| $$  \\ $$| $$            ',
+          '|  $$$$$$ | $$$$$$$/| $$  | $$| $$  | $$| $$$$$$$/   | $$  | $$  | $$| $$  | $$| $$            ',
+          ' \\____  $$| $$____/ | $$  | $$| $$  | $$| $$____/    | $$  | $$  | $$| $$  | $$| $$            ',
+          ' /$$  \\ $$| $$      | $$  | $$| $$  | $$| $$         | $$  | $$  | $$| $$  | $$| $$            ',
+          '|  $$$$$$/| $$      |  $$$$$$/|  $$$$$$/| $$         | $$  |  $$$$$$/|  $$$$$$/| $$$$$$$$      ',
+          ' \\______/ |__/       \\______/  \\______/ |__/         |__/   \\______/  \\______/ |________/      '
+        ].join('\n');
+        var el = document.getElementById('ascii-title');
+        var total = art.length;
+        var durationMs = 3000;
+        var html = '';
+        for (var i = 0; i < total; i++) {
+          var ch = art[i];
+          var delay = (i / total) * durationMs;
+          var escaped = ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch;
+          html += '<span class="ascii-char" style="animation-delay:' + delay + 'ms">' + escaped + '</span>';
+        }
+        el.innerHTML = html;
+      })();
+    </script>
     <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
-      <h1 class="text-2xl font-bold text-slate-100">SpoopTool</h1>
       <div class="flex items-center gap-3">
         <button type="button" id="btn-refresh" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">
           Update all
