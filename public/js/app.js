@@ -144,12 +144,49 @@
     return res.json();
   }
 
+  /** Load home page from latest snapshots only (no Hiscores). */
+  async function loadFromSnapshots() {
+    showError('');
+    leftLoading.classList.remove('hidden');
+    rightLoading.classList.remove('hidden');
+    leftTbody.innerHTML = '';
+    rightTbody.innerHTML = '';
+    try {
+      const res = await fetch(API + '/characters-with-snapshots');
+      if (!res.ok) throw new Error('Failed to load data');
+      const data = await res.json();
+      const list = data.characters || [];
+      characterList = list.map(c => (typeof c === 'string' ? c : c.username));
+      playerData = {};
+      list.forEach((c) => {
+        const username = typeof c === 'string' ? c : c.username;
+        if (c.latestSnapshot) playerData[username] = { skills: c.latestSnapshot.skills, bosses: c.latestSnapshot.bosses };
+      });
+      if (characterList.length === 0) {
+        leftLoading.textContent = 'No characters. Add one above.';
+        rightLoading.textContent = 'No characters. Add one above.';
+        return;
+      }
+      populateFilterSkill();
+      populateFilterBoss();
+      renderLeft();
+      renderRight();
+    } catch (e) {
+      console.error(e);
+      showError(e.message || 'Failed to load data. Is the API running?');
+      leftLoading.textContent = 'Error loading.';
+      rightLoading.textContent = 'Error loading.';
+    }
+  }
+
+  /** Load from Hiscores API (used when user clicks Update all). */
   async function loadAll() {
     showError('');
     leftLoading.classList.remove('hidden');
     rightLoading.classList.remove('hidden');
     leftTbody.innerHTML = '';
     rightTbody.innerHTML = '';
+    playerData = {};
     try {
       const list = await fetchCharacters();
       characterList = Array.isArray(list) ? list.map(c => (typeof c === 'string' ? c : c.username)) : [];
@@ -233,7 +270,7 @@
         return;
       }
       closeAddModal();
-      await loadAll();
+      await loadFromSnapshots();
     } catch (e) {
       modalError.textContent = e.message || 'Failed to add character';
       modalError.classList.remove('hidden');
@@ -247,7 +284,35 @@
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
-  document.getElementById('btn-refresh').addEventListener('click', loadAll);
+  const btnRefresh = document.getElementById('btn-refresh');
+  const REFRESH_COOLDOWN_SEC = 60;
+  let refreshCooldownTimer = null;
+
+  function setRefreshCooldown() {
+    if (refreshCooldownTimer) return;
+    let secs = REFRESH_COOLDOWN_SEC;
+    btnRefresh.disabled = true;
+    btnRefresh.classList.add('cursor-not-allowed', 'opacity-80');
+    function tick() {
+      secs--;
+      btnRefresh.textContent = secs > 0 ? `Update all (${secs}s)` : 'Update all';
+      if (secs <= 0) {
+        clearInterval(refreshCooldownTimer);
+        refreshCooldownTimer = null;
+        btnRefresh.disabled = false;
+        btnRefresh.classList.remove('cursor-not-allowed', 'opacity-80');
+        return;
+      }
+    }
+    tick();
+    refreshCooldownTimer = setInterval(tick, 1000);
+  }
+
+  btnRefresh.addEventListener('click', async function () {
+    if (btnRefresh.disabled) return;
+    await loadAll();
+    setRefreshCooldown();
+  });
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);
   modalUsername.addEventListener('keydown', function (e) {
@@ -262,5 +327,5 @@
     if (e.target === addModal) closeAddModal();
   });
 
-  loadAll();
+  loadFromSnapshots();
 })();
