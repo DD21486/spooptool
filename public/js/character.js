@@ -12,6 +12,8 @@
   const bossesTbody = document.getElementById('bosses-tbody');
   const errorEl = document.getElementById('error-message');
 
+  let characterDeltas = { skillDeltas: {}, bossDeltas: {} };
+
   function skillLabel(key) {
     if (!key) return '';
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
@@ -100,9 +102,12 @@
         ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
+      const skillDelta = characterDeltas.skillDeltas[key];
+      const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2 font-medium">${skillLabel(key)}</td>
         <td class="px-4 py-2 text-right">${level}</td>
+        <td class="pl-2 pr-4 py-2 text-right">${last24Skill}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(xp)}</td>
         <td class="px-4 py-2 text-right font-mono align-top">
           <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
@@ -118,12 +123,15 @@
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
       const rank = (b.rank != null) ? b.rank : '—';
+      const bossDelta = characterDeltas.bossDeltas[bossKey];
+      const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2">${skillLabel(bossKey)}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
+        <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="3" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
 
     loadingEl.classList.add('hidden');
     contentEl.classList.remove('hidden');
@@ -139,12 +147,21 @@
     loadingEl.classList.remove('hidden');
     contentEl.classList.add('hidden');
     try {
-      const res = await fetch(API + '/player/' + encodeURIComponent(name));
+      const [res, deltasRes] = await Promise.all([
+        fetch(API + '/player/' + encodeURIComponent(name)),
+        fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&hours=24'),
+      ]);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.error || 'Character not found');
       }
       const data = await res.json();
+      if (deltasRes && deltasRes.ok) {
+        const d = await deltasRes.json().catch(() => ({}));
+        characterDeltas = { skillDeltas: d.skillDeltas || {}, bossDeltas: d.bossDeltas || {} };
+      } else {
+        characterDeltas = { skillDeltas: {}, bossDeltas: {} };
+      }
       render(data);
     } catch (e) {
       loadingEl.textContent = 'Failed to load';

@@ -87,7 +87,7 @@
       const d = last24hDeltas[r.username];
       const xpDelta = d && d.xpDelta != null && d.xpDelta > 0 ? d.xpDelta : null;
       const last24Cell = xpDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(xpDelta)}</span>` : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${value}</td><td class="px-4 py-2 text-right">${last24Cell}</td>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${value}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
       leftTbody.appendChild(tr);
     });
   }
@@ -117,7 +117,7 @@
       const d = last24hDeltas[r.username];
       const kcDelta = d && d.bossKcDelta != null && d.bossKcDelta > 0 ? d.bossKcDelta : null;
       const last24Cell = kcDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(kcDelta)}</span>` : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${formatNum(r.kc)}</td><td class="px-4 py-2 text-right">${last24Cell}</td>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${formatNum(r.kc)}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
       rightTbody.appendChild(tr);
     });
   }
