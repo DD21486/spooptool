@@ -16,11 +16,11 @@ Private Old School RuneScape tool for you and your friends. Uses OSRS Hiscores d
 1. **Neon**
    - Go to [neon.tech](https://neon.tech) and create a project (sign in with GitHub or email).
    - In the Neon dashboard, open the SQL Editor and run the schema: copy contents of `sql/schema.sql` and execute it (creates `characters` table).
-   - Copy the connection string (Connection details → connection string). It looks like `postgresql://user:pass@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`.
+   - Copy the **connection string**. In the dashboard use **Connection string** (or **Connect** → **Connection string**). For Vercel serverless, prefer the **pooled** connection string if Neon shows both (pooled works better with serverless). It looks like `postgresql://user:pass@ep-xxx-pooler.region.aws.neon.tech/neondb?sslmode=require`.
 
 2. **Vercel**
    - Push this repo to GitHub, then go to [vercel.com](https://vercel.com) and import the repo (e.g. DD21486/spooptool).
-   - In the project settings → Environment Variables, add `DATABASE_URL` with the Neon connection string.
+   - In the project → **Settings** → **Environment Variables**, add `DATABASE_URL` with the Neon connection string. **Redeploy** after saving (Deployments → ⋮ on latest → Redeploy).
    - Deploy. The site will serve `index.html` and `character.html`; API routes live under `/api/characters` and `/api/player/[name]`.
 
 3. **Seed a character**

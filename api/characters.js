@@ -21,7 +21,11 @@ module.exports = async function handler(req, res) {
       return res.status(200).json(rows);
     } catch (err) {
       console.error('GET /api/characters', err);
-      return res.status(500).json({ error: 'Failed to load characters' });
+      const msg = err.message || String(err);
+      const safe = msg.includes('characters') && msg.toLowerCase().includes('does not exist')
+        ? 'Characters table missing. Run sql/schema.sql in Neon SQL Editor.'
+        : msg.replace(/postgresql:\/\/[^@]+@/i, '***@');
+      return res.status(500).json({ error: 'Failed to load characters', detail: safe });
     }
   }
 
