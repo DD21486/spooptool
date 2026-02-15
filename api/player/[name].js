@@ -25,11 +25,22 @@ module.exports = async function handler(req, res) {
       const xp = data.xp != null ? data.xp : 0;
       withXpToNext[key] = { ...data, xpToNext: xpToNextLevel(level, xp) };
     }
+    // Library returns bosses as { rank, score }; we normalize to { rank, count } for the frontend
+    const rawBosses = player.main.bosses || {};
+    const bosses = {};
+    for (const [key, b] of Object.entries(rawBosses)) {
+      if (b && typeof b === 'object') {
+        const score = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
+        const count = typeof score === 'number' && score >= 0 ? score : 0;
+        bosses[key] = { rank: b.rank >= 0 ? b.rank : null, count };
+      }
+    }
+
     const out = {
       name: player.name,
       mode: player.mode || 'main',
       skills: withXpToNext,
-      bosses: player.main.bosses || {},
+      bosses,
       activities: player.main.clues || {},
     };
     return res.status(200).json(out);
