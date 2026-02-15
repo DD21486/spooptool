@@ -14,7 +14,6 @@
   const rightTitle = document.getElementById('right-title');
   const filterType = document.getElementById('filter-type');
   const filterSkill = document.getElementById('filter-skill');
-  const filterBoss = document.getElementById('filter-boss');
   const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
 
@@ -35,7 +34,6 @@
   function getFilter() {
     const type = filterType.value;
     if (type === 'skill') return { type: 'skill', key: filterSkill.value || 'overall' };
-    if (type === 'boss') return { type: 'boss', key: filterBoss.value };
     return { type: 'overall' };
   }
 
@@ -50,11 +48,6 @@
     }
     if (filter.type === 'skill') {
       return skillXp(player.skills[filter.key]);
-    }
-    if (filter.type === 'boss' && filter.key && player.bosses) {
-      const b = player.bosses[filter.key];
-      const n = b && (b.count != null ? b.count : b.kc);
-      return typeof n === 'number' ? n : 0;
     }
     return null;
   }
@@ -74,7 +67,7 @@
     const filter = getFilter();
     leftLoading.classList.add('hidden');
     leftTbody.innerHTML = '';
-    leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : (filter.type === 'skill' ? skillLabel(filter.key) : (filter.key ? formatBossKey(filter.key) : 'Total XP'));
+    leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
 
     const rows = characterList.map(username => ({
       username,
@@ -127,7 +120,6 @@
     const keys = new Set();
     Object.values(playerData).forEach(p => { if (p && p.bosses) Object.keys(p.bosses).forEach(k => keys.add(k)); });
     bossKeys = Array.from(keys).sort();
-    filterBoss.innerHTML = '<option value="">Select boss</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
     if (filterRightBoss) {
       filterRightBoss.innerHTML = '<option value="">Total</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
     }
@@ -211,11 +203,9 @@
 
   filterType.addEventListener('change', function () {
     filterSkill.classList.toggle('hidden', this.value !== 'skill');
-    filterBoss.classList.toggle('hidden', this.value !== 'boss');
     renderLeft();
   });
   filterSkill.addEventListener('change', () => renderLeft());
-  filterBoss.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
   document.getElementById('btn-refresh').addEventListener('click', loadAll);

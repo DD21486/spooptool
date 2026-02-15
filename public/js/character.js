@@ -51,7 +51,8 @@
       const xp = (s && (s.xp != null ? s.xp : s.experience)) != null ? (s.xp != null ? s.xp : s.experience) : 0;
       let xpToNextDisplay = '—';
       if (s && s.xpToNext != null && typeof s.xpToNext === 'number') {
-        xpToNextDisplay = s.xpToNext === 0 ? 'Max' : formatNum(s.xpToNext);
+        const isMaxLevel = (s.level != null && parseInt(s.level, 10) >= 99);
+        xpToNextDisplay = (s.xpToNext === 0 || isMaxLevel) ? 'Max' : formatNum(s.xpToNext);
       }
       const rank = (s && s.rank != null) ? s.rank : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">

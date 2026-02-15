@@ -21,8 +21,10 @@ module.exports = async function handler(req, res) {
     const skills = player.main.skills || {};
     const withXpToNext = {};
     for (const [key, data] of Object.entries(skills)) {
-      const level = (data.level != null && data.level >= 0) ? data.level : 1;
-      const xp = Math.max(0, (data.xp != null ? data.xp : data.experience != null ? data.experience : 0));
+      const rawLevel = data.level != null ? parseInt(data.level, 10) : NaN;
+      const rawXp = data.xp != null ? data.xp : data.experience;
+      const level = Number.isNaN(rawLevel) || rawLevel < 0 ? 1 : Math.min(99, rawLevel);
+      const xp = Math.max(0, parseInt(rawXp, 10) || 0);
       const xpToNext = key === 'overall' ? null : xpToNextLevel(level, xp);
       withXpToNext[key] = { ...data, xpToNext };
     }
