@@ -74,7 +74,10 @@
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div class="px-4 py-2 border-b border-slate-700">
-          <p class="text-xs text-slate-500 mb-1">Total XP gain (last 24h, all characters)</p>
+          <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 mb-1">
+            <p class="text-xs text-slate-500">Total XP gain (last 24h, all characters)</p>
+            <span id="home-chart-xp-total" class="text-xs font-medium text-slate-300 tabular-nums shrink-0">—</span>
+          </div>
           <div class="h-20">
             <canvas id="home-chart-xp"></canvas>
           </div>
@@ -107,7 +110,10 @@
       </section>
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
         <div class="px-4 py-2 border-b border-slate-700">
-          <p class="text-xs text-slate-500 mb-1">Total boss kills (last 24h, all characters)</p>
+          <div class="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1 mb-1">
+            <p class="text-xs text-slate-500">Total boss kills (last 24h, all characters)</p>
+            <span id="home-chart-boss-total" class="text-xs font-medium text-slate-300 tabular-nums shrink-0">—</span>
+          </div>
           <div class="h-20">
             <canvas id="home-chart-boss"></canvas>
           </div>

@@ -237,12 +237,21 @@
         if (homeChartXp) { homeChartXp.destroy(); homeChartXp = null; }
         if (homeChartBoss) { homeChartBoss.destroy(); homeChartBoss = null; }
 
-        if (history.length === 0) return;
+        const xpTotalEl = document.getElementById('home-chart-xp-total');
+        const bossTotalEl = document.getElementById('home-chart-boss-total');
+        if (history.length === 0) {
+          if (xpTotalEl) xpTotalEl.textContent = '—';
+          if (bossTotalEl) bossTotalEl.textContent = '—';
+          return;
+        }
 
         const xpValues = history.map((h) => h.totalXp);
         const bossValues = history.map((h) => h.totalBossKc);
         const lastXp = xpValues[xpValues.length - 1];
         const lastBoss = bossValues[bossValues.length - 1];
+
+        if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
+        if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
 
         function rangeFromLast(lastVal, fallbackMax) {
           const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
