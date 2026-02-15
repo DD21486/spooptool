@@ -153,21 +153,43 @@
   }
 
   let chartInstance = null;
+  const CHART_RANGES = [
+    { hours: 3, label: 'last 3 hours' },
+    { hours: 12, label: 'last 12 hours' },
+    { hours: 24, label: 'last 24 hours' },
+    { hours: 168, label: 'last 7 days' },
+  ];
 
-  function openChartModal() {
-    const modal = document.getElementById('chart-modal');
+  function chartRangeLabel(hours) {
+    const r = CHART_RANGES.find((x) => x.hours === hours);
+    return r ? r.label : 'last ' + hours + ' hours';
+  }
+
+  function setChartRangeActive(hours) {
+    document.querySelectorAll('.chart-range-btn').forEach((btn) => {
+      const isActive = parseInt(btn.getAttribute('data-hours'), 10) === hours;
+      btn.classList.toggle('bg-sky-600', isActive);
+      btn.classList.toggle('hover:bg-sky-500', isActive);
+      btn.classList.toggle('bg-slate-700', !isActive);
+      btn.classList.toggle('hover:bg-slate-600', !isActive);
+    });
+  }
+
+  function fetchAndDrawChart(hours) {
+    const titleEl = document.getElementById('chart-modal-title');
     const emptyEl = document.getElementById('chart-modal-empty');
     const canvasWrap = document.getElementById('chart-modal-canvas-wrap');
-    modal.classList.remove('hidden');
-    modal.setAttribute('aria-hidden', 'false');
+    titleEl.textContent = 'Total XP (' + chartRangeLabel(hours) + ')';
     emptyEl.classList.add('hidden');
+    emptyEl.textContent = 'No snapshot data for this range. Snapshots are taken periodically; try again later.';
     canvasWrap.classList.add('hidden');
     if (chartInstance) {
       chartInstance.destroy();
       chartInstance = null;
     }
+    setChartRangeActive(hours);
 
-    fetch(API + '/player-history?name=' + encodeURIComponent(name) + '&hours=6')
+    fetch(API + '/player-history?name=' + encodeURIComponent(name) + '&hours=' + hours)
       .then((res) => res.json())
       .then((data) => {
         const history = (data.history || []).slice();
@@ -176,9 +198,12 @@
           return;
         }
         canvasWrap.classList.remove('hidden');
+        const isWeek = hours >= 168;
         const labels = history.map((h) => {
           const d = new Date(h.at);
-          return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+          return isWeek
+            ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+            : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         });
         const values = history.map((h) => h.totalXp);
         const dataMin = Math.min(...values);
@@ -229,6 +254,13 @@
       });
   }
 
+  function openChartModal() {
+    const modal = document.getElementById('chart-modal');
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    fetchAndDrawChart(12);
+  }
+
   function closeChartModal() {
     document.getElementById('chart-modal').classList.add('hidden');
     document.getElementById('chart-modal').setAttribute('aria-hidden', 'true');
@@ -242,5 +274,11 @@
   document.getElementById('btn-view-chart').addEventListener('click', openChartModal);
   document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
   document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });
+  document.querySelectorAll('.chart-range-btn').forEach((btn) => {
+    btn.addEventListener('click', function () {
+      const hours = parseInt(this.getAttribute('data-hours'), 10);
+      fetchAndDrawChart(hours);
+    });
+  });
   load();
 })();

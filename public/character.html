@@ -66,10 +66,17 @@
   <div id="chart-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
     <div class="w-full max-w-2xl rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog" aria-labelledby="chart-modal-title">
       <div class="flex items-center justify-between mb-4">
-        <h2 id="chart-modal-title" class="text-lg font-semibold text-slate-100">Total XP (last 6 hours)</h2>
+        <h2 id="chart-modal-title" class="text-lg font-semibold text-slate-100">Total XP</h2>
         <button type="button" id="chart-modal-close" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>
       </div>
-      <p id="chart-modal-empty" class="hidden py-8 text-center text-slate-500 text-sm">No snapshot data in the last 6 hours. Snapshots are taken periodically; try again later.</p>
+      <div class="flex flex-wrap gap-2 mb-3">
+        <span class="text-slate-400 text-sm self-center mr-1">Range:</span>
+        <button type="button" class="chart-range-btn px-2.5 py-1 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200" data-hours="3">3hr</button>
+        <button type="button" class="chart-range-btn px-2.5 py-1 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200" data-hours="12">12hr</button>
+        <button type="button" class="chart-range-btn px-2.5 py-1 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200" data-hours="24">24hr</button>
+        <button type="button" class="chart-range-btn px-2.5 py-1 rounded-lg text-sm font-medium bg-slate-700 hover:bg-slate-600 text-slate-200" data-hours="168">Week</button>
+      </div>
+      <p id="chart-modal-empty" class="hidden py-8 text-center text-slate-500 text-sm">No snapshot data for this range. Snapshots are taken periodically; try again later.</p>
       <div id="chart-modal-canvas-wrap" class="hidden h-72">
         <canvas id="chart-canvas"></canvas>
       </div>

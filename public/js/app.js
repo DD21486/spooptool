@@ -16,6 +16,11 @@
   const filterSkill = document.getElementById('filter-skill');
   const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
+  const homeLastUpdated = document.getElementById('home-last-updated');
+
+  function setHomeLastUpdated() {
+    if (homeLastUpdated) homeLastUpdated.textContent = 'Last updated @ ' + new Date().toLocaleTimeString();
+  }
 
   function showError(msg) {
     errorEl.textContent = msg || '';
@@ -171,6 +176,8 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
+      setHomeLastUpdated();
+      loadHomeCharts();
     } catch (e) {
       console.error(e);
       showError(e.message || 'Failed to load data. Is the API running?');
@@ -203,12 +210,102 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
+      setHomeLastUpdated();
+      loadHomeCharts();
     } catch (e) {
       console.error(e);
       showError(e.message || 'Failed to load data. Is the API running?');
       leftLoading.textContent = 'Error loading.';
       rightLoading.textContent = 'Error loading.';
+      throw e;
     }
+  }
+
+  let homeChartXp = null;
+  let homeChartBoss = null;
+
+  function loadHomeCharts() {
+    fetch(API + '/aggregate-history?hours=24')
+      .then((res) => res.json())
+      .then((data) => {
+        const history = (data.history || []).slice();
+        const labels = history.map((h) => {
+          const d = new Date(h.at);
+          return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        });
+
+        if (homeChartXp) { homeChartXp.destroy(); homeChartXp = null; }
+        if (homeChartBoss) { homeChartBoss.destroy(); homeChartBoss = null; }
+
+        if (history.length === 0) return;
+
+        const xpValues = history.map((h) => h.totalXp);
+        const xpMin = Math.min(0, ...xpValues);
+        const xpMax = Math.max(0, ...xpValues);
+        const xpRange = xpMax - xpMin || 1;
+        const xpPad = xpRange * 0.01;
+        const bossValues = history.map((h) => h.totalBossKc);
+        const bossMin = Math.min(0, ...bossValues);
+        const bossMax = Math.max(0, ...bossValues);
+        const bossRange = bossMax - bossMin || 1;
+        const bossPad = bossRange * 0.01;
+
+        const chartOpts = (yMin, yMax, tickCallback) => ({
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
+            },
+            y: {
+              min: yMin,
+              max: yMax,
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', callback: tickCallback, font: { size: 10 } },
+            },
+          },
+        });
+
+        const ctxXp = document.getElementById('home-chart-xp');
+        const ctxBoss = document.getElementById('home-chart-boss');
+        if (ctxXp && ctxXp.getContext) {
+          homeChartXp = new Chart(ctxXp.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                label: 'Total XP',
+                data: xpValues,
+                borderColor: 'rgb(56, 189, 248)',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                fill: true,
+                tension: 0.2,
+              }],
+            },
+            options: chartOpts(xpMin - xpPad, xpMax + xpPad, (v) => Number(v).toLocaleString()),
+          });
+        }
+        if (ctxBoss && ctxBoss.getContext) {
+          homeChartBoss = new Chart(ctxBoss.getContext('2d'), {
+            type: 'line',
+            data: {
+              labels,
+              datasets: [{
+                label: 'Total KC',
+                data: bossValues,
+                borderColor: 'rgb(56, 189, 248)',
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                fill: true,
+                tension: 0.2,
+              }],
+            },
+            options: chartOpts(bossMin - bossPad, bossMax + bossPad, (v) => Number(v).toLocaleString()),
+          });
+        }
+      })
+      .catch(() => {});
   }
 
   const addModal = document.getElementById('add-character-modal');
@@ -310,8 +407,17 @@
 
   btnRefresh.addEventListener('click', async function () {
     if (btnRefresh.disabled) return;
-    await loadAll();
-    setRefreshCooldown();
+    btnRefresh.disabled = true;
+    btnRefresh.classList.add('cursor-not-allowed', 'opacity-80');
+    btnRefresh.textContent = 'Updating…';
+    try {
+      await loadAll();
+      setRefreshCooldown();
+    } catch (e) {
+      btnRefresh.disabled = false;
+      btnRefresh.classList.remove('cursor-not-allowed', 'opacity-80');
+      btnRefresh.textContent = 'Update all';
+    }
   });
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);

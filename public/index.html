@@ -30,8 +30,9 @@
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
   <div class="max-w-7xl mx-auto px-4 py-6">
-    <div class="flex justify-center mb-6">
+    <div class="flex flex-col items-center mb-6">
       <pre id="ascii-title" class="m-0" aria-hidden="true"><!-- filled by script --></pre>
+      <p id="home-last-updated" class="text-slate-500 mt-2" style="font-size: 12px;">Last updated @ —</p>
     </div>
     <script>
       (function () {
@@ -72,6 +73,12 @@
     <!-- Two side-by-side tables -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-700">
+          <p class="text-xs text-slate-500 mb-1">Total XP gain (last 24h, all characters)</p>
+          <div class="h-20">
+            <canvas id="home-chart-xp"></canvas>
+          </div>
+        </div>
         <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
           <h2 id="left-title" class="text-lg font-semibold text-slate-100">Total XP</h2>
           <div class="flex items-center gap-2 flex-shrink-0">
@@ -99,6 +106,12 @@
         <p id="left-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
       </section>
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <div class="px-4 py-2 border-b border-slate-700">
+          <p class="text-xs text-slate-500 mb-1">Total boss kills (last 24h, all characters)</p>
+          <div class="h-20">
+            <canvas id="home-chart-boss"></canvas>
+          </div>
+        </div>
         <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
           <h2 id="right-title" class="text-lg font-semibold text-slate-100">Total boss kills</h2>
           <select id="filter-right-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500 flex-shrink-0">
@@ -138,6 +151,7 @@
       </div>
     </div>
   </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
