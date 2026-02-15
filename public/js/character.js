@@ -39,6 +39,19 @@
     if (nextXp == null) return null;
     return Math.max(0, nextXp - xp);
   }
+  /** Percent (0–100) of the way to the next level; null if max or invalid. */
+  function percentToNextLevel(level, currentXp) {
+    const L = parseInt(level, 10);
+    if (Number.isNaN(L) || L >= 99) return null;
+    const xp = Math.max(0, parseInt(currentXp, 10) || 0);
+    const currentLevelXp = xpTable[L];
+    const nextLevelXp = xpTable[L + 1];
+    if (currentLevelXp == null || nextLevelXp == null) return null;
+    const needed = nextLevelXp - currentLevelXp;
+    if (needed <= 0) return null;
+    const intoLevel = xp - currentLevelXp;
+    return Math.min(100, Math.max(0, (intoLevel / needed) * 100));
+  }
 
   function showError(msg) {
     errorEl.textContent = msg || '';
@@ -70,6 +83,7 @@
       const xp = (s && (s.xp != null ? s.xp : s.experience)) != null ? (s.xp != null ? s.xp : s.experience) : 0;
       const levelNum = s && s.level != null ? parseInt(s.level, 10) : NaN;
       const isMaxLevel = !Number.isNaN(levelNum) && levelNum >= 99;
+      const pct = !isMaxLevel && !Number.isNaN(levelNum) && xp !== '—' ? percentToNextLevel(levelNum, xp) : null;
       let xpToNextDisplay = '—';
       if (isMaxLevel) {
         xpToNextDisplay = 'Max';
@@ -77,14 +91,22 @@
         const fromApi = s && s.xpToNext != null && typeof s.xpToNext === 'number' ? s.xpToNext : null;
         const computed = !Number.isNaN(levelNum) && xp !== '—' ? xpToNextFromLevelAndXp(levelNum, xp) : null;
         const xpToNext = fromApi != null ? fromApi : computed;
-        if (xpToNext != null) xpToNextDisplay = xpToNext === 0 ? 'Max' : formatNum(xpToNext);
+        if (xpToNext != null) {
+          xpToNextDisplay = xpToNext === 0 ? 'Max' : formatNum(xpToNext);
+          if (pct != null && xpToNext > 0) xpToNextDisplay += ` (${Math.round(pct)}%)`;
+        }
       }
+      const progressBar = pct != null
+        ? `<div class="mt-1 h-1 w-20 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
+        : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2 font-medium">${skillLabel(key)}</td>
         <td class="px-4 py-2 text-right">${level}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(xp)}</td>
-        <td class="px-4 py-2 text-right font-mono">${xpToNextDisplay}</td>
+        <td class="px-4 py-2 text-right font-mono align-top">
+          <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
+        </td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
       </tr>`;
     }).join('');
