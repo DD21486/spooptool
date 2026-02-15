@@ -240,15 +240,19 @@
         if (history.length === 0) return;
 
         const xpValues = history.map((h) => h.totalXp);
-        const xpMin = Math.min(0, ...xpValues);
-        const xpMax = Math.max(0, ...xpValues);
-        const xpRange = xpMax - xpMin || 1;
-        const xpPad = xpRange * 0.01;
         const bossValues = history.map((h) => h.totalBossKc);
-        const bossMin = Math.min(0, ...bossValues);
-        const bossMax = Math.max(0, ...bossValues);
-        const bossRange = bossMax - bossMin || 1;
-        const bossPad = bossRange * 0.01;
+        const lastXp = xpValues[xpValues.length - 1];
+        const lastBoss = bossValues[bossValues.length - 1];
+
+        function rangeFromLast(lastVal, fallbackMax) {
+          const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
+          const pad = max * 0.1;
+          return { min: Math.max(0, max - pad), max: max + pad };
+        }
+        const xpRange = rangeFromLast(lastXp, 10);
+        const bossRange = rangeFromLast(lastBoss, 10);
+
+        const formatInt = (v) => Math.round(Number(v)).toLocaleString();
 
         const chartOpts = (yMin, yMax, tickCallback) => ({
           responsive: true,
@@ -284,7 +288,7 @@
                 tension: 0.2,
               }],
             },
-            options: chartOpts(xpMin - xpPad, xpMax + xpPad, (v) => Number(v).toLocaleString()),
+            options: chartOpts(xpRange.min, xpRange.max, formatInt),
           });
         }
         if (ctxBoss && ctxBoss.getContext) {
@@ -301,7 +305,7 @@
                 tension: 0.2,
               }],
             },
-            options: chartOpts(bossMin - bossPad, bossMax + bossPad, (v) => Number(v).toLocaleString()),
+            options: chartOpts(bossRange.min, bossRange.max, formatInt),
           });
         }
       })
