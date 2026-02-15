@@ -255,7 +255,7 @@
 
         function rangeFromLast(lastVal, fallbackMax) {
           const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
-          const pad = max * 0.1;
+          const pad = max * 0.03;
           return { min: Math.max(0, max - pad), max: max + pad };
         }
         const xpRange = rangeFromLast(lastXp, 10);
