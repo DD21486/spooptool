@@ -253,13 +253,13 @@
         if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
         if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
 
-        function rangeFromLast(lastVal, fallbackMax) {
+        function rangeFromLast(lastVal, fallbackMax, padPct) {
           const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
-          const pad = max * 0.03;
+          const pad = max * padPct;
           return { min: Math.max(0, max - pad), max: max + pad };
         }
-        const xpRange = rangeFromLast(lastXp, 10);
-        const bossRange = rangeFromLast(lastBoss, 10);
+        const xpRange = rangeFromLast(lastXp, 10, 0.003);
+        const bossRange = rangeFromLast(lastBoss, 10, 0.01);
 
         const formatInt = (v) => Math.round(Number(v)).toLocaleString();
 
