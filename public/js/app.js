@@ -3,6 +3,7 @@
   const skillLabel = (key) => (key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   let characterList = [];
   let playerData = {};
+  let last24hDeltas = {};
   let bossKeys = [];
   let skillKeys = ['overall'];
 
@@ -83,7 +84,10 @@
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
       const value = r.value != null ? formatNum(r.value) : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${value}</td>`;
+      const d = last24hDeltas[r.username];
+      const xpDelta = d && d.xpDelta != null && d.xpDelta > 0 ? d.xpDelta : null;
+      const last24Cell = xpDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(xpDelta)}</span>` : '—';
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${value}</td><td class="px-4 py-2 text-right">${last24Cell}</td>`;
       leftTbody.appendChild(tr);
     });
   }
@@ -110,7 +114,10 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${formatNum(r.kc)}</td>`;
+      const d = last24hDeltas[r.username];
+      const kcDelta = d && d.bossKcDelta != null && d.bossKcDelta > 0 ? d.bossKcDelta : null;
+      const last24Cell = kcDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(kcDelta)}</span>` : '—';
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${formatNum(r.kc)}</td><td class="px-4 py-2 text-right">${last24Cell}</td>`;
       rightTbody.appendChild(tr);
     });
   }
@@ -157,9 +164,17 @@
     leftTbody.innerHTML = '';
     rightTbody.innerHTML = '';
     try {
-      const res = await fetch(API + '/characters-with-snapshots');
-      if (!res.ok) throw new Error('Failed to load data');
-      const data = await res.json();
+      const [dataRes, deltasRes] = await Promise.all([
+        fetch(API + '/characters-with-snapshots'),
+        fetch(API + '/characters-deltas?hours=24'),
+      ]);
+      if (!dataRes.ok) throw new Error('Failed to load data');
+      const data = await dataRes.json();
+      const deltasData = await deltasRes.json().catch(() => ({}));
+      last24hDeltas = {};
+      (deltasData.deltas || []).forEach((d) => {
+        last24hDeltas[d.username] = { xpDelta: d.xpDelta, bossKcDelta: d.bossKcDelta };
+      });
       const list = data.characters || [];
       characterList = list.map(c => (typeof c === 'string' ? c : c.username));
       playerData = {};
@@ -205,6 +220,14 @@
       for (const name of characterList) {
         const data = await fetchPlayer(name);
         playerData[name] = data || null;
+      }
+      const deltasRes = await fetch(API + '/characters-deltas?hours=24').catch(() => null);
+      if (deltasRes && deltasRes.ok) {
+        const deltasData = await deltasRes.json().catch(() => ({}));
+        last24hDeltas = {};
+        (deltasData.deltas || []).forEach((d) => {
+          last24hDeltas[d.username] = { xpDelta: d.xpDelta, bossKcDelta: d.bossKcDelta };
+        });
       }
       populateFilterSkill();
       populateFilterBoss();
