@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Character – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
+  <div class="max-w-4xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-4 mb-6">
+      <a href="/" class="text-sky-400 hover:underline text-sm">← SpoopTool</a>
+      <div class="flex items-center gap-3">
+        <span id="last-updated" class="text-slate-500 text-sm"></span>
+        <button type="button" id="btn-update" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">Update</button>
+      </div>
+    </header>
+
+    <div id="loading" class="py-12 text-slate-500 text-center">Loading…</div>
+    <div id="content" class="hidden">
+      <h1 id="char-name" class="text-2xl font-bold text-slate-100 mb-1"></h1>
+      <p id="char-mode" class="text-slate-500 text-sm mb-6"></p>
+
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Skills</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Skill</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Level</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">XP</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">XP to next</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Rank</th>
+              </tr>
+            </thead>
+            <tbody id="skills-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Boss kills</h2>
+        <div class="overflow-x-auto max-h-96">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Boss</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Kill count</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Rank</th>
+              </tr>
+            </thead>
+            <tbody id="bosses-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <p id="error-message" class="mt-4 text-red-400 text-sm hidden"></p>
+  </div>
+  <script src="/js/character.js"></script>
+</body>
+</html>

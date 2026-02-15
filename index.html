@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SpoopTool – OSRS Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <style>
+    body { background-color: #0f172a; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
+  <div class="max-w-7xl mx-auto px-4 py-6">
+    <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <h1 class="text-2xl font-bold text-slate-100">SpoopTool</h1>
+      <div class="flex items-center gap-3">
+        <button type="button" id="btn-refresh" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">
+          Update all
+        </button>
+        <div class="flex items-center gap-2">
+          <input type="text" id="input-username" placeholder="Username" maxlength="12"
+            class="w-32 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500" />
+          <button type="button" id="btn-add" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">
+            Add character
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Filters for left table (Total XP) -->
+    <div class="mb-4 p-3 rounded-lg bg-slate-800/80 border border-slate-700">
+      <span class="text-slate-400 text-sm mr-3">Rank left table by:</span>
+      <select id="filter-type" class="mr-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500">
+        <option value="overall">Overall (Total XP)</option>
+        <option value="skill">Skill</option>
+        <option value="boss">Boss</option>
+      </select>
+      <select id="filter-skill" class="mr-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
+        <option value="overall">Overall</option>
+      </select>
+      <select id="filter-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
+        <option value="">Select boss</option>
+      </select>
+    </div>
+
+    <!-- Two side-by-side tables -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <h2 id="left-title" class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Total XP</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Value</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Mode</th>
+              </tr>
+            </thead>
+            <tbody id="left-tbody"></tbody>
+          </table>
+        </div>
+        <p id="left-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
+      </section>
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Total boss kills</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Total KC</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Mode</th>
+              </tr>
+            </thead>
+            <tbody id="right-tbody"></tbody>
+          </table>
+        </div>
+        <p id="right-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
+      </section>
+    </div>
+
+    <p id="error-message" class="mt-4 text-red-400 text-sm hidden"></p>
+  </div>
+  <script src="/js/app.js"></script>
+</body>
+</html>
