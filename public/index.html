@@ -147,13 +147,14 @@
   <div id="add-character-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
     <div class="w-full max-w-sm rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog" aria-labelledby="modal-title" aria-modal="true">
       <h3 id="modal-title" class="text-lg font-semibold text-slate-100 mb-2">Add character</h3>
-      <p class="text-slate-400 text-sm mb-4">Enter a character to be added to the list of characters.</p>
-      <input type="text" id="modal-username" placeholder="Character name" maxlength="12" autocomplete="off"
-        class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 mb-3" />
-      <p id="modal-error" class="text-red-400 text-sm mb-3 hidden"></p>
-      <div class="flex justify-end gap-2">
-        <button type="button" id="modal-cancel" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm font-medium">Cancel</button>
-        <button type="button" id="modal-submit" disabled class="px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium">Add</button>
+      <p class="text-slate-400 text-sm mb-4">Contact Spoop to be added to the character list.</p>
+      <div class="hidden" aria-hidden="true">
+        <input type="text" id="modal-username" disabled />
+        <p id="modal-error"></p>
+        <button type="button" id="modal-submit" disabled>Add</button>
+      </div>
+      <div class="flex justify-end">
+        <button type="button" id="modal-cancel" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm font-medium">Close</button>
       </div>
     </div>
   </div>
