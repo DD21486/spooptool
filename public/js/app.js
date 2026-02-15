@@ -11,9 +11,11 @@
   const leftLoading = document.getElementById('left-loading');
   const rightLoading = document.getElementById('right-loading');
   const leftTitle = document.getElementById('left-title');
+  const rightTitle = document.getElementById('right-title');
   const filterType = document.getElementById('filter-type');
   const filterSkill = document.getElementById('filter-skill');
   const filterBoss = document.getElementById('filter-boss');
+  const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
 
   function showError(msg) {
@@ -76,7 +78,6 @@
 
     const rows = characterList.map(username => ({
       username,
-      mode: (playerData[username] && playerData[username].mode) || '—',
       value: leftTableValue(playerData[username], filter),
     })).filter(r => r.value != null);
     rows.sort((a, b) => (b.value - a.value));
@@ -84,24 +85,34 @@
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
       const value = r.value != null ? formatNum(r.value) : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${value}</td><td class="px-4 py-2 text-slate-500 capitalize">${escapeHtml(r.mode)}</td>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${value}</td>`;
       leftTbody.appendChild(tr);
     });
+  }
+
+  function getRightBossKc(player, bossKey) {
+    if (!bossKey || !player || !player.bosses) return totalBossKc(player);
+    const b = player.bosses[bossKey];
+    const n = b && (b.count != null ? b.count : b.kc);
+    return typeof n === 'number' ? n : 0;
   }
 
   function renderRight() {
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
+    const bossKey = (filterRightBoss && filterRightBoss.value) || '';
+    if (rightTitle) {
+      rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
+    }
     const rows = characterList.map(username => ({
       username,
-      mode: (playerData[username] && playerData[username].mode) || '—',
-      totalKc: totalBossKc(playerData[username]),
+      kc: getRightBossKc(playerData[username], bossKey),
     }));
-    rows.sort((a, b) => (b.totalKc - a.totalKc));
+    rows.sort((a, b) => (b.kc - a.kc));
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${formatNum(r.totalKc)}</td><td class="px-4 py-2 text-slate-500 capitalize">${escapeHtml(r.mode)}</td>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${formatNum(r.kc)}</td>`;
       rightTbody.appendChild(tr);
     });
   }
@@ -117,6 +128,9 @@
     Object.values(playerData).forEach(p => { if (p && p.bosses) Object.keys(p.bosses).forEach(k => keys.add(k)); });
     bossKeys = Array.from(keys).sort();
     filterBoss.innerHTML = '<option value="">Select boss</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
+    if (filterRightBoss) {
+      filterRightBoss.innerHTML = '<option value="">Total</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
+    }
   }
 
   function populateFilterSkill() {
@@ -202,6 +216,7 @@
   });
   filterSkill.addEventListener('change', () => renderLeft());
   filterBoss.addEventListener('change', () => renderLeft());
+  if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
   document.getElementById('btn-refresh').addEventListener('click', loadAll);
   document.getElementById('btn-add').addEventListener('click', addCharacter);

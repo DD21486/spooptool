@@ -23,33 +23,32 @@
         <div class="flex items-center gap-2">
           <input type="text" id="input-username" placeholder="Username" maxlength="12"
             class="w-32 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500" />
-          <button type="button" id="btn-add" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">
+          <button type="button" id="btn-add" disabled class="px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium" title="Disabled for now">
             Add character
           </button>
         </div>
       </div>
     </header>
 
-    <!-- Filters for left table (Total XP) -->
-    <div class="mb-4 p-3 rounded-lg bg-slate-800/80 border border-slate-700">
-      <span class="text-slate-400 text-sm mr-3">Rank left table by:</span>
-      <select id="filter-type" class="mr-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500">
-        <option value="overall">Overall (Total XP)</option>
-        <option value="skill">Skill</option>
-        <option value="boss">Boss</option>
-      </select>
-      <select id="filter-skill" class="mr-2 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
-        <option value="overall">Overall</option>
-      </select>
-      <select id="filter-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
-        <option value="">Select boss</option>
-      </select>
-    </div>
-
     <!-- Two side-by-side tables -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-        <h2 id="left-title" class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Total XP</h2>
+        <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="left-title" class="text-lg font-semibold text-slate-100">Total XP</h2>
+          <div class="flex items-center gap-2 flex-shrink-0">
+            <select id="filter-type" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500">
+              <option value="overall">Overall</option>
+              <option value="skill">Skill</option>
+              <option value="boss">Boss</option>
+            </select>
+            <select id="filter-skill" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
+              <option value="overall">Overall</option>
+            </select>
+            <select id="filter-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm hidden">
+              <option value="">Select boss</option>
+            </select>
+          </div>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -57,7 +56,6 @@
                 <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
                 <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
                 <th class="text-right px-4 py-2 text-slate-400 font-medium">Value</th>
-                <th class="text-left px-4 py-2 text-slate-400 font-medium">Mode</th>
               </tr>
             </thead>
             <tbody id="left-tbody"></tbody>
@@ -66,7 +64,12 @@
         <p id="left-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
       </section>
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">
-        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Total boss kills</h2>
+        <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+          <h2 id="right-title" class="text-lg font-semibold text-slate-100">Total boss kills</h2>
+          <select id="filter-right-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500 flex-shrink-0">
+            <option value="">Total</option>
+          </select>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -74,7 +77,6 @@
                 <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
                 <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
                 <th class="text-right px-4 py-2 text-slate-400 font-medium">Total KC</th>
-                <th class="text-left px-4 py-2 text-slate-400 font-medium">Mode</th>
               </tr>
             </thead>
             <tbody id="right-tbody"></tbody>
