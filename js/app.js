@@ -128,8 +128,14 @@
 
   async function fetchCharacters() {
     const res = await fetch(API + '/characters');
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.detail || data.error || 'Failed to load characters');
+    const text = await res.text();
+    let data = {};
+    try {
+      data = JSON.parse(text);
+    } catch (_) {
+      if (!res.ok) throw new Error(text || 'Failed to load characters');
+    }
+    if (!res.ok) throw new Error(data.detail || data.error || text || 'Failed to load characters');
     return data;
   }
 
