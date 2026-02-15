@@ -21,6 +21,25 @@
     return Number(n).toLocaleString();
   }
 
+  // OSRS cumulative XP table (same as wiki Module:Experience/data). Used for XP-to-next when API doesn't send it.
+  const xpTable = (function () {
+    const ret = [0];
+    let total = 0;
+    for (let i = 1; i <= 98; i++) {
+      total = Math.floor(total + i + 300 * Math.pow(2, i / 7));
+      ret[i + 1] = Math.floor(total / 4);
+    }
+    return ret;
+  })();
+  function xpToNextFromLevelAndXp(level, currentXp) {
+    const L = parseInt(level, 10);
+    if (Number.isNaN(L) || L >= 99) return null;
+    const xp = Math.max(0, parseInt(currentXp, 10) || 0);
+    const nextXp = xpTable[L + 1];
+    if (nextXp == null) return null;
+    return Math.max(0, nextXp - xp);
+  }
+
   function showError(msg) {
     errorEl.textContent = msg || '';
     errorEl.classList.toggle('hidden', !msg);
@@ -49,10 +68,16 @@
       const s = skills[key];
       const level = (s && s.level) != null ? s.level : '—';
       const xp = (s && (s.xp != null ? s.xp : s.experience)) != null ? (s.xp != null ? s.xp : s.experience) : 0;
+      const levelNum = s && s.level != null ? parseInt(s.level, 10) : NaN;
+      const isMaxLevel = !Number.isNaN(levelNum) && levelNum >= 99;
       let xpToNextDisplay = '—';
-      if (s && s.xpToNext != null && typeof s.xpToNext === 'number') {
-        const isMaxLevel = (s.level != null && parseInt(s.level, 10) >= 99);
-        xpToNextDisplay = (s.xpToNext === 0 || isMaxLevel) ? 'Max' : formatNum(s.xpToNext);
+      if (isMaxLevel) {
+        xpToNextDisplay = 'Max';
+      } else {
+        const fromApi = s && s.xpToNext != null && typeof s.xpToNext === 'number' ? s.xpToNext : null;
+        const computed = !Number.isNaN(levelNum) && xp !== '—' ? xpToNextFromLevelAndXp(levelNum, xp) : null;
+        const xpToNext = fromApi != null ? fromApi : computed;
+        if (xpToNext != null) xpToNextDisplay = xpToNext === 0 ? 'Max' : formatNum(xpToNext);
       }
       const rank = (s && s.rank != null) ? s.rank : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">

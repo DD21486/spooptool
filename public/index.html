@@ -63,13 +63,9 @@
         <button type="button" id="btn-refresh" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">
           Update all
         </button>
-        <div class="flex items-center gap-2">
-          <input type="text" id="input-username" placeholder="Username" maxlength="12"
-            class="w-32 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-600 text-sm placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500" />
-          <button type="button" id="btn-add" disabled class="px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium" title="Disabled for now">
-            Add character
-          </button>
-        </div>
+        <button type="button" id="btn-add" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">
+          Add character
+        </button>
       </div>
     </header>
 
@@ -126,6 +122,21 @@
     </div>
 
     <p id="error-message" class="mt-4 text-red-400 text-sm hidden"></p>
+  </div>
+
+  <!-- Add character modal -->
+  <div id="add-character-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-sm rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog" aria-labelledby="modal-title" aria-modal="true">
+      <h3 id="modal-title" class="text-lg font-semibold text-slate-100 mb-2">Add character</h3>
+      <p class="text-slate-400 text-sm mb-4">Enter a character to be added to the list of characters.</p>
+      <input type="text" id="modal-username" placeholder="Character name" maxlength="12" autocomplete="off"
+        class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-sky-500 mb-3" />
+      <p id="modal-error" class="text-red-400 text-sm mb-3 hidden"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="modal-cancel" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm font-medium">Cancel</button>
+        <button type="button" id="modal-submit" disabled class="px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium">Add</button>
+      </div>
+    </div>
   </div>
   <script src="/js/app.js"></script>
 </body>

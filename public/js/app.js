@@ -174,30 +174,69 @@
     }
   }
 
-  async function addCharacter() {
-    const input = document.getElementById('input-username');
-    const username = (input.value || '').trim();
-    if (!username) {
-      showError('Enter a username.');
+  const addModal = document.getElementById('add-character-modal');
+  const modalUsername = document.getElementById('modal-username');
+  const modalError = document.getElementById('modal-error');
+  const modalSubmit = document.getElementById('modal-submit');
+  const modalCancel = document.getElementById('modal-cancel');
+
+  function openAddModal() {
+    modalUsername.value = '';
+    modalError.textContent = '';
+    modalError.classList.add('hidden');
+    modalSubmit.disabled = true;
+    modalSubmit.className = 'px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium';
+    addModal.classList.remove('hidden');
+    addModal.setAttribute('aria-hidden', 'false');
+    modalUsername.focus();
+  }
+
+  function closeAddModal() {
+    addModal.classList.add('hidden');
+    addModal.setAttribute('aria-hidden', 'true');
+  }
+
+  function setModalAddEnabled(enabled) {
+    modalSubmit.disabled = !enabled;
+    modalSubmit.className = enabled
+      ? 'px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium'
+      : 'px-3 py-1.5 rounded-lg bg-slate-600 text-slate-400 cursor-not-allowed text-sm font-medium';
+  }
+
+  function updateModalAddState() {
+    const trimmed = (modalUsername.value || '').trim();
+    setModalAddEnabled(trimmed.length > 0);
+    modalError.classList.add('hidden');
+  }
+
+  async function submitAddCharacter() {
+    const username = (modalUsername.value || '').trim().replace(/\s+/g, ' ');
+    if (!username) return;
+    const lower = username.toLowerCase();
+    const isDuplicate = characterList.some(c => (c || '').toLowerCase() === lower);
+    if (isDuplicate) {
+      modalError.textContent = 'That character is already in the list.';
+      modalError.classList.remove('hidden');
       return;
     }
-    showError('');
+    modalError.classList.add('hidden');
     try {
       const res = await fetch(API + '/characters', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username: username.replace(/\s+/g, ' ') }),
+        body: JSON.stringify({ username }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        showError(data.error || 'Failed to add character');
+        modalError.textContent = data.error || 'Failed to add character';
+        modalError.classList.remove('hidden');
         return;
       }
-      input.value = '';
-      showError('');
+      closeAddModal();
       await loadAll();
     } catch (e) {
-      showError(e.message || 'Failed to add character');
+      modalError.textContent = e.message || 'Failed to add character';
+      modalError.classList.remove('hidden');
     }
   }
 
@@ -209,9 +248,18 @@
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
   document.getElementById('btn-refresh').addEventListener('click', loadAll);
-  document.getElementById('btn-add').addEventListener('click', addCharacter);
-  document.getElementById('input-username').addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') addCharacter();
+  document.getElementById('btn-add').addEventListener('click', openAddModal);
+  modalUsername.addEventListener('input', updateModalAddState);
+  modalUsername.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!modalSubmit.disabled) submitAddCharacter();
+    }
+  });
+  modalSubmit.addEventListener('click', submitAddCharacter);
+  modalCancel.addEventListener('click', closeAddModal);
+  addModal.addEventListener('click', function (e) {
+    if (e.target === addModal) closeAddModal();
   });
 
   loadAll();
