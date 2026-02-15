@@ -19,7 +19,10 @@
 
     <div id="loading" class="py-12 text-slate-500 text-center">Loading…</div>
     <div id="content" class="hidden">
-      <h1 id="char-name" class="text-2xl font-bold text-slate-100 mb-1"></h1>
+      <div class="flex items-center justify-between gap-4 mb-1">
+        <h1 id="char-name" class="text-2xl font-bold text-slate-100"></h1>
+        <button type="button" id="btn-view-chart" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium shrink-0">View chart</button>
+      </div>
       <p id="char-mode" class="text-slate-500 text-sm mb-6"></p>
 
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
@@ -58,6 +61,21 @@
     </div>
     <p id="error-message" class="mt-4 text-red-400 text-sm hidden"></p>
   </div>
+
+  <!-- Chart modal -->
+  <div id="chart-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-2xl rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog" aria-labelledby="chart-modal-title">
+      <div class="flex items-center justify-between mb-4">
+        <h2 id="chart-modal-title" class="text-lg font-semibold text-slate-100">Total XP (last 6 hours)</h2>
+        <button type="button" id="chart-modal-close" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>
+      </div>
+      <p id="chart-modal-empty" class="hidden py-8 text-center text-slate-500 text-sm">No snapshot data in the last 6 hours. Snapshots are taken periodically; try again later.</p>
+      <div id="chart-modal-canvas-wrap" class="hidden h-72">
+        <canvas id="chart-canvas"></canvas>
+      </div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="/js/character.js"></script>
 </body>
 </html>

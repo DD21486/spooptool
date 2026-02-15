@@ -152,6 +152,95 @@
     }
   }
 
+  let chartInstance = null;
+
+  function openChartModal() {
+    const modal = document.getElementById('chart-modal');
+    const emptyEl = document.getElementById('chart-modal-empty');
+    const canvasWrap = document.getElementById('chart-modal-canvas-wrap');
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    emptyEl.classList.add('hidden');
+    canvasWrap.classList.add('hidden');
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+
+    fetch(API + '/player-history?name=' + encodeURIComponent(name) + '&hours=6')
+      .then((res) => res.json())
+      .then((data) => {
+        const history = (data.history || []).slice();
+        if (history.length === 0) {
+          emptyEl.classList.remove('hidden');
+          return;
+        }
+        canvasWrap.classList.remove('hidden');
+        const labels = history.map((h) => {
+          const d = new Date(h.at);
+          return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        });
+        const values = history.map((h) => h.totalXp);
+        const dataMin = Math.min(...values);
+        const dataMax = Math.max(...values);
+        const range = dataMax - dataMin;
+        const pad = range > 0 ? range * 0.01 : Math.max(1, dataMin * 0.01);
+        const yMin = range > 0 ? dataMin - pad : dataMin - pad;
+        const yMax = range > 0 ? dataMax + pad : dataMax + pad;
+
+        const ctx = document.getElementById('chart-canvas').getContext('2d');
+        chartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [{
+              label: 'Total XP',
+              data: values,
+              borderColor: 'rgb(56, 189, 248)',
+              backgroundColor: 'rgba(56, 189, 248, 0.1)',
+              fill: true,
+              tension: 0.2,
+            }],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { display: false },
+            },
+            scales: {
+              x: {
+                grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                ticks: { color: '#94a3b8', maxTicksLimit: 10 },
+              },
+              y: {
+                min: yMin,
+                max: yMax,
+                grid: { color: 'rgba(148, 163, 184, 0.2)' },
+                ticks: { color: '#94a3b8', callback: (v) => Number(v).toLocaleString() },
+              },
+            },
+          },
+        });
+      })
+      .catch(() => {
+        emptyEl.textContent = 'Failed to load chart data.';
+        emptyEl.classList.remove('hidden');
+      });
+  }
+
+  function closeChartModal() {
+    document.getElementById('chart-modal').classList.add('hidden');
+    document.getElementById('chart-modal').setAttribute('aria-hidden', 'true');
+    if (chartInstance) {
+      chartInstance.destroy();
+      chartInstance = null;
+    }
+  }
+
   document.getElementById('btn-update').addEventListener('click', load);
+  document.getElementById('btn-view-chart').addEventListener('click', openChartModal);
+  document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
+  document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });
   load();
 })();
