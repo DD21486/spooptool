@@ -97,7 +97,7 @@
         }
       }
       const progressBar = pct != null
-        ? `<div class="mt-1 h-1 w-20 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
+        ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">

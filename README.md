@@ -25,3 +25,14 @@ Private Old School RuneScape tool for you and your friends. Uses OSRS Hiscores d
 
 3. **Seed a character**
    - After first deploy, open the app and use "Add character" to add **SpoopSpooply** (or run the commented INSERT in `sql/schema.sql` in Neon SQL Editor).
+
+## Historical snapshots (optional)
+
+To store periodic Hiscores snapshots for progress-over-time and insights:
+
+1. **Neon:** Run the migration in the SQL Editor: copy and run `sql/migration_character_snapshots.sql` (creates `character_snapshots` table).
+2. **Vercel:** Add env var `CRON_SECRET` (e.g. `openssl rand -hex 32`). Vercel Cron will send this as `Authorization: Bearer <CRON_SECRET>` when it invokes the snapshot job.
+3. **Schedule:**
+   - **Hobby plan:** Vercel Cron is limited to **once per day**. The app is configured to run the snapshot at 12:00 UTC daily. That gives one snapshot per character per day — good for "yesterday vs today" and weekly trends.
+   - **More frequent (e.g. every 30 min) on Hobby:** Use an external cron (e.g. [cron-job.org](https://cron-job.org), free) to call `GET https://your-app.vercel.app/api/cron/snapshot` with header `Authorization: Bearer YOUR_CRON_SECRET` every 30 minutes. Keeps data recent without upgrading Vercel.
+   - **10 min:** Same idea with external cron every 10 min; watch Neon storage (0.5 GB on free) and prune old snapshots if needed (e.g. keep last 30 days).
