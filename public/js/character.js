@@ -50,47 +50,87 @@
     if (!key) return '';
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
-  /** Map API boss key to /assets/Bosses filename (PascalCase.png); overrides for names that don't match. */
+  /** Map API boss key to /assets/bosses/ filename (exact casing); overrides for names that don't match. */
   function bossImageSrc(bossKey) {
     if (!bossKey) return '';
     const overrides = {
       barrows: 'barrows.png',
       giant_mole: 'giantmole.png',
+      giantmole: 'giantmole.png',
       deranged_archaeologist: 'derangedarchaeologist.png',
+      derangedarchaeologist: 'derangedarchaeologist.png',
       scurrius: 'scurrius.png',
       wintertodt: 'Wintertodt.gif',
       doom_of_mokhaiotl: 'DoomofMokhaiotl.png',
+      doomofmokhaiotl: 'DoomofMokhaiotl.png',
       phantom_muspah: 'PhantomMuspah.png',
+      phantommuspah: 'PhantomMuspah.png',
       shellbane_gryphon: 'Shellbanegryphon.png',
+      shellbanegryphon: 'Shellbanegryphon.png',
       sol_heredit: 'SolHeredit.png',
+      solheredit: 'SolHeredit.png',
       chambers_of_xeric: 'ChambersOfXeric.png',
+      chambersofxeric: 'ChambersOfXeric.png',
       chambers_of_xeric_challenge_mode: 'ChambersOfXericChallengeMode.png',
+      chambersofxericchallengemode: 'ChambersOfXericChallengeMode.png',
       theatre_of_blood: 'TheatreOfBlood.png',
+      theatreofblood: 'TheatreOfBlood.png',
       tombs_of_amascut: 'TombsOfAmascut.png',
+      tombsofamascut: 'TombsOfAmascut.png',
       tombs_of_amascut_expert_mode: 'TombsOfAmascutExpertMode.png',
+      tombsofamascutexpertmode: 'TombsOfAmascutExpertMode.png',
       king_black_dragon: 'KingBlackDragon.png',
+      kingblackdragon: 'KingBlackDragon.png',
       thermonuclear_smoke_devil: 'ThermonuclearSmokeDevil.png',
+      thermonuclearsmokedevil: 'ThermonuclearSmokeDevil.png',
       grotesque_guardians: 'GrotesqueGuardians.png',
+      grotesqueguardians: 'GrotesqueGuardians.png',
       dagannoth_prime: 'DagannothPrime.png',
+      dagannothprime: 'DagannothPrime.png',
       dagannoth_rex: 'DagannothRex.png',
+      dagannothrex: 'DagannothRex.png',
       dagannoth_supreme: 'DagannothSupreme.png',
+      dagannothsupreme: 'DagannothSupreme.png',
       chaos_elemental: 'ChaosElemental.png',
+      chaoselemental: 'ChaosElemental.png',
       chaos_fanatic: 'ChaosFanatic.png',
+      chaosfanatic: 'ChaosFanatic.png',
       crazy_archaeologist: 'Crazyarchaeologist.png',
+      crazyarchaeologist: 'Crazyarchaeologist.png',
       commander_zilyana: 'CommanderZilyana.png',
+      commanderzilyana: 'CommanderZilyana.png',
       general_graardor: 'GeneralGraardor.png',
+      generalgraardor: 'GeneralGraardor.png',
       kreearra: 'Kreearra.png',
       kril_tsutsaroth: 'KrilTsutsaroth.png',
+      kriltsutsaroth: 'KrilTsutsaroth.png',
       corporeal_beast: 'CorporealBeast.png',
+      corporealbeast: 'CorporealBeast.png',
       lunar_chests: 'LunarChests.png',
+      lunarchests: 'LunarChests.png',
       tzkal_zuk: 'TzKalZuk.png',
+      tzkalzuk: 'TzKalZuk.png',
       tztok_jad: 'TzTokJad.png',
-      crazy_archaeologist: 'Crazyarchaeologist.png',
+      tztokjad: 'TzTokJad.png',
+      abyssal_sire: 'AbyssalSire.png',
+      abyssalsire: 'AbyssalSire.png',
+      alchemical_hydra: 'AlchemicalHydra.png',
+      alchemicalhydra: 'AlchemicalHydra.png',
+      duke_sucellus: 'DukeSucellus.png',
+      dukesucellus: 'DukeSucellus.png',
+      the_whisperer: 'TheWhisperer.png',
+      whisperer: 'TheWhisperer.png',
+      kalphite_queen: 'KalphiteQueen.png',
+      kalphitequeen: 'KalphiteQueen.png',
+      royal_titans: 'RoyalTitans.png',
+      royaltitans: 'RoyalTitans.png',
+      corrupted_gauntlet: 'CorruptedGuantlet.png',
+      corruptedgauntlet: 'CorruptedGuantlet.png',
     };
-    const lower = String(bossKey).toLowerCase().trim();
-    if (overrides[lower]) return '/assets/Bosses/' + overrides[lower];
+    const lower = String(bossKey).toLowerCase().trim().replace(/\s+/g, '_');
+    if (overrides[lower]) return '/assets/bosses/' + overrides[lower];
     const pascal = lower.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join('') + '.png';
-    return '/assets/Bosses/' + pascal;
+    return '/assets/bosses/' + pascal;
   }
   function skillIconSrc(key) {
     if (!key) return '';
