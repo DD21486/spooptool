@@ -82,38 +82,65 @@ module.exports = async function handler(req, res) {
       const periodFilter = hours === 24 || hours === 168 ? hours : null;
       const sourceFilter = (req.query.source || req.query.from || '').trim() || null;
 
-      const sourceCond = sourceFilter ? sql`AND TRIM(source) = TRIM(${sourceFilter})` : sql``;
-
       let agg;
       if (periodFilter != null) {
-        agg = await sql`
-          SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
-          FROM loot_drops
-          WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-            AND at >= NOW() - make_interval(hours => ${periodFilter})
-            ${sourceCond}
-        `;
+        if (sourceFilter) {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= NOW() - make_interval(hours => ${periodFilter})
+              AND TRIM(source) = TRIM(${sourceFilter})
+          `;
+        } else {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= NOW() - make_interval(hours => ${periodFilter})
+          `;
+        }
       } else {
-        agg = await sql`
-          SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
-          FROM loot_drops
-          WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-          ${sourceCond}
-        `;
+        if (sourceFilter) {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND TRIM(source) = TRIM(${sourceFilter})
+          `;
+        } else {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+          `;
+        }
       }
       const a = agg[0] || { total_drops: 0, total_value_gp: 0 };
 
       let lootHistory = [];
       if (periodFilter != null) {
-        const buckets = await sql`
-          SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
-          FROM loot_drops
-          WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-            AND at >= NOW() - make_interval(hours => ${periodFilter})
-            ${sourceCond}
-          GROUP BY date_trunc('hour', at)
-          ORDER BY bucket ASC
-        `;
+        let buckets;
+        if (sourceFilter) {
+          buckets = await sql`
+            SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= NOW() - make_interval(hours => ${periodFilter})
+              AND TRIM(source) = TRIM(${sourceFilter})
+            GROUP BY date_trunc('hour', at)
+            ORDER BY bucket ASC
+          `;
+        } else {
+          buckets = await sql`
+            SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= NOW() - make_interval(hours => ${periodFilter})
+            GROUP BY date_trunc('hour', at)
+            ORDER BY bucket ASC
+          `;
+        }
         let cum = 0;
         lootHistory = buckets.map((r) => {
           cum += Number(r.value || 0);
