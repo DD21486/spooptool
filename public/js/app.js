@@ -266,7 +266,7 @@
     leftLoading.classList.add('hidden');
     leftTbody.innerHTML = '';
     if (homeViewMode === 'last24') {
-      leftTitle.textContent = filter.type === 'overall' ? 'XP (last 24hrs)' : skillLabel(filter.key) + ' (last 24hrs)';
+      leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Last 24 Hr' : skillLabel(filter.key) + ' (24h)';
     } else {
       leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
@@ -315,7 +315,7 @@
     lootTbody.innerHTML = '';
     const isLast24 = homeViewMode === 'last24';
     const list = isLast24 ? lootLeaderboard24 : lootLeaderboardTotal;
-    if (lootTitle) lootTitle.textContent = isLast24 ? 'Loot value (last 24hrs)' : 'Loot value';
+    if (lootTitle) lootTitle.textContent = 'Loot value';
     if (lootValueTh) lootValueTh.textContent = isLast24 ? 'Value (24h)' : 'Value';
     const getValue = (username) => {
       const p = list.find((x) => (x.username || '').toLowerCase() === (username || '').toLowerCase());
@@ -350,7 +350,7 @@
     const bossKey = (filterRightBoss && filterRightBoss.value) || '';
     if (rightTitle) {
       if (homeViewMode === 'last24') {
-        rightTitle.textContent = bossKey ? formatBossKey(bossKey) + ' (last 24hrs)' : 'Boss KC (last 24hrs)';
+        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
       } else {
         rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
       }
