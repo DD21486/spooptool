@@ -311,7 +311,7 @@
       if (homeViewMode === 'last24') {
         rightTitle.textContent = bossKey ? formatBossKey(bossKey) + ' (last 24hrs)' : 'Boss KC (last 24hrs)';
       } else {
-        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
+        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
       }
     }
     if (rightValueTh) {
@@ -454,6 +454,7 @@
   }
 
   document.addEventListener('mouseenter', function (e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     const cell = e.target.closest('.home-value-cell');
     if (!cell || !homeTooltipEl) return;
     if (homeTooltipHideTimer) { clearTimeout(homeTooltipHideTimer); homeTooltipHideTimer = null; }
@@ -472,6 +473,7 @@
     }
   }, true);
   document.addEventListener('mouseleave', function (e) {
+    if (!e.target || typeof e.target.closest !== 'function') return;
     const cell = e.target.closest('.home-value-cell');
     if (!cell || !homeTooltipEl) return;
     homeTooltipHideTimer = setTimeout(hideHomeTooltip, 120);
@@ -482,7 +484,7 @@
     Object.values(playerData).forEach(p => { if (p && p.bosses) Object.keys(p.bosses).forEach(k => keys.add(k)); });
     bossKeys = Array.from(keys).sort();
     if (filterRightBoss) {
-      filterRightBoss.innerHTML = '<option value="">Total</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
+      filterRightBoss.innerHTML = '<option value="">Filter</option>' + bossKeys.map(k => `<option value="${escapeHtml(k)}">${escapeHtml(formatBossKey(k))}</option>`).join('');
     }
   }
 
@@ -624,7 +626,7 @@
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     const lootLabelEl = document.getElementById('home-chart-loot-label');
     if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP in last 24 hours' : 'Total XP (all characters)';
-    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Total boss kills in last 24 hours' : 'Total boss kills (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC in last 24 hours' : 'Boss KC (all characters)';
     if (lootLabelEl) lootLabelEl.textContent = isLast24 ? 'Loot value in last 24 hours' : 'Loot value (all characters)';
   }
 

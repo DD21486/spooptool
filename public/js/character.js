@@ -126,6 +126,10 @@
       royaltitans: 'RoyalTitans.png',
       corrupted_gauntlet: 'CorruptedGuantlet.png',
       corruptedgauntlet: 'CorruptedGuantlet.png',
+      phosani_nightmare: 'PhosanisNightmare.png',
+      phosanis_nightmare: 'PhosanisNightmare.png',
+      phosanisnightmare: 'PhosanisNightmare.png',
+      gauntlet: 'Gauntlet.png',
     };
     const lower = String(bossKey).toLowerCase().trim().replace(/\s+/g, '_');
     if (overrides[lower]) return '/assets/bosses/' + overrides[lower];
