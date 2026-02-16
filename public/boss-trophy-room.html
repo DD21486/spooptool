@@ -18,8 +18,12 @@
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
   <div class="max-w-6xl mx-auto px-4 py-6">
-    <header class="flex items-center justify-between gap-4 mb-6">
-      <a href="/" class="text-sky-400 hover:text-sky-300 hover:underline text-sm">← SpoopTool</a>
+    <header class="flex items-center justify-between gap-6 mb-6">
+      <a href="/" class="text-sky-400 hover:text-sky-300 hover:underline text-sm shrink-0">← SpoopTool</a>
+      <div id="champions-list" class="hidden text-right min-w-0">
+        <p class="text-xs text-slate-500 mb-1">Champions</p>
+        <div id="champions-list-rows" class="flex flex-col gap-0.5"></div>
+      </div>
     </header>
 
     <h1 class="text-2xl font-bold text-slate-100 mb-6">Boss Trophy Room</h1>
@@ -122,6 +126,31 @@
       var errorEl = document.getElementById('trophy-error');
       var gridEl = document.getElementById('trophy-grid');
       var emptyEl = document.getElementById('trophy-empty');
+      var championsListEl = document.getElementById('champions-list');
+      var championsListRowsEl = document.getElementById('champions-list-rows');
+
+      var championCountByUser = {};
+      bossKeys.forEach(function (bossKey) {
+        var byChar = bossStats[bossKey].byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
+        var champ = byChar.length > 0 ? byChar[0].username : null;
+        if (champ) {
+          championCountByUser[champ] = (championCountByUser[champ] || 0) + 1;
+        }
+      });
+      var championUsers = Object.keys(championCountByUser).sort(function (a, b) { return championCountByUser[b] - championCountByUser[a]; });
+      if (championUsers.length > 0 && championsListEl && championsListRowsEl) {
+        championsListEl.classList.remove('hidden');
+        var starSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 shrink-0 text-amber-400/90" viewBox="0 0 12 12" fill="currentColor"><path d="M6 0l1.5 4.5L12 6 7.5 7.5 6 12 4.5 7.5 0 6l4.5-1.5L6 0z"/></svg>';
+        championUsers.forEach(function (username) {
+          var n = championCountByUser[username];
+          var stars = '';
+          for (var i = 0; i < n; i++) stars += starSvg;
+          var row = document.createElement('div');
+          row.className = 'flex items-center justify-end gap-1 flex-nowrap';
+          row.innerHTML = '<span class="text-xs text-slate-300 truncate max-w-[100px] mr-1" title="' + escapeHtml(username) + '">' + escapeHtml(username) + '</span><span class="flex items-center gap-0.5 shrink-0">' + stars + '</span>';
+          championsListRowsEl.appendChild(row);
+        });
+      }
 
       loadingEl.classList.add('hidden');
       if (bossKeys.length === 0) {
