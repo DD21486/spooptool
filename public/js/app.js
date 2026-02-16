@@ -42,6 +42,7 @@
   const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
   const homeCaptureCountdown = document.getElementById('home-capture-countdown');
+  const homeRefreshWrap = document.getElementById('home-refresh-wrap');
   const tabTotal = document.getElementById('tab-total');
   const tabLast24 = document.getElementById('tab-last24');
 
@@ -77,7 +78,13 @@
     if (!homeCaptureCountdown) return;
     const next = getNextFifteenMin();
     const ms = next - Date.now();
+    const totalSec = Math.max(0, Math.floor(ms / 1000));
     homeCaptureCountdown.textContent = formatCountdown(ms);
+    if (homeRefreshWrap) {
+      const inFirstMinuteAfterReset = totalSec >= 14 * 60 && totalSec < 15 * 60;
+      const atZero = totalSec === 0;
+      homeRefreshWrap.classList.toggle('hidden', !inFirstMinuteAfterReset && !atZero);
+    }
   }
 
   function startCaptureCountdown() {
@@ -85,6 +92,16 @@
     setInterval(tickCaptureCountdown, 1000);
   }
   if (homeCaptureCountdown) startCaptureCountdown();
+
+  if (homeRefreshWrap) {
+    const refreshBtn = document.getElementById('home-refresh-btn');
+    if (refreshBtn) {
+      refreshBtn.addEventListener('click', function () {
+        homeRefreshWrap.classList.add('hidden');
+        loadFromSnapshots();
+      });
+    }
+  }
 
   function showError(msg) {
     errorEl.textContent = msg || '';

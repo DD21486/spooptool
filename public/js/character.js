@@ -42,6 +42,17 @@
     if (!key) return '';
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
+  function skillIconSrc(key) {
+    if (!key) return '';
+    if (key === 'overall') return '/assets/Skills_icon.png';
+    const name = skillLabel(key).replace(/\s+/g, '');
+    return '/assets/' + name + '_icon.png';
+  }
+  function skillIconHtml(key) {
+    const src = skillIconSrc(key);
+    const label = skillLabel(key);
+    return '<img src="' + escapeHtml(src) + '" alt="" class="w-4 h-4 object-contain shrink-0" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'">';
+  }
   function formatNum(n) {
     if (n == null || n === undefined) return '—';
     return Number(n).toLocaleString();
@@ -149,7 +160,7 @@
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
       const chartIcon = '<button type="button" class="row-chart-btn p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-slate-700" data-skill="' + escapeHtml(key) + '" title="View chart" aria-label="View chart">' + chartIconSvg + '</button>';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
-        <td class="px-4 py-2 font-medium">${skillLabel(key)}</td>
+        <td class="px-4 py-2 font-medium"><span class="inline-flex items-center gap-2"><span class="w-4 h-4 flex items-center justify-center shrink-0">${skillIconHtml(key)}</span>${skillLabel(key)}</span></td>
         <td class="px-4 py-2 text-right">${level}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Skill}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(xp)}</td>
