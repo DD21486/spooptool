@@ -6,21 +6,175 @@
   <title>Boss Trophy Room – SpoopTool</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
+  <style>
+    .trophy-card { min-height: 100%; display: flex; flex-direction: column; }
+    .trophy-card .card-body { flex: 1; display: flex; flex-direction: column; }
+    .trophy-card .champion-wrap { margin-top: auto; }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
-  <div class="max-w-4xl mx-auto px-4 py-6">
-    <header class="flex items-center justify-between gap-4 mb-8">
+  <div class="max-w-6xl mx-auto px-4 py-6">
+    <header class="flex items-center justify-between gap-4 mb-6">
       <a href="/" class="text-sky-400 hover:text-sky-300 hover:underline text-sm">← SpoopTool</a>
     </header>
 
-    <main class="flex flex-col items-center justify-center min-h-[60vh] text-center">
-      <h1 class="text-2xl font-bold text-slate-100 mb-6">Boss Trophy Room</h1>
-      <div class="prose prose-invert prose-slate max-w-none text-slate-400 text-left">
-        <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-        <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-        <p>Curabitur pretium tincidunt lacus. Nulla facilisi. Ut convallis, sem sit amet interdum consectetuer, odio augue aliquam leo, nec dapibus tortor nibh sed augue.</p>
-      </div>
-    </main>
+    <h1 class="text-2xl font-bold text-slate-100 mb-6">Boss Trophy Room</h1>
+
+    <div id="trophy-loading" class="py-12 text-slate-500 text-center">Loading…</div>
+    <div id="trophy-error" class="hidden py-12 text-red-400 text-center text-sm"></div>
+    <div id="trophy-grid" class="hidden grid gap-4 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"></div>
+
+    <p id="trophy-empty" class="hidden py-12 text-slate-500 text-center text-sm">No characters or boss data yet. Add characters on the home page.</p>
   </div>
+
+  <script>
+(function () {
+  const API = typeof window !== 'undefined' && window.location && window.location.origin
+    ? window.location.origin + '/api'
+    : '/api';
+
+  function formatBossKey(key) {
+    return (key || '').replace(/_/g, ' ').replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
+
+  var BOSS_IMAGE_OVERRIDES = {
+    barrows: 'barrows.png', giant_mole: 'giantmole.png', giantmole: 'giantmole.png',
+    deranged_archaeologist: 'derangedarchaeologist.png', derangedarchaeologist: 'derangedarchaeologist.png',
+    scurrius: 'scurrius.png', wintertodt: 'Wintertodt.gif', doom_of_mokhaiotl: 'DoomofMokhaiotl.png', doomofmokhaiotl: 'DoomofMokhaiotl.png',
+    phantom_muspah: 'PhantomMuspah.png', phantommuspah: 'PhantomMuspah.png', shellbane_gryphon: 'Shellbanegryphon.png', shellbanegryphon: 'Shellbanegryphon.png',
+    sol_heredit: 'SolHeredit.png', solheredit: 'SolHeredit.png', chambers_of_xeric: 'ChambersOfXeric.png', chambersofxeric: 'ChambersOfXeric.png',
+    chambers_of_xeric_challenge_mode: 'ChambersOfXericChallengeMode.png', chambersofxericchallengemode: 'ChambersOfXericChallengeMode.png',
+    theatre_of_blood: 'TheatreOfBlood.png', theatreofblood: 'TheatreOfBlood.png', tombs_of_amascut: 'TombsOfAmascut.png', tombsofamascut: 'TombsOfAmascut.png',
+    tombs_of_amascut_expert_mode: 'TombsOfAmascutExpertMode.png', tombsofamascutexpertmode: 'TombsOfAmascutExpertMode.png',
+    king_black_dragon: 'KingBlackDragon.png', kingblackdragon: 'KingBlackDragon.png',
+    thermonuclear_smoke_devil: 'ThermonuclearSmokeDevil.png', thermonuclearsmokedevil: 'ThermonuclearSmokeDevil.png',
+    grotesque_guardians: 'GrotesqueGuardians.png', grotesqueguardians: 'GrotesqueGuardians.png',
+    dagannoth_prime: 'DagannothPrime.png', dagannothprime: 'DagannothPrime.png', dagannoth_rex: 'DagannothRex.png', dagannothrex: 'DagannothRex.png',
+    dagannoth_supreme: 'DagannothSupreme.png', dagannothsupreme: 'DagannothSupreme.png',
+    chaos_elemental: 'ChaosElemental.png', chaoselemental: 'ChaosElemental.png', chaos_fanatic: 'ChaosFanatic.png', chaosfanatic: 'ChaosFanatic.png',
+    crazy_archaeologist: 'Crazyarchaeologist.png', crazyarchaeologist: 'Crazyarchaeologist.png',
+    commander_zilyana: 'CommanderZilyana.png', commanderzilyana: 'CommanderZilyana.png', general_graardor: 'GeneralGraardor.png', generalgraardor: 'GeneralGraardor.png',
+    kreearra: 'Kreearra.png', kril_tsutsaroth: 'KrilTsutsaroth.png', kriltsutsaroth: 'KrilTsutsaroth.png',
+    corporeal_beast: 'CorporealBeast.png', corporealbeast: 'CorporealBeast.png', lunar_chests: 'LunarChests.png', lunarchests: 'LunarChests.png',
+    tzkal_zuk: 'TzKalZuk.png', tzkalzuk: 'TzKalZuk.png', tztok_jad: 'TzTokJad.png', tztokjad: 'TzTokJad.png',
+    abyssal_sire: 'AbyssalSire.png', abyssalsire: 'AbyssalSire.png', alchemical_hydra: 'AlchemicalHydra.png', alchemicalhydra: 'AlchemicalHydra.png',
+    duke_sucellus: 'DukeSucellus.png', dukesucellus: 'DukeSucellus.png', the_whisperer: 'TheWhisperer.png', whisperer: 'TheWhisperer.png',
+    kalphite_queen: 'KalphiteQueen.png', kalphitequeen: 'KalphiteQueen.png', royal_titans: 'RoyalTitans.png', royaltitans: 'RoyalTitans.png',
+    corrupted_gauntlet: 'CorruptedGuantlet.png', corruptedgauntlet: 'CorruptedGuantlet.png',
+    phosani_nightmare: 'PhosanisNightmare.png', phosanis_nightmare: 'PhosanisNightmare.png', phosanisnightmare: 'PhosanisNightmare.png', gauntlet: 'Gauntlet.png',
+  };
+
+  function bossImageSrc(bossKey) {
+    if (!bossKey) return '';
+    var lower = String(bossKey).toLowerCase().trim().replace(/\s+/g, '_');
+    if (BOSS_IMAGE_OVERRIDES[lower]) return '/assets/bosses/' + BOSS_IMAGE_OVERRIDES[lower];
+    var pascal = lower.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join('') + '.png';
+    return '/assets/bosses/' + pascal;
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    var div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
+
+  function formatNum(n) {
+    if (n == null || n === undefined) return '0';
+    return Number(n).toLocaleString();
+  }
+
+  function getBossKc(bosses, bossKey) {
+    if (!bosses || !bossKey) return 0;
+    var b = bosses[bossKey];
+    if (!b) return 0;
+    var n = b.count != null ? b.count : (b.kc != null ? b.kc : b.score);
+    return typeof n === 'number' && n >= 0 ? n : 0;
+  }
+
+  fetch(API + '/characters-with-snapshots')
+    .then(function (res) {
+      if (!res.ok) throw new Error('Failed to load data');
+      return res.json();
+    })
+    .then(function (data) {
+      var list = data.characters || [];
+      var bossStats = {};
+      list.forEach(function (c) {
+        var username = typeof c === 'string' ? c : c.username;
+        var bosses = (c.latestSnapshot && c.latestSnapshot.bosses) ? c.latestSnapshot.bosses : {};
+        Object.keys(bosses).forEach(function (bossKey) {
+          if (!bossStats[bossKey]) {
+            bossStats[bossKey] = { total: 0, byCharacter: [] };
+          }
+          var kc = getBossKc(bosses, bossKey);
+          bossStats[bossKey].total += kc;
+          bossStats[bossKey].byCharacter.push({ username: username, kc: kc });
+        });
+      });
+
+      var bossKeys = Object.keys(bossStats).sort();
+      var loadingEl = document.getElementById('trophy-loading');
+      var errorEl = document.getElementById('trophy-error');
+      var gridEl = document.getElementById('trophy-grid');
+      var emptyEl = document.getElementById('trophy-empty');
+
+      loadingEl.classList.add('hidden');
+      if (bossKeys.length === 0) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      gridEl.classList.remove('hidden');
+      gridEl.innerHTML = '';
+
+      bossKeys.forEach(function (bossKey) {
+        var stat = bossStats[bossKey];
+        var total = stat.total;
+        var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
+        var champion = byChar.length > 0 ? byChar[0] : null;
+
+        var card = document.createElement('div');
+        card.className = 'trophy-card rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden';
+        var name = formatBossKey(bossKey);
+        var imgSrc = bossImageSrc(bossKey);
+        var totalStr = formatNum(total);
+        var championHtml = '';
+        if (champion) {
+          championHtml =
+            '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
+            '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
+            '<div class="flex items-center gap-1.5 min-w-0">' +
+            '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
+            '<span class="text-slate-200 font-medium truncate">' + escapeHtml(champion.username) + '</span>' +
+            '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
+            '</div></div>';
+        } else {
+          championHtml =
+            '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
+            '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
+            '<p class="text-slate-500 text-sm">—</p></div>';
+        }
+        card.innerHTML =
+          '<div class="card-body p-4">' +
+            '<h2 class="text-sm font-semibold text-slate-100 mb-2 truncate" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</h2>' +
+            '<div class="flex justify-center mb-3">' +
+              '<img src="' + escapeHtml(imgSrc) + '" alt="" class="w-[100px] h-[100px] object-contain rounded-sm" width="100" height="100" loading="lazy" onerror="this.style.display=\'none\'" />' +
+            '</div>' +
+            '<p class="text-xs text-slate-500 mb-1">Times Killed By The Boys</p>' +
+            '<p class="text-slate-300 font-mono text-sm mb-0">' + escapeHtml(totalStr) + '</p>' +
+            championHtml +
+          '</div>';
+        gridEl.appendChild(card);
+      });
+    })
+    .catch(function (err) {
+      document.getElementById('trophy-loading').classList.add('hidden');
+      var errorEl = document.getElementById('trophy-error');
+      errorEl.textContent = err.message || 'Failed to load trophy room. Is the API running?';
+      errorEl.classList.remove('hidden');
+    });
+})();
+  </script>
 </body>
 </html>
