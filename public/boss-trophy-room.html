@@ -7,9 +7,13 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <style>
-    .trophy-card { min-height: 100%; display: flex; flex-direction: column; }
+    .trophy-card { min-height: 100%; display: flex; flex-direction: column; opacity: 0; animation: trophy-fade-in 0.35s ease-out forwards; }
     .trophy-card .card-body { flex: 1; display: flex; flex-direction: column; }
     .trophy-card .champion-wrap { margin-top: auto; }
+    @keyframes trophy-fade-in {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
@@ -128,7 +132,7 @@
       gridEl.classList.remove('hidden');
       gridEl.innerHTML = '';
 
-      bossKeys.forEach(function (bossKey) {
+      bossKeys.forEach(function (bossKey, index) {
         var stat = bossStats[bossKey];
         var total = stat.total;
         var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
@@ -136,6 +140,7 @@
 
         var card = document.createElement('div');
         card.className = 'trophy-card rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden';
+        card.style.animationDelay = (index * 0.1) + 's';
         var name = formatBossKey(bossKey);
         var imgSrc = bossImageSrc(bossKey);
         var totalStr = formatNum(total);
