@@ -183,6 +183,7 @@
         var total = stat.total;
         var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
         var champion = byChar.length > 0 ? byChar[0] : null;
+        var nextClosest = byChar.length >= 2 ? byChar[1] : null;
 
         var card = document.createElement('div');
         card.className = 'trophy-card rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden';
@@ -199,7 +200,11 @@
             '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
             '<span class="text-slate-200 font-medium text-sm truncate">' + escapeHtml(champion.username) + '</span>' +
             '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
-            '</div></div>';
+            '</div>';
+          if (nextClosest) {
+            championHtml += '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')</p>';
+          }
+          championHtml += '</div>';
         } else {
           championHtml =
             '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
