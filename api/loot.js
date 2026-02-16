@@ -78,7 +78,7 @@ module.exports = async function handler(req, res) {
       const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
 
       const rows = await sql`
-        SELECT id, item_name, quantity, total_value_gp, source, at
+        SELECT id, item_id, item_name, quantity, total_value_gp, source, at
         FROM loot_drops
         WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
         ORDER BY at DESC
@@ -97,6 +97,7 @@ module.exports = async function handler(req, res) {
         totalValueGp: Number(a.total_value_gp),
         drops: rows.map((r) => ({
           id: r.id,
+          item_id: r.item_id != null ? r.item_id : null,
           item_name: r.item_name,
           quantity: r.quantity,
           total_value_gp: Number(r.total_value_gp),
@@ -148,12 +149,13 @@ module.exports = async function handler(req, res) {
       let inserted = 0;
       for (const item of items) {
         const itemName = (item.name || 'Unknown').trim().substring(0, 255);
+        const itemId = item.id != null ? parseInt(item.id, 10) : null;
         const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
         const priceEach = parseInt(item.priceEach, 10) || 0;
         const totalValueGp = qty * priceEach;
         await sql`
-          INSERT INTO loot_drops (character_id, username, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
-          VALUES (${characterId}, ${username}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+          INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+          VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
         `;
         inserted += 1;
       }

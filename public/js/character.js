@@ -231,12 +231,18 @@
     lootTotalDrops.textContent = formatNum(totalDrops);
     lootTotalValue.textContent = totalValueGp >= 1e6 ? (totalValueGp / 1e6).toFixed(2) + 'M gp' : formatNum(totalValueGp) + ' gp';
 
+    const spriteUrl = (id) => 'https://chisel.weirdgloop.org/rsc/config/config18.jag/sprites/' + Number(id) + '.png';
     lootTbody.innerHTML = drops.length === 0
       ? '<tr><td colspan="3" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
           const valueStr = d.total_value_gp >= 1e6 ? (d.total_value_gp / 1e6).toFixed(2) + 'M' : formatNum(d.total_value_gp);
+          const itemId = d.item_id != null && !Number.isNaN(Number(d.item_id)) ? Number(d.item_id) : null;
+          const iconHtml = itemId != null
+            ? '<img src="' + escapeHtml(spriteUrl(itemId)) + '" alt="" width="20" height="20" class="w-5 h-5 object-contain shrink-0" loading="lazy" onerror="this.style.display=\'none\'">'
+            : '';
+          const nameCell = '<td class="px-4 py-2 text-slate-200"><div class="flex items-center gap-2">' + iconHtml + '<span>' + escapeHtml(d.item_name || '') + '</span></div></td>';
           return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
-            '<td class="px-4 py-2 text-slate-200">' + escapeHtml(d.item_name || '') + '</td>' +
+            nameCell +
             '<td class="px-4 py-2 text-right font-mono text-slate-300">' + escapeHtml(String(d.quantity)) + '</td>' +
             '<td class="px-4 py-2 text-right font-mono text-slate-200">' + escapeHtml(valueStr) + '</td>' +
             '</tr>';

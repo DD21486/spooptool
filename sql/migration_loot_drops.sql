@@ -5,6 +5,7 @@ CREATE TABLE IF NOT EXISTS loot_drops (
   id BIGSERIAL PRIMARY KEY,
   character_id INTEGER REFERENCES characters(id) ON DELETE SET NULL,
   username VARCHAR(12) NOT NULL,
+  item_id INT NULL,
   item_name VARCHAR(255) NOT NULL,
   quantity INT NOT NULL DEFAULT 1,
   total_value_gp BIGINT NOT NULL,
