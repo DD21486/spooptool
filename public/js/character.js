@@ -1,5 +1,29 @@
 (function () {
   const API = '/api';
+
+  if (typeof Chart !== 'undefined') {
+    Chart.register({
+      id: 'verticalHoverLine',
+      afterDraw(chart) {
+        const active = chart.getActiveElements();
+        if (!active || active.length === 0) return;
+        const x = active[0].element.x;
+        const ctx = chart.ctx;
+        const yScale = chart.scales.y;
+        if (!yScale) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, yScale.top);
+        ctx.lineTo(x, yScale.bottom);
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      },
+    });
+  }
+
   const params = new URLSearchParams(window.location.search);
   const name = params.get('name') || params.get('username') || '';
 
@@ -55,6 +79,8 @@
     return Math.min(100, Math.max(0, (intoLevel / needed) * 100));
   }
 
+  const chartIconSvg = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>';
+
   function showError(msg) {
     errorEl.textContent = msg || '';
     errorEl.classList.toggle('hidden', !msg);
@@ -104,6 +130,7 @@
       const rank = (s && s.rank != null) ? s.rank : '—';
       const skillDelta = characterDeltas.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
+      const chartIcon = '<button type="button" class="row-chart-btn p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-slate-700" data-skill="' + escapeHtml(key) + '" title="View chart" aria-label="View chart">' + chartIconSvg + '</button>';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2 font-medium">${skillLabel(key)}</td>
         <td class="px-4 py-2 text-right">${level}</td>
@@ -113,6 +140,7 @@
           <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
         </td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
+        <td class="px-2 py-2 text-right">${chartIcon}</td>
       </tr>`;
     }).join('');
 
@@ -125,13 +153,15 @@
       const rank = (b.rank != null) ? b.rank : '—';
       const bossDelta = characterDeltas.bossDeltas[bossKey];
       const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';
+      const chartIconBoss = '<button type="button" class="row-chart-btn p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-slate-700" data-boss="' + escapeHtml(bossKey) + '" title="View chart" aria-label="View chart">' + chartIconSvg + '</button>';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2">${skillLabel(bossKey)}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
+        <td class="px-2 py-2 text-right">${chartIconBoss}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="4" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
 
     loadingEl.classList.add('hidden');
     contentEl.classList.remove('hidden');
@@ -170,6 +200,7 @@
   }
 
   let chartInstance = null;
+  let currentChartOpts = {};
   const CHART_RANGES = [
     { hours: 3, label: 'last 3 hours' },
     { hours: 12, label: 'last 12 hours' },
@@ -192,11 +223,14 @@
     });
   }
 
-  function fetchAndDrawChart(hours) {
+  function fetchAndDrawChart(hours, opts) {
+    if (opts) currentChartOpts = opts;
+    opts = opts || currentChartOpts;
     const titleEl = document.getElementById('chart-modal-title');
     const emptyEl = document.getElementById('chart-modal-empty');
     const canvasWrap = document.getElementById('chart-modal-canvas-wrap');
-    titleEl.textContent = 'Total XP (' + chartRangeLabel(hours) + ')';
+    const seriesLabel = opts.seriesLabel || 'Total XP';
+    titleEl.textContent = seriesLabel + ' (' + chartRangeLabel(hours) + ')';
     emptyEl.classList.add('hidden');
     emptyEl.textContent = 'No snapshot data for this range. Snapshots are taken periodically; try again later.';
     canvasWrap.classList.add('hidden');
@@ -206,7 +240,11 @@
     }
     setChartRangeActive(hours);
 
-    fetch(API + '/player-history?name=' + encodeURIComponent(name) + '&hours=' + hours)
+    let url = API + '/player-history?name=' + encodeURIComponent(name) + '&hours=' + hours;
+    if (opts.skill) url += '&skill=' + encodeURIComponent(opts.skill);
+    if (opts.boss) url += '&boss=' + encodeURIComponent(opts.boss);
+
+    fetch(url)
       .then((res) => res.json())
       .then((data) => {
         const history = (data.history || []).slice();
@@ -222,7 +260,7 @@
             ? d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
             : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         });
-        const values = history.map((h) => h.totalXp);
+        const values = history.map((h) => (h.value != null ? h.value : h.totalXp));
         const dataMin = Math.min(...values);
         const dataMax = Math.max(...values);
         const range = dataMax - dataMin;
@@ -236,7 +274,7 @@
           data: {
             labels,
             datasets: [{
-              label: 'Total XP',
+              label: data.seriesLabel || seriesLabel,
               data: values,
               borderColor: 'rgb(56, 189, 248)',
               backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -271,11 +309,20 @@
       });
   }
 
-  function openChartModal() {
+  function openChartModal(opts) {
+    currentChartOpts = opts || {};
     const modal = document.getElementById('chart-modal');
     modal.classList.remove('hidden');
     modal.setAttribute('aria-hidden', 'false');
-    fetchAndDrawChart(12);
+    fetchAndDrawChart(12, currentChartOpts);
+  }
+
+  function openChartForSkill(skillKey) {
+    openChartModal({ skill: skillKey, seriesLabel: skillLabel(skillKey) + ' XP' });
+  }
+
+  function openChartForBoss(bossKey) {
+    openChartModal({ boss: bossKey, seriesLabel: skillLabel(bossKey) + ' KC' });
   }
 
   function closeChartModal() {
@@ -294,8 +341,16 @@
   document.querySelectorAll('.chart-range-btn').forEach((btn) => {
     btn.addEventListener('click', function () {
       const hours = parseInt(this.getAttribute('data-hours'), 10);
-      fetchAndDrawChart(hours);
+      fetchAndDrawChart(hours, currentChartOpts);
     });
+  });
+  skillsTbody.addEventListener('click', function (e) {
+    const btn = e.target.closest('.row-chart-btn[data-skill]');
+    if (btn) openChartForSkill(btn.getAttribute('data-skill'));
+  });
+  bossesTbody.addEventListener('click', function (e) {
+    const btn = e.target.closest('.row-chart-btn[data-boss]');
+    if (btn) openChartForBoss(btn.getAttribute('data-boss'));
   });
   load();
 })();

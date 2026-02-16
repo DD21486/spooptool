@@ -1,5 +1,29 @@
 (function () {
   const API = '/api';
+
+  if (typeof Chart !== 'undefined') {
+    Chart.register({
+      id: 'verticalHoverLine',
+      afterDraw(chart) {
+        const active = chart.getActiveElements();
+        if (!active || active.length === 0) return;
+        const x = active[0].element.x;
+        const ctx = chart.ctx;
+        const yScale = chart.scales.y;
+        if (!yScale) return;
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x, yScale.top);
+        ctx.lineTo(x, yScale.bottom);
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.restore();
+      },
+    });
+  }
+
   const skillLabel = (key) => (key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   let characterList = [];
   let playerData = {};
