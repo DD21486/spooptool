@@ -68,8 +68,27 @@ module.exports = async function handler(req, res) {
       };
     });
 
+    const periodFilter = hours === 24 || hours === 168 ? hours : 24;
+    let lootHistory = [];
+    try {
+      const lootBuckets = await sql`
+        SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+        FROM loot_drops
+        WHERE at >= NOW() - make_interval(hours => ${periodFilter})
+        GROUP BY date_trunc('hour', at)
+        ORDER BY bucket ASC
+      `;
+      let cum = 0;
+      lootHistory = lootBuckets.map((r) => {
+        cum += Number(r.value || 0);
+        return { at: r.bucket, value: cum };
+      });
+    } catch (lootErr) {
+      console.error('aggregate-history lootHistory', lootErr);
+    }
+
     res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
-    return res.status(200).json({ history });
+    return res.status(200).json({ history, lootHistory });
   } catch (err) {
     console.error('/api/aggregate-history', err);
     return res.status(500).json({ error: 'Failed to load aggregate history' });

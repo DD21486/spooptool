@@ -33,10 +33,13 @@
 
   const leftTbody = document.getElementById('left-tbody');
   const rightTbody = document.getElementById('right-tbody');
+  const lootTbody = document.getElementById('loot-tbody');
   const leftLoading = document.getElementById('left-loading');
   const rightLoading = document.getElementById('right-loading');
+  const lootLoading = document.getElementById('loot-loading');
   const leftTitle = document.getElementById('left-title');
   const rightTitle = document.getElementById('right-title');
+  const lootTitle = document.getElementById('loot-title');
   const filterType = document.getElementById('filter-type');
   const filterSkill = document.getElementById('filter-skill');
   const filterRightBoss = document.getElementById('filter-right-boss');
@@ -47,6 +50,7 @@
   const tabLast24 = document.getElementById('tab-last24');
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
+  const lootValueTh = document.getElementById('loot-value-th');
 
   let homeViewMode = 'total';
 
@@ -261,6 +265,29 @@
     return typeof n === 'number' ? n : 0;
   }
 
+  function renderLoot() {
+    if (!lootTbody || !lootLoading) return;
+    lootLoading.classList.add('hidden');
+    lootTbody.innerHTML = '';
+    const isLast24 = homeViewMode === 'last24';
+    const list = isLast24 ? lootLeaderboard24 : lootLeaderboardTotal;
+    if (lootTitle) lootTitle.textContent = isLast24 ? 'Loot value (last 24hrs)' : 'Loot value';
+    if (lootValueTh) lootValueTh.textContent = isLast24 ? 'Value (24h)' : 'Value';
+    const getValue = (username) => {
+      const p = list.find((x) => (x.username || '').toLowerCase() === (username || '').toLowerCase());
+      return p ? Number(p.totalValueGp) || 0 : 0;
+    };
+    const rows = characterList.map((username) => ({ username, value: getValue(username) }));
+    rows.sort((a, b) => b.value - a.value);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      const displayValue = r.value >= 1e6 ? (r.value / 1e6).toFixed(2) + 'M gp' : formatNum(r.value) + ' gp';
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
+      lootTbody.appendChild(tr);
+    });
+  }
+
   function renderRight() {
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
@@ -343,12 +370,16 @@
     showError('');
     leftLoading.classList.remove('hidden');
     rightLoading.classList.remove('hidden');
+    if (lootLoading) lootLoading.classList.remove('hidden');
     leftTbody.innerHTML = '';
     rightTbody.innerHTML = '';
+    if (lootTbody) lootTbody.innerHTML = '';
     try {
-      const [dataRes, deltasRes] = await Promise.all([
+      const [dataRes, deltasRes, lootTotalRes, loot24Res] = await Promise.all([
         fetch(API + '/characters-with-snapshots'),
         fetch(API + '/characters-deltas?hours=24'),
+        fetch(API + '/loot?leaderboard=1'),
+        fetch(API + '/loot?leaderboard=1&hours=24'),
       ]);
       if (!dataRes.ok) throw new Error('Failed to load data');
       const data = await dataRes.json();
@@ -372,12 +403,18 @@
       if (characterList.length === 0) {
         leftLoading.textContent = 'No characters. Add one above.';
         rightLoading.textContent = 'No characters. Add one above.';
+        if (lootLoading) lootLoading.textContent = 'No characters.';
         return;
       }
+      const lootTotalData = await lootTotalRes.json().catch(() => ({}));
+      const loot24Data = await loot24Res.json().catch(() => ({}));
+      lootLeaderboardTotal = Array.isArray(lootTotalData.players) ? lootTotalData.players : [];
+      lootLeaderboard24 = Array.isArray(loot24Data.players) ? loot24Data.players : [];
       populateFilterSkill();
       populateFilterBoss();
       renderLeft();
       renderRight();
+      renderLoot();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -436,27 +473,37 @@
 
   let homeChartXp = null;
   let homeChartBoss = null;
+  let homeChartLoot = null;
   let cachedHomeHistory = null;
+  let cachedLootHistory = null;
+  let lootLeaderboardTotal = [];
+  let lootLeaderboard24 = [];
 
   function setHomeChartLabels(isLast24) {
     const xpLabelEl = document.getElementById('home-chart-xp-label');
     const bossLabelEl = document.getElementById('home-chart-boss-label');
+    const lootLabelEl = document.getElementById('home-chart-loot-label');
     if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP in last 24 hours' : 'Total XP (all characters)';
     if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Total boss kills in last 24 hours' : 'Total boss kills (all characters)';
+    if (lootLabelEl) lootLabelEl.textContent = isLast24 ? 'Loot value in last 24 hours' : 'Loot value (all characters)';
   }
 
-  function paintHomeCharts(history, mode) {
+  function paintHomeCharts(history, mode, lootHistory) {
     const isLast24 = mode === 'last24';
     const xpTotalEl = document.getElementById('home-chart-xp-total');
     const bossTotalEl = document.getElementById('home-chart-boss-total');
+    const lootTotalEl = document.getElementById('home-chart-loot-total');
 
     if (homeChartXp) { homeChartXp.destroy(); homeChartXp = null; }
     if (homeChartBoss) { homeChartBoss.destroy(); homeChartBoss = null; }
+    if (homeChartLoot) { homeChartLoot.destroy(); homeChartLoot = null; }
 
     if (!history || history.length === 0) {
       if (xpTotalEl) xpTotalEl.textContent = '—';
       if (bossTotalEl) bossTotalEl.textContent = '—';
+      if (lootTotalEl) lootTotalEl.textContent = '—';
       setHomeChartLabels(isLast24);
+      paintHomeLootChart(lootHistory || []);
       return;
     }
 
@@ -483,11 +530,15 @@
     if (isLast24) {
       const sumXp = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
       const sumBoss = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboard24.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (24h)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (24h)';
+      if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (24h)';
     } else {
+      const sumLoot = lootLeaderboardTotal.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
+      if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp';
     }
     setHomeChartLabels(isLast24);
 
@@ -558,6 +609,67 @@
         options: chartOpts(bossRange.min, bossRange.max, formatInt),
       });
     }
+    paintHomeLootChart(lootHistory || []);
+  }
+
+  function paintHomeLootChart(lootHistory) {
+    const lootTotalEl = document.getElementById('home-chart-loot-total');
+    if (homeChartLoot) { homeChartLoot.destroy(); homeChartLoot = null; }
+    if (!lootHistory || lootHistory.length === 0) {
+      if (lootTotalEl) lootTotalEl.textContent = '—';
+      return;
+    }
+    const labels = lootHistory.map((h) => {
+      const d = new Date(h.at);
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    });
+    let values = lootHistory.map((h) => Number(h.value) || 0);
+    const now = new Date();
+    const lastBucket = lootHistory.length ? new Date(lootHistory[lootHistory.length - 1].at) : null;
+    if (lastBucket && (now - lastBucket) > 45 * 60 * 1000) {
+      labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
+      values = values.concat(values[values.length - 1]);
+    }
+    const lastVal = values[values.length - 1];
+    const maxVal = Math.max(...values, 1);
+    const pad = maxVal * 0.05;
+    const ctxLoot = document.getElementById('home-chart-loot');
+    if (ctxLoot && ctxLoot.getContext) {
+      homeChartLoot = new Chart(ctxLoot.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Loot value',
+            data: values,
+            borderColor: 'rgb(56, 189, 248)',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
+            },
+            y: {
+              min: Math.max(0, (lastVal != null ? lastVal : maxVal) - pad),
+              max: (lastVal != null ? lastVal : maxVal) + pad,
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', callback: (v) => (Number(v) >= 1e6 ? (Number(v) / 1e6).toFixed(1) + 'M' : Math.round(Number(v)).toLocaleString()), font: { size: 10 } },
+            },
+          },
+        },
+      });
+    }
   }
 
   function loadHomeCharts() {
@@ -566,7 +678,8 @@
       .then((data) => {
         const history = (data.history || []).slice();
         cachedHomeHistory = history;
-        paintHomeCharts(history, homeViewMode);
+        cachedLootHistory = (data.lootHistory || []).slice();
+        paintHomeCharts(history, homeViewMode, cachedLootHistory);
       })
       .catch(() => {});
   }
@@ -590,8 +703,9 @@
     }
     renderLeft();
     renderRight();
+    renderLoot();
     if (cachedHomeHistory) {
-      paintHomeCharts(cachedHomeHistory, mode);
+      paintHomeCharts(cachedHomeHistory, mode, cachedLootHistory);
     } else {
       loadHomeCharts();
     }

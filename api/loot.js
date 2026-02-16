@@ -76,7 +76,46 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       const player = (req.query.player || req.query.username || '').trim().replace(/\s+/g, ' ');
-      if (!player) return res.status(400).json({ error: 'player required' });
+
+      if (!player) {
+        if (req.query.webhook === '1' || req.query.webhook === 'true') {
+          const secret = process.env.LOOT_WEBHOOK_SECRET || '';
+          const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+          const protocol = req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http';
+          const base = host ? protocol + '://' + host : '';
+          if (!base) return res.status(500).json({ error: 'Could not determine base URL' });
+          const path = '/api/loot';
+          const url = secret ? base + path + '?secret=' + encodeURIComponent(secret) : base + path;
+          res.setHeader('Cache-Control', 'private, no-store');
+          return res.status(200).json({ url });
+        }
+        if (req.query.leaderboard === '1' || req.query.leaderboard === 'true') {
+          const hoursParam = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
+          const periodFilter = hoursParam === 24 || hoursParam === 168 ? hoursParam : null;
+          let rows;
+          if (periodFilter != null) {
+            rows = await sql`
+              SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+              FROM loot_drops
+              WHERE at >= NOW() - make_interval(hours => ${periodFilter})
+              GROUP BY LOWER(TRIM(username))
+              ORDER BY total_value_gp DESC
+            `;
+          } else {
+            rows = await sql`
+              SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+              FROM loot_drops
+              GROUP BY LOWER(TRIM(username))
+              ORDER BY total_value_gp DESC
+            `;
+          }
+          const players = rows.map((r) => ({ username: r.username, totalValueGp: Number(r.total_value_gp) }));
+          res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+          return res.status(200).json({ players });
+        }
+        return res.status(400).json({ error: 'player required' });
+      }
+
       const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
       const hours = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
       const periodFilter = hours === 24 || hours === 168 ? hours : null;
