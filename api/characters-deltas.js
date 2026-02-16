@@ -1,7 +1,8 @@
 /**
  * GET /api/characters-deltas?hours=24
  * Returns per-character XP and boss KC deltas over the last N hours (earliest vs latest snapshot).
- * Response: { deltas: [ { username, xpDelta, bossKcDelta }, ... ] }
+ * Includes per-skill and per-boss deltas so the homepage can show correct Last 24 values when filtered.
+ * Response: { deltas: [ { username, xpDelta, bossKcDelta, skillDeltas, bossDeltas }, ... ] }
  */
 
 const { neon } = require('@neondatabase/serverless');
@@ -23,6 +24,21 @@ function xpFromData(data) {
   if (!data || !data.skills || !data.skills.overall) return 0;
   const x = data.skills.overall.xp;
   return x != null ? Number(x) : 0;
+}
+
+function xpForSkill(data, skillKey) {
+  if (!data || !data.skills) return 0;
+  const s = data.skills[skillKey];
+  if (!s) return 0;
+  const x = s.xp != null ? s.xp : s.experience;
+  return x != null ? Number(x) : 0;
+}
+
+function kcForBoss(data, bossKey) {
+  if (!data || !data.bosses || !bossKey) return 0;
+  const b = data.bosses[bossKey];
+  const n = b && (b.count != null ? b.count : b.kc);
+  return typeof n === 'number' ? n : 0;
 }
 
 module.exports = async function handler(req, res) {
@@ -54,17 +70,44 @@ module.exports = async function handler(req, res) {
 
     const deltas = chars.map((c) => {
       const snaps = byChar[c.id] || [];
-      if (snaps.length === 0) return { username: c.username, xpDelta: 0, bossKcDelta: 0 };
+      if (snaps.length === 0) {
+        return { username: c.username, xpDelta: 0, bossKcDelta: 0, skillDeltas: {}, bossDeltas: {} };
+      }
       const first = snaps[0];
       const last = snaps[snaps.length - 1];
-      const firstXp = xpFromData(first.data);
-      const lastXp = xpFromData(last.data);
-      const firstKc = totalBossKcFromData(first.data);
-      const lastKc = totalBossKcFromData(last.data);
+      const firstData = first.data || {};
+      const lastData = last.data || {};
+      const firstXp = xpFromData(firstData);
+      const lastXp = xpFromData(lastData);
+      const firstKc = totalBossKcFromData(firstData);
+      const lastKc = totalBossKcFromData(lastData);
+
+      const skillKeys = new Set([
+        ...Object.keys(firstData.skills || {}),
+        ...Object.keys(lastData.skills || {}),
+      ]);
+      const skillDeltas = {};
+      for (const key of skillKeys) {
+        const delta = Math.max(0, xpForSkill(lastData, key) - xpForSkill(firstData, key));
+        skillDeltas[key] = delta;
+      }
+
+      const bossKeys = new Set([
+        ...Object.keys(firstData.bosses || {}),
+        ...Object.keys(lastData.bosses || {}),
+      ]);
+      const bossDeltas = {};
+      for (const key of bossKeys) {
+        const delta = Math.max(0, kcForBoss(lastData, key) - kcForBoss(firstData, key));
+        bossDeltas[key] = delta;
+      }
+
       return {
         username: c.username,
         xpDelta: Math.max(0, lastXp - firstXp),
         bossKcDelta: Math.max(0, lastKc - firstKc),
+        skillDeltas,
+        bossDeltas,
       };
     });
 

@@ -222,11 +222,18 @@
       leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
     }
 
-    const rows = characterList.map(username => ({
-      username,
-      value: leftTableValue(playerData[username], filter),
-      xpDelta: (last24hDeltas[username] && last24hDeltas[username].xpDelta != null) ? last24hDeltas[username].xpDelta : 0,
-    })).filter(r => r.value != null);
+    const skillKey = filter.type === 'skill' ? filter.key : 'overall';
+    const rows = characterList.map(username => {
+      const d = last24hDeltas[username];
+      const delta = homeViewMode === 'last24' && d
+        ? (d.skillDeltas && skillKey in d.skillDeltas ? d.skillDeltas[skillKey] : d.xpDelta)
+        : 0;
+      return {
+        username,
+        value: leftTableValue(playerData[username], filter),
+        xpDelta: delta != null ? delta : 0,
+      };
+    }).filter(r => r.value != null);
     if (homeViewMode === 'last24') {
       rows.sort((a, b) => (b.xpDelta - a.xpDelta));
     } else {
@@ -236,8 +243,7 @@
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
       const value = r.value != null ? formatNum(r.value) : '—';
-      const d = last24hDeltas[r.username];
-      const xpDelta = d && d.xpDelta != null && d.xpDelta > 0 ? d.xpDelta : null;
+      const xpDelta = r.xpDelta != null && r.xpDelta > 0 ? r.xpDelta : null;
       const last24Cell = xpDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(xpDelta)}</span>` : '—';
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${value}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
       leftTbody.appendChild(tr);
@@ -262,11 +268,17 @@
         rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
       }
     }
-    const rows = characterList.map(username => ({
-      username,
-      kc: getRightBossKc(playerData[username], bossKey),
-      kcDelta: (last24hDeltas[username] && last24hDeltas[username].bossKcDelta != null) ? last24hDeltas[username].bossKcDelta : 0,
-    }));
+    const rows = characterList.map(username => {
+      const d = last24hDeltas[username];
+      const kcDelta = homeViewMode === 'last24' && d
+        ? (bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : d.bossKcDelta)
+        : 0;
+      return {
+        username,
+        kc: getRightBossKc(playerData[username], bossKey),
+        kcDelta: kcDelta != null ? kcDelta : 0,
+      };
+    });
     if (homeViewMode === 'last24') {
       rows.sort((a, b) => (b.kcDelta - a.kcDelta));
     } else {
@@ -275,8 +287,7 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const d = last24hDeltas[r.username];
-      const kcDelta = d && d.bossKcDelta != null && d.bossKcDelta > 0 ? d.bossKcDelta : null;
+      const kcDelta = r.kcDelta != null && r.kcDelta > 0 ? r.kcDelta : null;
       const last24Cell = kcDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(kcDelta)}</span>` : '—';
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${formatNum(r.kc)}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
       rightTbody.appendChild(tr);
@@ -334,7 +345,12 @@
       const deltasData = await deltasRes.json().catch(() => ({}));
       last24hDeltas = {};
       (deltasData.deltas || []).forEach((d) => {
-        last24hDeltas[d.username] = { xpDelta: d.xpDelta, bossKcDelta: d.bossKcDelta };
+        last24hDeltas[d.username] = {
+          xpDelta: d.xpDelta,
+          bossKcDelta: d.bossKcDelta,
+          skillDeltas: d.skillDeltas || {},
+          bossDeltas: d.bossDeltas || {},
+        };
       });
       const list = data.characters || [];
       characterList = list.map(c => (typeof c === 'string' ? c : c.username));
@@ -386,7 +402,12 @@
         const deltasData = await deltasRes.json().catch(() => ({}));
         last24hDeltas = {};
         (deltasData.deltas || []).forEach((d) => {
-          last24hDeltas[d.username] = { xpDelta: d.xpDelta, bossKcDelta: d.bossKcDelta };
+          last24hDeltas[d.username] = {
+            xpDelta: d.xpDelta,
+            bossKcDelta: d.bossKcDelta,
+            skillDeltas: d.skillDeltas || {},
+            bossDeltas: d.bossDeltas || {},
+          };
         });
       }
       populateFilterSkill();
