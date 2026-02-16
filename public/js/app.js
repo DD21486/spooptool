@@ -45,6 +45,8 @@
   const homeRefreshWrap = document.getElementById('home-refresh-wrap');
   const tabTotal = document.getElementById('tab-total');
   const tabLast24 = document.getElementById('tab-last24');
+  const leftValueTh = document.getElementById('left-value-th');
+  const rightValueTh = document.getElementById('right-value-th');
 
   let homeViewMode = 'total';
 
@@ -218,8 +220,10 @@
     leftTbody.innerHTML = '';
     if (homeViewMode === 'last24') {
       leftTitle.textContent = filter.type === 'overall' ? 'XP (last 24hrs)' : skillLabel(filter.key) + ' (last 24hrs)';
+      if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Last 24 Hr' : skillLabel(filter.key) + ' (24h)';
     } else {
       leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
+      if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
     }
 
     const skillKey = filter.type === 'skill' ? filter.key : 'overall';
@@ -242,10 +246,10 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const value = r.value != null ? formatNum(r.value) : '—';
-      const xpDelta = r.xpDelta != null && r.xpDelta > 0 ? r.xpDelta : null;
-      const last24Cell = xpDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(xpDelta)}</span>` : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${value}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
+      const displayValue = homeViewMode === 'last24'
+        ? (r.xpDelta != null && r.xpDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.xpDelta)}</span>` : '—')
+        : (r.value != null ? formatNum(r.value) : '—');
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
       leftTbody.appendChild(tr);
     });
   }
@@ -268,6 +272,11 @@
         rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
       }
     }
+    if (rightValueTh) {
+      rightValueTh.textContent = homeViewMode === 'last24'
+        ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
+        : (bossKey ? formatBossKey(bossKey) : 'Total KC');
+    }
     const rows = characterList.map(username => {
       const d = last24hDeltas[username];
       const kcDelta = homeViewMode === 'last24' && d
@@ -287,9 +296,10 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const kcDelta = r.kcDelta != null && r.kcDelta > 0 ? r.kcDelta : null;
-      const last24Cell = kcDelta != null ? `<span class="text-green-400 font-mono">+${formatNum(kcDelta)}</span>` : '—';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="pl-4 pr-2 py-2 text-right font-mono">${formatNum(r.kc)}</td><td class="pl-2 pr-4 py-2 text-right">${last24Cell}</td>`;
+      const displayValue = homeViewMode === 'last24'
+        ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
+        : formatNum(r.kc);
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
       rightTbody.appendChild(tr);
     });
   }
