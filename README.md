@@ -36,3 +36,11 @@ To store periodic Hiscores snapshots for progress-over-time and insights:
    - **Hobby plan:** Vercel Cron is limited to **once per day**. The app is configured to run the snapshot at 12:00 UTC daily. That gives one snapshot per character per day — good for "yesterday vs today" and weekly trends.
    - **More frequent (e.g. every 30 min) on Hobby:** Use an external cron (e.g. [cron-job.org](https://cron-job.org), free) to call `GET https://your-app.vercel.app/api/cron/snapshot` with header `Authorization: Bearer YOUR_CRON_SECRET` every 30 minutes. Keeps data recent without upgrading Vercel.
    - **10 min:** Same idea with external cron every 10 min; watch Neon storage (0.5 GB on free) and prune old snapshots if needed (e.g. keep last 30 days).
+
+## Loot (Dink webhook)
+
+To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
+
+1. **Neon:** Run `sql/migration_loot_drops.sql` in the SQL Editor.
+2. **Vercel:** Add env var `LOOT_WEBHOOK_SECRET` (e.g. `openssl rand -hex 24`). The Settings cog on the homepage shows the full webhook URL for users to copy.
+3. **Dink:** In the Loot notifier, add the webhook URL (from Settings) as a second URL or in Webhook Overrides. Dink will POST loot events to your app; character pages show a Loot section (drop count, total value, last 20 drops).

@@ -35,6 +35,11 @@
   const skillsTbody = document.getElementById('skills-tbody');
   const bossesTbody = document.getElementById('bosses-tbody');
   const errorEl = document.getElementById('error-message');
+  const lootTotalDrops = document.getElementById('loot-total-drops');
+  const lootTotalValue = document.getElementById('loot-total-value');
+  const lootTbody = document.getElementById('loot-tbody');
+  const lootLoading = document.getElementById('loot-loading');
+  const lootEmpty = document.getElementById('loot-empty');
 
   let characterDeltas = { skillDeltas: {}, bossDeltas: {} };
 
@@ -200,8 +205,44 @@
       </tr>`;
     }).join('') || '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
 
+    if (lootTotalDrops) lootTotalDrops.textContent = '—';
+    if (lootTotalValue) lootTotalValue.textContent = '—';
+    if (lootTbody) lootTbody.innerHTML = '';
+    if (lootLoading) lootLoading.classList.remove('hidden');
+    if (lootEmpty) lootEmpty.classList.add('hidden');
+
     loadingEl.classList.add('hidden');
     contentEl.classList.remove('hidden');
+  }
+
+  function renderLoot(data) {
+    if (!lootTotalDrops || !lootTotalValue || !lootTbody || !lootLoading || !lootEmpty) return;
+    if (!data) {
+      lootLoading.classList.add('hidden');
+      lootEmpty.classList.remove('hidden');
+      lootTbody.innerHTML = '';
+      return;
+    }
+    lootLoading.classList.add('hidden');
+    const totalDrops = data.totalDrops != null ? data.totalDrops : 0;
+    const totalValueGp = data.totalValueGp != null ? data.totalValueGp : 0;
+    const drops = Array.isArray(data.drops) ? data.drops : [];
+
+    lootTotalDrops.textContent = formatNum(totalDrops);
+    lootTotalValue.textContent = totalValueGp >= 1e6 ? (totalValueGp / 1e6).toFixed(2) + 'M gp' : formatNum(totalValueGp) + ' gp';
+
+    lootTbody.innerHTML = drops.length === 0
+      ? '<tr><td colspan="3" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
+      : drops.map((d) => {
+          const valueStr = d.total_value_gp >= 1e6 ? (d.total_value_gp / 1e6).toFixed(2) + 'M' : formatNum(d.total_value_gp);
+          return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
+            '<td class="px-4 py-2 text-slate-200">' + escapeHtml(d.item_name || '') + '</td>' +
+            '<td class="px-4 py-2 text-right font-mono text-slate-300">' + escapeHtml(String(d.quantity)) + '</td>' +
+            '<td class="px-4 py-2 text-right font-mono text-slate-200">' + escapeHtml(valueStr) + '</td>' +
+            '</tr>';
+        }).join('');
+
+    lootEmpty.classList.toggle('hidden', totalDrops > 0);
   }
 
   async function load() {
@@ -214,9 +255,10 @@
     loadingEl.classList.remove('hidden');
     contentEl.classList.add('hidden');
     try {
-      const [res, deltasRes] = await Promise.all([
+      const [res, deltasRes, lootRes] = await Promise.all([
         fetch(API + '/character-snapshot?name=' + encodeURIComponent(name)),
         fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&hours=24'),
+        fetch(API + '/loot?player=' + encodeURIComponent(name) + '&limit=20'),
       ]);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -230,6 +272,12 @@
         characterDeltas = { skillDeltas: {}, bossDeltas: {} };
       }
       render(data);
+      if (lootRes && lootRes.ok) {
+        const lootData = await lootRes.json().catch(() => ({}));
+        renderLoot(lootData);
+      } else {
+        renderLoot(null);
+      }
     } catch (e) {
       loadingEl.textContent = 'Failed to load';
       showError(e.message || 'Failed to load character');

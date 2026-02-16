@@ -119,6 +119,53 @@
     }
   }
 
+  const settingsModal = document.getElementById('settings-modal');
+  const settingsWebhookInput = document.getElementById('settings-webhook-url');
+  const settingsCopyBtn = document.getElementById('settings-copy-btn');
+  const settingsCopyFeedback = document.getElementById('settings-copy-feedback');
+  const btnSettings = document.getElementById('btn-settings');
+  if (btnSettings && settingsModal) {
+    btnSettings.addEventListener('click', function () {
+      settingsModal.classList.remove('hidden');
+      settingsModal.setAttribute('aria-hidden', 'false');
+      if (settingsWebhookInput) {
+        settingsWebhookInput.value = '';
+        fetch(API + '/loot-webhook-url')
+          .then((r) => r.json())
+          .then((d) => { if (d && d.url) settingsWebhookInput.value = d.url; })
+          .catch(() => {});
+      }
+      if (settingsCopyFeedback) settingsCopyFeedback.classList.add('hidden');
+    });
+  }
+  const settingsModalClose = document.getElementById('settings-modal-close');
+  if (settingsModalClose && settingsModal) {
+    settingsModalClose.addEventListener('click', function () {
+      settingsModal.classList.add('hidden');
+      settingsModal.setAttribute('aria-hidden', 'true');
+    });
+  }
+  if (settingsModal) {
+    settingsModal.addEventListener('click', function (e) {
+      if (e.target === settingsModal) {
+        settingsModal.classList.add('hidden');
+        settingsModal.setAttribute('aria-hidden', 'true');
+      }
+    });
+  }
+  if (settingsCopyBtn && settingsWebhookInput) {
+    settingsCopyBtn.addEventListener('click', function () {
+      settingsWebhookInput.select();
+      try {
+        navigator.clipboard.writeText(settingsWebhookInput.value);
+        if (settingsCopyFeedback) {
+          settingsCopyFeedback.classList.remove('hidden');
+          setTimeout(function () { settingsCopyFeedback.classList.add('hidden'); }, 2000);
+        }
+      } catch (_) {}
+    });
+  }
+
   function showError(msg) {
     errorEl.textContent = msg || '';
     errorEl.classList.toggle('hidden', !msg);
