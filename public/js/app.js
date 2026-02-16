@@ -369,8 +369,15 @@
     const lastXp = xpValues[xpValues.length - 1];
     const lastBoss = bossValues[bossValues.length - 1];
 
-    if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + (isLast24 ? ' XP (24h)' : ' XP');
-    if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + (isLast24 ? ' kills (24h)' : ' kills');
+    if (isLast24) {
+      const sumXp = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
+      if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (24h)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (24h)';
+    } else {
+      if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
+    }
     setHomeChartLabels(isLast24);
 
     function rangeFromLast(lastVal, fallbackMax, padPct) {
