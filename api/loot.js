@@ -77,13 +77,30 @@ module.exports = async function handler(req, res) {
       if (!player) return res.status(400).json({ error: 'player required' });
       const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
 
-      const rows = await sql`
-        SELECT id, item_id, item_name, quantity, total_value_gp, source, at
-        FROM loot_drops
-        WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-        ORDER BY at DESC
-        LIMIT ${limit}
-      `;
+      let rows;
+      try {
+        rows = await sql`
+          SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+          FROM loot_drops
+          WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+          ORDER BY at DESC
+          LIMIT ${limit}
+        `;
+      } catch (selectErr) {
+        const msg = (selectErr && selectErr.message) || String(selectErr);
+        if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
+          rows = await sql`
+            SELECT id, item_name, quantity, total_value_gp, source, at
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+            ORDER BY at DESC
+            LIMIT ${limit}
+          `;
+          rows = rows.map((r) => ({ ...r, item_id: null }));
+        } else {
+          throw selectErr;
+        }
+      }
       const agg = await sql`
         SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
         FROM loot_drops
@@ -147,16 +164,38 @@ module.exports = async function handler(req, res) {
       const characterId = charRow.length ? charRow[0].id : null;
 
       let inserted = 0;
+      let tableHasItemId = true;
       for (const item of items) {
         const itemName = (item.name || 'Unknown').trim().substring(0, 255);
         const itemId = item.id != null ? parseInt(item.id, 10) : null;
         const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
         const priceEach = parseInt(item.priceEach, 10) || 0;
         const totalValueGp = qty * priceEach;
-        await sql`
-          INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
-          VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
-        `;
+
+        if (tableHasItemId) {
+          try {
+            await sql`
+              INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+              VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+            `;
+          } catch (insertErr) {
+            const msg = (insertErr && insertErr.message) || String(insertErr);
+            if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
+              tableHasItemId = false;
+              await sql`
+                INSERT INTO loot_drops (character_id, username, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+                VALUES (${characterId}, ${username}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+              `;
+            } else {
+              throw insertErr;
+            }
+          }
+        } else {
+          await sql`
+            INSERT INTO loot_drops (character_id, username, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+            VALUES (${characterId}, ${username}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+          `;
+        }
         inserted += 1;
       }
 
