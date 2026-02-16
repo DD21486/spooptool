@@ -325,6 +325,7 @@
 
   let homeChartXp = null;
   let homeChartBoss = null;
+  let homeChartLoadId = 0;
 
   function setHomeChartLabels(isLast24) {
     const xpLabelEl = document.getElementById('home-chart-xp-label');
@@ -335,9 +336,11 @@
 
   function loadHomeCharts() {
     const requestedMode = homeViewMode;
+    const loadId = ++homeChartLoadId;
     fetch(API + '/aggregate-history?hours=24')
       .then((res) => res.json())
       .then((data) => {
+        if (loadId !== homeChartLoadId) return;
         const history = (data.history || []).slice();
         const labels = history.map((h) => {
           const d = new Date(h.at);
