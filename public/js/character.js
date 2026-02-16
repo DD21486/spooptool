@@ -50,6 +50,48 @@
     if (!key) return '';
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
+  /** Map API boss key to /assets/Bosses filename (PascalCase.png); overrides for names that don't match. */
+  function bossImageSrc(bossKey) {
+    if (!bossKey) return '';
+    const overrides = {
+      barrows: 'barrows.png',
+      giant_mole: 'giantmole.png',
+      deranged_archaeologist: 'derangedarchaeologist.png',
+      scurrius: 'scurrius.png',
+      wintertodt: 'Wintertodt.gif',
+      doom_of_mokhaiotl: 'DoomofMokhaiotl.png',
+      phantom_muspah: 'PhantomMuspah.png',
+      shellbane_gryphon: 'Shellbanegryphon.png',
+      sol_heredit: 'SolHeredit.png',
+      chambers_of_xeric: 'ChambersOfXeric.png',
+      chambers_of_xeric_challenge_mode: 'ChambersOfXericChallengeMode.png',
+      theatre_of_blood: 'TheatreOfBlood.png',
+      tombs_of_amascut: 'TombsOfAmascut.png',
+      tombs_of_amascut_expert_mode: 'TombsOfAmascutExpertMode.png',
+      king_black_dragon: 'KingBlackDragon.png',
+      thermonuclear_smoke_devil: 'ThermonuclearSmokeDevil.png',
+      grotesque_guardians: 'GrotesqueGuardians.png',
+      dagannoth_prime: 'DagannothPrime.png',
+      dagannoth_rex: 'DagannothRex.png',
+      dagannoth_supreme: 'DagannothSupreme.png',
+      chaos_elemental: 'ChaosElemental.png',
+      chaos_fanatic: 'ChaosFanatic.png',
+      crazy_archaeologist: 'Crazyarchaeologist.png',
+      commander_zilyana: 'CommanderZilyana.png',
+      general_graardor: 'GeneralGraardor.png',
+      kreearra: 'Kreearra.png',
+      kril_tsutsaroth: 'KrilTsutsaroth.png',
+      corporeal_beast: 'CorporealBeast.png',
+      lunar_chests: 'LunarChests.png',
+      tzkal_zuk: 'TzKalZuk.png',
+      tztok_jad: 'TzTokJad.png',
+      crazy_archaeologist: 'Crazyarchaeologist.png',
+    };
+    const lower = String(bossKey).toLowerCase().trim();
+    if (overrides[lower]) return '/assets/Bosses/' + overrides[lower];
+    const pascal = lower.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join('') + '.png';
+    return '/assets/Bosses/' + pascal;
+  }
   function skillIconSrc(key) {
     if (!key) return '';
     if (key === 'overall') return '/assets/Skills_icon.png';
@@ -199,8 +241,10 @@
       const bossDelta = characterDeltas.bossDeltas[bossKey];
       const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';
       const chartIconBoss = '<button type="button" class="row-chart-btn p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-slate-700" data-boss="' + escapeHtml(bossKey) + '" title="View chart" aria-label="View chart">' + chartIconSvg + '</button>';
+      const bossImgSrc = bossImageSrc(bossKey);
+      const bossIconHtml = bossImgSrc ? '<img src="' + escapeHtml(bossImgSrc) + '" alt="" width="20" height="20" class="w-5 h-5 object-contain shrink-0 rounded-sm" loading="lazy" onerror="this.style.display=\'none\'">' : '';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
-        <td class="px-4 py-2">${skillLabel(bossKey)}</td>
+        <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${skillLabel(bossKey)}</span></div></td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
