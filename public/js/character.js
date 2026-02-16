@@ -46,6 +46,11 @@
     if (n == null || n === undefined) return '—';
     return Number(n).toLocaleString();
   }
+  function escapeHtml(s) {
+    const div = document.createElement('div');
+    div.textContent = s;
+    return div.innerHTML;
+  }
 
   // OSRS cumulative XP table (same as wiki Module:Experience/data). Used for XP-to-next when API doesn't send it.
   const xpTable = (function () {
@@ -285,6 +290,7 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { intersect: false, mode: 'index' },
             plugins: {
               legend: { display: false },
             },

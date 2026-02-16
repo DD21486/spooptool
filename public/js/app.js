@@ -313,6 +313,7 @@
         const chartOpts = (yMin, yMax, tickCallback) => ({
           responsive: true,
           maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
           plugins: { legend: { display: false } },
           scales: {
             x: {
