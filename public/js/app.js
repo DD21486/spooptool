@@ -41,16 +41,11 @@
   const filterSkill = document.getElementById('filter-skill');
   const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
-  const homeLastUpdated = document.getElementById('home-last-updated');
   const homeCaptureCountdown = document.getElementById('home-capture-countdown');
   const tabTotal = document.getElementById('tab-total');
   const tabLast24 = document.getElementById('tab-last24');
 
   let homeViewMode = 'total';
-
-  function setHomeLastUpdated() {
-    if (homeLastUpdated) homeLastUpdated.textContent = 'Last updated @ ' + new Date().toLocaleTimeString();
-  }
 
   function getNextFifteenMin() {
     const now = new Date();
@@ -141,7 +136,11 @@
     const filter = getFilter();
     leftLoading.classList.add('hidden');
     leftTbody.innerHTML = '';
-    leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
+    if (homeViewMode === 'last24') {
+      leftTitle.textContent = filter.type === 'overall' ? 'XP (last 24hrs)' : skillLabel(filter.key) + ' (last 24hrs)';
+    } else {
+      leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
+    }
 
     const rows = characterList.map(username => ({
       username,
@@ -177,7 +176,11 @@
     rightTbody.innerHTML = '';
     const bossKey = (filterRightBoss && filterRightBoss.value) || '';
     if (rightTitle) {
-      rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
+      if (homeViewMode === 'last24') {
+        rightTitle.textContent = bossKey ? formatBossKey(bossKey) + ' (last 24hrs)' : 'Boss KC (last 24hrs)';
+      } else {
+        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Total boss kills';
+      }
     }
     const rows = characterList.map(username => ({
       username,
@@ -269,7 +272,6 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
-      setHomeLastUpdated();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -311,7 +313,6 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
-      setHomeLastUpdated();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -324,6 +325,13 @@
 
   let homeChartXp = null;
   let homeChartBoss = null;
+
+  function setHomeChartLabels(isLast24) {
+    const xpLabelEl = document.getElementById('home-chart-xp-label');
+    const bossLabelEl = document.getElementById('home-chart-boss-label');
+    if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP in last 24 hours' : 'Total XP (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss kills in last 24 hours' : 'Total boss kills (all characters)';
+  }
 
   function loadHomeCharts() {
     fetch(API + '/aggregate-history?hours=24')
@@ -345,8 +353,7 @@
         if (history.length === 0) {
           if (xpTotalEl) xpTotalEl.textContent = '—';
           if (bossTotalEl) bossTotalEl.textContent = '—';
-          if (xpLabelEl) xpLabelEl.textContent = homeViewMode === 'last24' ? 'XP gain in last 24h' : 'Total XP (all characters)';
-          if (bossLabelEl) bossLabelEl.textContent = homeViewMode === 'last24' ? 'Boss KC gain in last 24h' : 'Total boss kills (all characters)';
+          setHomeChartLabels(homeViewMode === 'last24');
           return;
         }
 
@@ -361,9 +368,8 @@
         const lastBoss = bossValues[bossValues.length - 1];
 
         if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
-        if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
-        if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'XP gain in last 24h' : 'Total XP (all characters)';
-        if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC gain in last 24h' : 'Total boss kills (all characters)';
+        if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + (isLast24 ? ' kills (24h)' : ' kills');
+        setHomeChartLabels(isLast24);
 
         function rangeFromLast(lastVal, fallbackMax, padPct) {
           const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
@@ -440,6 +446,8 @@
 
   function setHomeViewMode(mode) {
     homeViewMode = mode;
+    const isLast24 = mode === 'last24';
+    setHomeChartLabels(isLast24);
     if (tabTotal && tabLast24) {
       const isTotal = mode === 'total';
       tabTotal.classList.toggle('bg-sky-600', isTotal);
