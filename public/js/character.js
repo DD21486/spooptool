@@ -42,6 +42,8 @@
   const lootEmpty = document.getElementById('loot-empty');
 
   let characterDeltas = { skillDeltas: {}, bossDeltas: {} };
+  let lootPeriodHours = 24;
+  let lootChartInstance = null;
 
   function skillLabel(key) {
     if (!key) return '';
@@ -215,21 +217,78 @@
     contentEl.classList.remove('hidden');
   }
 
+  function paintLootChart(history) {
+    const canvas = document.getElementById('loot-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (lootChartInstance) {
+      lootChartInstance.destroy();
+      lootChartInstance = null;
+    }
+    if (!history || history.length === 0) return;
+    const labels = history.map((h) => {
+      const d = new Date(h.at);
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    });
+    const values = history.map((h) => Number(h.value) || 0);
+    const maxVal = Math.max(...values, 1);
+    const pad = maxVal * 0.05;
+    const ctx = canvas.getContext('2d');
+    lootChartInstance = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels,
+        datasets: [{
+          label: 'Loot value',
+          data: values,
+          borderColor: 'rgb(56, 189, 248)',
+          backgroundColor: 'rgba(56, 189, 248, 0.1)',
+          fill: true,
+          tension: 0.2,
+          pointRadius: 0,
+          pointHoverRadius: 4,
+        }],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { intersect: false, mode: 'index' },
+        plugins: { legend: { display: false } },
+        scales: {
+          x: {
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } },
+          },
+          y: {
+            min: Math.max(0, values[0] - pad),
+            max: maxVal + pad,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: { color: '#94a3b8', callback: (v) => Number(v).toLocaleString(), font: { size: 10 } },
+          },
+        },
+      },
+    });
+  }
+
   function renderLoot(data) {
     if (!lootTotalDrops || !lootTotalValue || !lootTbody || !lootLoading || !lootEmpty) return;
     if (!data) {
       lootLoading.classList.add('hidden');
       lootEmpty.classList.remove('hidden');
       lootTbody.innerHTML = '';
+      paintLootChart([]);
       return;
     }
     lootLoading.classList.add('hidden');
     const totalDrops = data.totalDrops != null ? data.totalDrops : 0;
     const totalValueGp = data.totalValueGp != null ? data.totalValueGp : 0;
     const drops = Array.isArray(data.drops) ? data.drops : [];
+    const lootHistory = Array.isArray(data.lootHistory) ? data.lootHistory : [];
 
     lootTotalDrops.textContent = formatNum(totalDrops);
     lootTotalValue.textContent = totalValueGp >= 1e6 ? (totalValueGp / 1e6).toFixed(2) + 'M gp' : formatNum(totalValueGp) + ' gp';
+
+    paintLootChart(lootHistory);
 
     const spriteUrl = (id) => 'https://chisel.weirdgloop.org/rsc/config/config18.jag/sprites/' + Number(id) + '.png';
     lootTbody.innerHTML = drops.length === 0
@@ -248,7 +307,29 @@
             '</tr>';
         }).join('');
 
-    lootEmpty.classList.toggle('hidden', totalDrops > 0);
+    lootEmpty.classList.toggle('hidden', drops.length > 0);
+  }
+
+  function fetchLoot() {
+    const url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=20&hours=' + lootPeriodHours;
+    fetch(url)
+      .then((r) => r.json())
+      .then((data) => renderLoot(data))
+      .catch(() => renderLoot(null));
+  }
+
+  function setLootPeriod(hours) {
+    lootPeriodHours = hours;
+    document.querySelectorAll('.loot-filter-btn').forEach((btn) => {
+      const is24 = btn.id === 'loot-filter-24';
+      const active = (hours === 24 && is24) || (hours === 168 && !is24);
+      btn.classList.toggle('bg-sky-600', active);
+      btn.classList.toggle('text-white', active);
+      btn.classList.toggle('bg-slate-700', !active);
+      btn.classList.toggle('text-slate-300', !active);
+      btn.setAttribute('aria-selected', String(active));
+    });
+    fetchLoot();
   }
 
   async function load() {
@@ -261,10 +342,9 @@
     loadingEl.classList.remove('hidden');
     contentEl.classList.add('hidden');
     try {
-      const [res, deltasRes, lootRes] = await Promise.all([
+      const [res, deltasRes] = await Promise.all([
         fetch(API + '/character-snapshot?name=' + encodeURIComponent(name)),
         fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&hours=24'),
-        fetch(API + '/loot?player=' + encodeURIComponent(name) + '&limit=20'),
       ]);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -278,12 +358,7 @@
         characterDeltas = { skillDeltas: {}, bossDeltas: {} };
       }
       render(data);
-      if (lootRes && lootRes.ok) {
-        const lootData = await lootRes.json().catch(() => ({}));
-        renderLoot(lootData);
-      } else {
-        renderLoot(null);
-      }
+      fetchLoot();
     } catch (e) {
       loadingEl.textContent = 'Failed to load';
       showError(e.message || 'Failed to load character');
@@ -455,5 +530,9 @@
     const btn = e.target.closest('.row-chart-btn[data-boss]');
     if (btn) openChartForBoss(btn.getAttribute('data-boss'));
   });
+  const lootFilter24 = document.getElementById('loot-filter-24');
+  const lootFilter168 = document.getElementById('loot-filter-168');
+  if (lootFilter24) lootFilter24.addEventListener('click', () => setLootPeriod(24));
+  if (lootFilter168) lootFilter168.addEventListener('click', () => setLootPeriod(168));
   load();
 })();
