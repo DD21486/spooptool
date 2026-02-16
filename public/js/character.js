@@ -290,7 +290,7 @@
 
     paintLootChart(lootHistory);
 
-    const spriteUrl = (id) => 'https://chisel.weirdgloop.org/rsc/config/config18.jag/sprites/' + Number(id) + '.png';
+    const spriteUrl = (id) => API + '/loot-icon?id=' + Number(id);
     lootTbody.innerHTML = drops.length === 0
       ? '<tr><td colspan="3" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
