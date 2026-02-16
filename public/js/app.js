@@ -330,10 +330,11 @@
     const xpLabelEl = document.getElementById('home-chart-xp-label');
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP in last 24 hours' : 'Total XP (all characters)';
-    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss kills in last 24 hours' : 'Total boss kills (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Total boss kills in last 24 hours' : 'Total boss kills (all characters)';
   }
 
   function loadHomeCharts() {
+    const requestedMode = homeViewMode;
     fetch(API + '/aggregate-history?hours=24')
       .then((res) => res.json())
       .then((data) => {
@@ -353,11 +354,11 @@
         if (history.length === 0) {
           if (xpTotalEl) xpTotalEl.textContent = '—';
           if (bossTotalEl) bossTotalEl.textContent = '—';
-          setHomeChartLabels(homeViewMode === 'last24');
+          setHomeChartLabels(requestedMode === 'last24');
           return;
         }
 
-        const isLast24 = homeViewMode === 'last24';
+        const isLast24 = requestedMode === 'last24';
         const xpValues = isLast24
           ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalXp) - Number(history[0].totalXp))))
           : history.map((h) => h.totalXp);
@@ -367,7 +368,7 @@
         const lastXp = xpValues[xpValues.length - 1];
         const lastBoss = bossValues[bossValues.length - 1];
 
-        if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
+        if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + (isLast24 ? ' XP (24h)' : ' XP');
         if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + (isLast24 ? ' kills (24h)' : ' kills');
         setHomeChartLabels(isLast24);
 
