@@ -8,10 +8,20 @@
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
 
-const DELAY_MS_BETWEEN_CHARACTERS = 2500;
+/** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
+const DELAY_MS_BETWEEN_BATCHES = 1500;
+/** How many characters to fetch in parallel per batch. */
+const BATCH_CONCURRENCY = 2;
 
 function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
+}
+
+/** Process array in chunks of size n. */
+function chunk(arr, n) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+  return out;
 }
 
 function authorize(req) {
@@ -59,34 +69,49 @@ module.exports = async function handler(req, res) {
   }
 
   const sql = neon(process.env.DATABASE_URL);
-  const characters = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
+  let characters = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
   if (characters.length === 0) {
     return res.status(200).json({ ok: true, snapshots: 0, message: 'No characters' });
   }
 
+  const limit = Math.min(parseInt(req.query.limit, 10) || characters.length, 20);
+  const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  characters = characters.slice(offset, offset + limit);
+
   let written = 0;
   const errors = [];
+  const batches = chunk(characters, BATCH_CONCURRENCY);
 
-  for (const row of characters) {
-    try {
-      const player = await getStats(row.username);
-      const data = buildSnapshotData(player);
-      if (data) {
-        await sql`INSERT INTO character_snapshots (character_id, at, data) VALUES (${row.id}, NOW(), ${JSON.stringify(data)})`;
-        written += 1;
-      }
-    } catch (e) {
-      errors.push({ username: row.username, error: (e.message || String(e)).slice(0, 100) });
+  for (let i = 0; i < batches.length; i++) {
+    const batch = batches[i];
+    const results = await Promise.all(
+      batch.map(async (row) => {
+        try {
+          const player = await getStats(row.username);
+          const data = buildSnapshotData(player);
+          if (data) {
+            await sql`INSERT INTO character_snapshots (character_id, at, data) VALUES (${row.id}, NOW(), ${JSON.stringify(data)})`;
+            return { ok: true };
+          }
+          return { ok: false };
+        } catch (e) {
+          return { ok: false, username: row.username, error: (e.message || String(e)).slice(0, 100) };
+        }
+      })
+    );
+    for (const r of results) {
+      if (r.ok) written += 1;
+      else if (r.username) errors.push({ username: r.username, error: r.error });
     }
-    if (characters.indexOf(row) < characters.length - 1) {
-      await delay(DELAY_MS_BETWEEN_CHARACTERS);
-    }
+    if (i < batches.length - 1) await delay(DELAY_MS_BETWEEN_BATCHES);
   }
 
   return res.status(200).json({
     ok: true,
     snapshots: written,
     characters: characters.length,
+    offset,
+    limit,
     errors: errors.length ? errors : undefined,
   });
 };
