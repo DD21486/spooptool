@@ -53,6 +53,8 @@
   const lootValueTh = document.getElementById('loot-value-th');
 
   let homeViewMode = 'total';
+  let lootTopDropsCache = {};
+  let homeTooltipHideTimer = null;
 
   const CRON_TZ = 'America/New_York';
   /** Next :00 or :30 in America/New_York (cron schedule). */
@@ -253,7 +255,8 @@
       const displayValue = homeViewMode === 'last24'
         ? (r.xpDelta != null && r.xpDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.xpDelta)}</span>` : '—')
         : (r.value != null ? formatNum(r.value) : '—');
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
+      const valueCell = `<span class="home-value-cell cursor-help" data-table="xp" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       leftTbody.appendChild(tr);
     });
   }
@@ -277,13 +280,25 @@
       const p = list.find((x) => (x.username || '').toLowerCase() === (username || '').toLowerCase());
       return p ? Number(p.totalValueGp) || 0 : 0;
     };
+    function coinTierForValue(gp) {
+      const v = Number(gp) || 0;
+      if (v <= 80000) return 'Coins_1';
+      if (v <= 150000) return 'Coins_2';
+      if (v <= 400000) return 'Coins_3';
+      if (v <= 1100000) return 'Coins_4';
+      return 'Coins_5';
+    }
+    const assetsBase = (typeof window !== 'undefined' && window.location && window.location.origin ? window.location.origin : '') + '/assets/';
     const rows = characterList.map((username) => ({ username, value: getValue(username) }));
     rows.sort((a, b) => b.value - a.value);
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
       const displayValue = r.value >= 1e6 ? (r.value / 1e6).toFixed(2) + 'M gp' : formatNum(r.value) + ' gp';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
+      const coinTier = coinTierForValue(r.value);
+      const coinImg = '<img src="' + escapeHtml(assetsBase + coinTier + '.webp') + '" alt="" width="16" height="16" class="w-4 h-4 object-contain shrink-0 inline-block" loading="lazy" onerror="this.style.display=\'none\'">';
+      const valueCell = `<span class="home-value-cell cursor-help inline-flex items-center justify-end gap-1.5" data-table="loot" data-username="${escapeHtml(r.username)}" title="">${coinImg}<span>${displayValue}</span></span>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       lootTbody.appendChild(tr);
     });
   }
@@ -326,7 +341,8 @@
       const displayValue = homeViewMode === 'last24'
         ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
         : formatNum(r.kc);
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${displayValue}</td>`;
+      const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       rightTbody.appendChild(tr);
     });
   }
@@ -336,6 +352,130 @@
     div.textContent = s;
     return div.innerHTML;
   }
+
+  const homeTooltipEl = document.getElementById('home-value-tooltip');
+  function showHomeTooltip(content, anchor) {
+    if (!homeTooltipEl) return;
+    homeTooltipEl.innerHTML = content;
+    homeTooltipEl.classList.remove('hidden');
+    homeTooltipEl.setAttribute('aria-hidden', 'false');
+    const rect = anchor.getBoundingClientRect();
+    const ttRect = homeTooltipEl.getBoundingClientRect();
+    let left = rect.left + rect.width / 2 - ttRect.width / 2;
+    let top = rect.top - ttRect.height - 6;
+    if (top < 8) top = rect.bottom + 6;
+    if (left < 8) left = 8;
+    if (left + ttRect.width > window.innerWidth - 8) left = window.innerWidth - ttRect.width - 8;
+    homeTooltipEl.style.left = left + 'px';
+    homeTooltipEl.style.top = top + 'px';
+  }
+  function hideHomeTooltip() {
+    if (homeTooltipEl) {
+      homeTooltipEl.classList.add('hidden');
+      homeTooltipEl.setAttribute('aria-hidden', 'true');
+    }
+    if (homeTooltipHideTimer) {
+      clearTimeout(homeTooltipHideTimer);
+      homeTooltipHideTimer = null;
+    }
+  }
+  function buildXpTooltipContent(username) {
+    const player = playerData[username];
+    const deltas = last24hDeltas[username];
+    const isLast24 = homeViewMode === 'last24';
+    let lines = [];
+    if (isLast24 && deltas && deltas.skillDeltas) {
+      const entries = Object.entries(deltas.skillDeltas)
+        .filter(([k]) => k !== 'overall')
+        .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
+        .sort((a, b) => b.delta - a.delta)
+        .slice(0, 3);
+      if (entries.length === 0) return '<div class="text-slate-400">No skill gains in last 24h</div>';
+      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 skills (24h)</div>');
+      entries.forEach((e) => { lines.push('<div class="text-green-400/90">' + escapeHtml(skillLabel(e.key)) + ': +' + formatNum(e.delta) + ' XP</div>'); });
+    } else if (player && player.skills) {
+      const entries = Object.entries(player.skills)
+        .filter(([k]) => k !== 'overall')
+        .map(([k, s]) => ({ key: k, xp: (s && (s.xp != null ? s.xp : s.experience)) || 0 }))
+        .sort((a, b) => b.xp - a.xp)
+        .slice(0, 3);
+      if (entries.length === 0) return '<div class="text-slate-400">No skills</div>';
+      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 skills (total)</div>');
+      entries.forEach((e) => { lines.push('<div>' + escapeHtml(skillLabel(e.key)) + ': ' + formatNum(e.xp) + ' XP</div>'); });
+    } else return '<div class="text-slate-400">No data</div>';
+    return lines.join('');
+  }
+  function buildBossTooltipContent(username) {
+    const player = playerData[username];
+    const deltas = last24hDeltas[username];
+    const isLast24 = homeViewMode === 'last24';
+    let lines = [];
+    if (isLast24 && deltas && deltas.bossDeltas) {
+      const entries = Object.entries(deltas.bossDeltas)
+        .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
+        .filter((e) => e.delta > 0)
+        .sort((a, b) => b.delta - a.delta)
+        .slice(0, 3);
+      if (entries.length === 0) return '<div class="text-slate-400">No boss kills in last 24h</div>';
+      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 bosses (24h)</div>');
+      entries.forEach((e) => { lines.push('<div class="text-green-400/90">' + escapeHtml(formatBossKey(e.key)) + ': +' + formatNum(e.delta) + ' KC</div>'); });
+    } else if (player && player.bosses) {
+      const entries = Object.entries(player.bosses)
+        .map(([k, b]) => ({ key: k, kc: (b && (b.count != null ? b.count : b.kc)) || 0 }))
+        .filter((e) => e.kc > 0)
+        .sort((a, b) => b.kc - a.kc)
+        .slice(0, 3);
+      if (entries.length === 0) return '<div class="text-slate-400">No boss kills</div>';
+      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 bosses (total)</div>');
+      entries.forEach((e) => { lines.push('<div>' + escapeHtml(formatBossKey(e.key)) + ': ' + formatNum(e.kc) + ' KC</div>'); });
+    } else return '<div class="text-slate-400">No data</div>';
+    return lines.join('');
+  }
+  async function fetchAndBuildLootTooltipContent(username) {
+    const cacheKey = username + (homeViewMode === 'last24' ? ':24' : ':all');
+    if (lootTopDropsCache[cacheKey]) return lootTopDropsCache[cacheKey];
+    const url = API + '/loot?player=' + encodeURIComponent(username) + '&limit=3' + (homeViewMode === 'last24' ? '&hours=24' : '');
+    try {
+      const res = await fetch(url);
+      const data = await res.json();
+      const drops = Array.isArray(data.drops) ? data.drops : [];
+      if (drops.length === 0) return '<div class="text-slate-400">No loot recorded</div>';
+      let html = '<div class="font-semibold text-slate-300 mb-1">Top 3 by value</div>';
+      drops.slice(0, 3).forEach((d) => {
+        const val = Number(d.total_value_gp) || 0;
+        const valStr = val >= 1e6 ? (val / 1e6).toFixed(2) + 'M' : formatNum(val);
+        html += '<div>' + escapeHtml(d.item_name || '—') + ': ' + valStr + ' gp</div>';
+      });
+      lootTopDropsCache[cacheKey] = html;
+      return html;
+    } catch (_) {
+      return '<div class="text-slate-400">Failed to load</div>';
+    }
+  }
+
+  document.addEventListener('mouseenter', function (e) {
+    const cell = e.target.closest('.home-value-cell');
+    if (!cell || !homeTooltipEl) return;
+    if (homeTooltipHideTimer) { clearTimeout(homeTooltipHideTimer); homeTooltipHideTimer = null; }
+    const table = cell.getAttribute('data-table');
+    const username = cell.getAttribute('data-username');
+    if (!username) return;
+    if (table === 'xp') {
+      showHomeTooltip(buildXpTooltipContent(username), cell);
+    } else if (table === 'boss') {
+      showHomeTooltip(buildBossTooltipContent(username), cell);
+    } else if (table === 'loot') {
+      showHomeTooltip('<div class="text-slate-400">Loading…</div>', cell);
+      fetchAndBuildLootTooltipContent(username).then((content) => {
+        if (homeTooltipEl && !homeTooltipEl.classList.contains('hidden')) showHomeTooltip(content, cell);
+      });
+    }
+  }, true);
+  document.addEventListener('mouseleave', function (e) {
+    const cell = e.target.closest('.home-value-cell');
+    if (!cell || !homeTooltipEl) return;
+    homeTooltipHideTimer = setTimeout(hideHomeTooltip, 120);
+  }, true);
 
   function populateFilterBoss() {
     const keys = new Set();
