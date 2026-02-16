@@ -43,6 +43,7 @@
 
   let characterDeltas = { skillDeltas: {}, bossDeltas: {} };
   let lootPeriodHours = 24;
+  let lootSourceFilter = '';
   let lootChartInstance = null;
 
   function skillLabel(key) {
@@ -288,11 +289,18 @@
     lootTotalDrops.textContent = formatNum(totalDrops);
     lootTotalValue.textContent = totalValueGp >= 1e6 ? (totalValueGp / 1e6).toFixed(2) + 'M gp' : formatNum(totalValueGp) + ' gp';
 
+    const lootFilterFrom = document.getElementById('loot-filter-from');
+    if (lootFilterFrom && Array.isArray(data.sources)) {
+      lootFilterFrom.innerHTML = '<option value="">All</option>' +
+        data.sources.map((s) => '<option value="' + escapeHtml(s) + '">' + escapeHtml(s) + '</option>').join('');
+      lootFilterFrom.value = data.sources.includes(lootSourceFilter) ? lootSourceFilter : '';
+    }
+
     paintLootChart(lootHistory);
 
     const spriteUrl = (id) => API + '/loot-icon?id=' + Number(id);
     lootTbody.innerHTML = drops.length === 0
-      ? '<tr><td colspan="3" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
+      ? '<tr><td colspan="4" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
           const valueStr = d.total_value_gp >= 1e6 ? (d.total_value_gp / 1e6).toFixed(2) + 'M' : formatNum(d.total_value_gp);
           const itemId = d.item_id != null && !Number.isNaN(Number(d.item_id)) ? Number(d.item_id) : null;
@@ -300,8 +308,10 @@
             ? '<img src="' + escapeHtml(spriteUrl(itemId)) + '" alt="" width="20" height="20" class="w-5 h-5 object-contain shrink-0" loading="lazy" onerror="this.style.display=\'none\'">'
             : '';
           const nameCell = '<td class="px-4 py-2 text-slate-200"><div class="flex items-center gap-2">' + iconHtml + '<span>' + escapeHtml(d.item_name || '') + '</span></div></td>';
+          const fromCell = '<td class="px-4 py-2 text-slate-400">' + escapeHtml(d.source || '—') + '</td>';
           return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
             nameCell +
+            fromCell +
             '<td class="px-4 py-2 text-right font-mono text-slate-300">' + escapeHtml(String(d.quantity)) + '</td>' +
             '<td class="px-4 py-2 text-right font-mono text-slate-200">' + escapeHtml(valueStr) + '</td>' +
             '</tr>';
@@ -311,7 +321,8 @@
   }
 
   function fetchLoot() {
-    const url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=20&hours=' + lootPeriodHours;
+    let url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=20&hours=' + lootPeriodHours;
+    if (lootSourceFilter) url += '&source=' + encodeURIComponent(lootSourceFilter);
     fetch(url)
       .then((r) => r.json())
       .then((data) => renderLoot(data))
@@ -532,7 +543,12 @@
   });
   const lootFilter24 = document.getElementById('loot-filter-24');
   const lootFilter168 = document.getElementById('loot-filter-168');
+  const lootFilterFrom = document.getElementById('loot-filter-from');
   if (lootFilter24) lootFilter24.addEventListener('click', () => setLootPeriod(24));
   if (lootFilter168) lootFilter168.addEventListener('click', () => setLootPeriod(168));
+  if (lootFilterFrom) lootFilterFrom.addEventListener('change', function () {
+    lootSourceFilter = (this.value || '').trim();
+    fetchLoot();
+  });
   load();
 })();

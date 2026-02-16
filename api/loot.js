@@ -80,6 +80,9 @@ module.exports = async function handler(req, res) {
       const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
       const hours = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
       const periodFilter = hours === 24 || hours === 168 ? hours : null;
+      const sourceFilter = (req.query.source || req.query.from || '').trim() || null;
+
+      const sourceCond = sourceFilter ? sql`AND TRIM(source) = TRIM(${sourceFilter})` : sql``;
 
       let agg;
       if (periodFilter != null) {
@@ -88,12 +91,14 @@ module.exports = async function handler(req, res) {
           FROM loot_drops
           WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
             AND at >= NOW() - make_interval(hours => ${periodFilter})
+            ${sourceCond}
         `;
       } else {
         agg = await sql`
           SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
           FROM loot_drops
           WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+          ${sourceCond}
         `;
       }
       const a = agg[0] || { total_drops: 0, total_value_gp: 0 };
@@ -105,6 +110,7 @@ module.exports = async function handler(req, res) {
           FROM loot_drops
           WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
             AND at >= NOW() - make_interval(hours => ${periodFilter})
+            ${sourceCond}
           GROUP BY date_trunc('hour', at)
           ORDER BY bucket ASC
         `;
@@ -115,10 +121,21 @@ module.exports = async function handler(req, res) {
         });
       }
 
+      const sourceRows = await sql`
+        SELECT DISTINCT TRIM(source) AS source
+        FROM loot_drops
+        WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+          AND source IS NOT NULL
+          AND TRIM(source) != ''
+        ORDER BY source ASC
+      `;
+      const sources = sourceRows.map((r) => r.source);
+
       let grouped;
       try {
         grouped = await sql`
-          SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp
+          SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+            (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
           FROM loot_drops
           WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
           GROUP BY item_id, item_name
@@ -129,7 +146,8 @@ module.exports = async function handler(req, res) {
         const msg = (groupErr && groupErr.message) || String(groupErr);
         if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
           grouped = await sql`
-            SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp
+            SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+              (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
             FROM loot_drops
             WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
             GROUP BY item_name
@@ -147,6 +165,7 @@ module.exports = async function handler(req, res) {
         item_name: r.item_name,
         quantity: r.quantity,
         total_value_gp: Number(r.total_value_gp),
+        source: r.source != null ? r.source : null,
       }));
 
       res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
@@ -155,6 +174,7 @@ module.exports = async function handler(req, res) {
         totalValueGp: Number(a.total_value_gp),
         lootHistory: lootHistory.length ? lootHistory : undefined,
         drops,
+        sources,
       });
     }
 

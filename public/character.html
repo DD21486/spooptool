@@ -63,9 +63,17 @@
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" id="loot-section">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Loot</h2>
         <div class="px-4 py-3 border-b border-slate-700">
-          <nav class="flex gap-1 mb-3" role="tablist" aria-label="Loot period">
-            <button type="button" id="loot-filter-24" role="tab" aria-selected="true" class="loot-filter-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-600 text-white">Last 24 hours</button>
-            <button type="button" id="loot-filter-168" role="tab" aria-selected="false" class="loot-filter-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Last 7 days</button>
+          <nav class="flex flex-wrap items-center gap-3 mb-3" role="tablist" aria-label="Loot period">
+            <div class="flex gap-1">
+              <button type="button" id="loot-filter-24" role="tab" aria-selected="true" class="loot-filter-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-600 text-white">Last 24 hours</button>
+              <button type="button" id="loot-filter-168" role="tab" aria-selected="false" class="loot-filter-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Last 7 days</button>
+            </div>
+            <label class="flex items-center gap-2 text-sm text-slate-400">
+              From:
+              <select id="loot-filter-from" class="rounded-lg border border-slate-600 bg-slate-700 text-slate-200 px-2 py-1.5 text-sm min-w-[10rem]" aria-label="Filter by source (From)">
+                <option value="">All</option>
+              </select>
+            </label>
           </nav>
           <div class="flex flex-wrap gap-6 text-sm mb-2">
             <span><span class="text-slate-500">Loot drops:</span> <span id="loot-total-drops" class="font-mono text-slate-200">—</span></span>
@@ -82,6 +90,7 @@
               <thead>
                 <tr class="border-b border-slate-700 bg-slate-800/80">
                   <th class="text-left px-4 py-2 text-slate-400 font-medium">Name</th>
+                  <th class="text-left px-4 py-2 text-slate-400 font-medium">From</th>
                   <th class="text-right px-4 py-2 text-slate-400 font-medium">Amount</th>
                   <th class="text-right px-4 py-2 text-slate-400 font-medium">Value</th>
                 </tr>
