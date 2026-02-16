@@ -68,6 +68,7 @@ module.exports = async function handler(req, res) {
       };
     });
 
+    res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json({ deltas });
   } catch (err) {
     console.error('/api/characters-deltas', err);

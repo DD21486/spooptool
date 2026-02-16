@@ -39,6 +39,7 @@ module.exports = async function handler(req, res) {
       latestSnapshot: r.latest_snapshot ? { skills: r.latest_snapshot.skills || {}, bosses: r.latest_snapshot.bosses || {} } : null,
     }));
 
+    res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json({ characters });
   } catch (err) {
     console.error('/api/characters-with-snapshots', err);

@@ -28,6 +28,7 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'GET') {
       const rows = await sql`SELECT id, username, game_mode, added_at FROM characters ORDER BY added_at ASC`;
+      res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
       return res.status(200).json(rows);
     }
 

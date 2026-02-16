@@ -46,6 +46,7 @@ module.exports = async function handler(req, res) {
       bosses,
       activities: player.main.clues || {},
     };
+    res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json(out);
   } catch (err) {
     if (err.message && (err.message.includes('not found') || err.message.includes('404') || err.message.includes('404'))) {

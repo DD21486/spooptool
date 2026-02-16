@@ -57,16 +57,25 @@
     if (n == null || n === undefined) return '—';
     return Number(n).toLocaleString();
   }
-  /** Last 15-minute boundary that has passed (e.g. 3:37 → 3:30). */
-  function getLastFifteenMinInterval() {
-    const d = new Date();
-    const min = d.getMinutes();
-    const rounded = Math.floor(min / 15) * 15;
-    const out = new Date(d);
-    out.setMinutes(rounded);
-    out.setSeconds(0);
-    out.setMilliseconds(0);
-    return out;
+  /** Last :00 or :30 in America/New_York (matches cron schedule). Returns string e.g. "11:30 PM ET". */
+  function getLastCronRunInNY() {
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/New_York',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: false,
+    });
+    const now = new Date();
+    const parts = formatter.formatToParts(now);
+    const get = (name) => parts.find((p) => p.type === name)?.value || '0';
+    const nyMin = parseInt(get('minute'), 10);
+    let nyHour = parseInt(get('hour'), 10);
+    const runMin = nyMin < 30 ? 0 : 30;
+    const runHour = nyMin < 30 ? nyHour : nyHour;
+    const h12 = runHour % 12 || 12;
+    const period = runHour >= 12 ? 'PM' : 'AM';
+    const minStr = runMin === 0 ? '00' : '30';
+    return h12 + ':' + minStr + ' ' + period + ' ET';
   }
   function escapeHtml(s) {
     const div = document.createElement('div');
@@ -118,8 +127,8 @@
     document.title = (data.name || name) + ' – SpoopTool';
     charName.textContent = data.name || name;
     charMode.textContent = (data.mode || 'main').replace(/\b\w/g, c => c.toUpperCase());
-    const lastCapture = getLastFifteenMinInterval();
-    lastUpdated.textContent = 'Last capture: ' + lastCapture.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    const lastCapture = getLastCronRunInNY();
+    lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
     const skills = data.skills || {};
     const skillOrder = ['overall', 'attack', 'hitpoints', 'mining', 'strength', 'agility', 'smithing', 'defence', 'herblore', 'fishing', 'ranged', 'thieving', 'cooking', 'prayer', 'crafting', 'firemaking', 'magic', 'fletching', 'woodcutting', 'runecraft', 'slayer', 'farming', 'construction', 'hunter'];
@@ -206,7 +215,7 @@
     contentEl.classList.add('hidden');
     try {
       const [res, deltasRes] = await Promise.all([
-        fetch(API + '/player/' + encodeURIComponent(name)),
+        fetch(API + '/character-snapshot?name=' + encodeURIComponent(name)),
         fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&hours=24'),
       ]);
       if (!res.ok) {

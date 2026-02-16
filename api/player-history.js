@@ -71,6 +71,7 @@ module.exports = async function handler(req, res) {
       return { at: r.at instanceof Date ? r.at.toISOString() : r.at, totalXp: xp };
     });
 
+    res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json({ history });
   } catch (err) {
     console.error('/api/player-history', err);

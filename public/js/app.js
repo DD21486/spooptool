@@ -48,20 +48,36 @@
 
   let homeViewMode = 'total';
 
-  function getNextFifteenMin() {
-    const now = new Date();
-    const min = now.getMinutes();
-    const nextMin = (Math.floor(min / 15) + 1) * 15;
-    const next = new Date(now);
-    if (nextMin >= 60) {
-      next.setHours(next.getHours() + 1);
-      next.setMinutes(0);
-    } else {
-      next.setMinutes(nextMin);
+  const CRON_TZ = 'America/New_York';
+  /** Next :00 or :30 in America/New_York (cron schedule). */
+  function getNextCronRun() {
+    const now = Date.now();
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: CRON_TZ,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: 'numeric',
+      minute: 'numeric',
+      second: 'numeric',
+      hour12: false,
+    });
+    let candidate = new Date(now);
+    candidate.setSeconds(0);
+    candidate.setMilliseconds(0);
+    candidate.setMinutes(candidate.getMinutes() + 1);
+    for (let i = 0; i < 35; i++) {
+      const parts = formatter.formatToParts(candidate);
+      const get = (name) => parts.find((p) => p.type === name)?.value || '0';
+      const nyMin = parseInt(get('minute'), 10);
+      const nySec = parseInt(get('second'), 10);
+      if (nyMin === 0 || nyMin === 30) {
+        const runTime = new Date(candidate.getTime() - nySec * 1000);
+        if (runTime.getTime() > now) return runTime;
+      }
+      candidate = new Date(candidate.getTime() + 60000);
     }
-    next.setSeconds(0);
-    next.setMilliseconds(0);
-    return next;
+    return new Date(now + 30 * 60 * 1000);
   }
 
   function formatCountdown(ms) {
@@ -76,14 +92,14 @@
 
   function tickCaptureCountdown() {
     if (!homeCaptureCountdown) return;
-    const next = getNextFifteenMin();
-    const ms = next - Date.now();
+    const next = getNextCronRun();
+    const ms = next.getTime() - Date.now();
     const totalSec = Math.max(0, Math.floor(ms / 1000));
     homeCaptureCountdown.textContent = formatCountdown(ms);
     if (homeRefreshWrap) {
-      const inFirstMinuteAfterReset = totalSec >= 14 * 60 && totalSec < 15 * 60;
+      const inLastMinuteBeforeRun = totalSec >= 29 * 60 && totalSec < 30 * 60;
       const atZero = totalSec === 0;
-      homeRefreshWrap.classList.toggle('hidden', !inFirstMinuteAfterReset && !atZero);
+      homeRefreshWrap.classList.toggle('hidden', !inLastMinuteBeforeRun && !atZero);
     }
   }
 
