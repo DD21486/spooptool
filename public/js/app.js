@@ -52,7 +52,7 @@
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
 
-  let homeViewMode = 'total';
+  let homeViewMode = 'last24';
   let lootTopDropsCache = {};
   let homeTooltipHideTimer = null;
 
@@ -186,6 +186,47 @@
 
   function formatBossKey(key) {
     return (key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  }
+
+  function bossImageSrc(bossKey) {
+    if (!bossKey) return '';
+    const overrides = {
+      barrows: 'barrows.png', giant_mole: 'giantmole.png', giantmole: 'giantmole.png',
+      deranged_archaeologist: 'derangedarchaeologist.png', derangedarchaeologist: 'derangedarchaeologist.png',
+      scurrius: 'scurrius.png', wintertodt: 'Wintertodt.gif', doom_of_mokhaiotl: 'DoomofMokhaiotl.png', doomofmokhaiotl: 'DoomofMokhaiotl.png',
+      phantom_muspah: 'PhantomMuspah.png', phantommuspah: 'PhantomMuspah.png', shellbane_gryphon: 'Shellbanegryphon.png', shellbanegryphon: 'Shellbanegryphon.png',
+      sol_heredit: 'SolHeredit.png', solheredit: 'SolHeredit.png', chambers_of_xeric: 'ChambersOfXeric.png', chambersofxeric: 'ChambersOfXeric.png',
+      chambers_of_xeric_challenge_mode: 'ChambersOfXericChallengeMode.png', chambersofxericchallengemode: 'ChambersOfXericChallengeMode.png',
+      theatre_of_blood: 'TheatreOfBlood.png', theatreofblood: 'TheatreOfBlood.png', tombs_of_amascut: 'TombsOfAmascut.png', tombsofamascut: 'TombsOfAmascut.png',
+      tombs_of_amascut_expert_mode: 'TombsOfAmascutExpertMode.png', tombsofamascutexpertmode: 'TombsOfAmascutExpertMode.png',
+      king_black_dragon: 'KingBlackDragon.png', kingblackdragon: 'KingBlackDragon.png',
+      thermonuclear_smoke_devil: 'ThermonuclearSmokeDevil.png', thermonuclearsmokedevil: 'ThermonuclearSmokeDevil.png',
+      grotesque_guardians: 'GrotesqueGuardians.png', grotesqueguardians: 'GrotesqueGuardians.png',
+      dagannoth_prime: 'DagannothPrime.png', dagannothprime: 'DagannothPrime.png', dagannoth_rex: 'DagannothRex.png', dagannothrex: 'DagannothRex.png',
+      dagannoth_supreme: 'DagannothSupreme.png', dagannothsupreme: 'DagannothSupreme.png',
+      chaos_elemental: 'ChaosElemental.png', chaoselemental: 'ChaosElemental.png', chaos_fanatic: 'ChaosFanatic.png', chaosfanatic: 'ChaosFanatic.png',
+      crazy_archaeologist: 'Crazyarchaeologist.png', crazyarchaeologist: 'Crazyarchaeologist.png',
+      commander_zilyana: 'CommanderZilyana.png', commanderzilyana: 'CommanderZilyana.png', general_graardor: 'GeneralGraardor.png', generalgraardor: 'GeneralGraardor.png',
+      kreearra: 'Kreearra.png', kril_tsutsaroth: 'KrilTsutsaroth.png', kriltsutsaroth: 'KrilTsutsaroth.png',
+      corporeal_beast: 'CorporealBeast.png', corporealbeast: 'CorporealBeast.png', lunar_chests: 'LunarChests.png', lunarchests: 'LunarChests.png',
+      tzkal_zuk: 'TzKalZuk.png', tzkalzuk: 'TzKalZuk.png', tztok_jad: 'TzTokJad.png', tztokjad: 'TzTokJad.png',
+      abyssal_sire: 'AbyssalSire.png', abyssalsire: 'AbyssalSire.png', alchemical_hydra: 'AlchemicalHydra.png', alchemicalhydra: 'AlchemicalHydra.png',
+      duke_sucellus: 'DukeSucellus.png', dukesucellus: 'DukeSucellus.png', the_whisperer: 'TheWhisperer.png', whisperer: 'TheWhisperer.png',
+      kalphite_queen: 'KalphiteQueen.png', kalphitequeen: 'KalphiteQueen.png', royal_titans: 'RoyalTitans.png', royaltitans: 'RoyalTitans.png',
+      corrupted_gauntlet: 'CorruptedGuantlet.png', corruptedgauntlet: 'CorruptedGuantlet.png',
+      phosani_nightmare: 'PhosanisNightmare.png', phosanis_nightmare: 'PhosanisNightmare.png', phosanisnightmare: 'PhosanisNightmare.png', gauntlet: 'Gauntlet.png',
+    };
+    const lower = String(bossKey).toLowerCase().trim().replace(/\s+/g, '_');
+    if (overrides[lower]) return '/assets/bosses/' + overrides[lower];
+    const pascal = lower.split('_').map(function (w) { return w.charAt(0).toUpperCase() + w.slice(1); }).join('') + '.png';
+    return '/assets/bosses/' + pascal;
+  }
+
+  function skillIconSrc(key) {
+    if (!key) return '';
+    if (key === 'overall') return '/assets/Skills_icon.png';
+    const name = skillLabel(key).replace(/\s+/g, '');
+    return '/assets/' + name + '_icon.png';
   }
 
   function getFilter() {
@@ -383,53 +424,76 @@
     const player = playerData[username];
     const deltas = last24hDeltas[username];
     const isLast24 = homeViewMode === 'last24';
-    let lines = [];
+    let header = '';
+    let entries = [];
     if (isLast24 && deltas && deltas.skillDeltas) {
-      const entries = Object.entries(deltas.skillDeltas)
+      entries = Object.entries(deltas.skillDeltas)
         .filter(([k]) => k !== 'overall')
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
       if (entries.length === 0) return '<div class="text-slate-400">No skill gains in last 24h</div>';
-      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 skills (24h)</div>');
-      entries.forEach((e) => { lines.push('<div class="text-green-400/90">' + escapeHtml(skillLabel(e.key)) + ': +' + formatNum(e.delta) + ' XP</div>'); });
-    } else if (player && player.skills) {
-      const entries = Object.entries(player.skills)
+      header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 skills (24h)</div>';
+      return header + entries.map((e) => {
+        const icon = skillIconSrc(e.key);
+        const name = escapeHtml(skillLabel(e.key));
+        const val = '+' + formatNum(e.delta) + ' XP';
+        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums text-green-400/90">' + escapeHtml(val) + '</span></div>';
+      }).join('');
+    }
+    if (player && player.skills) {
+      entries = Object.entries(player.skills)
         .filter(([k]) => k !== 'overall')
         .map(([k, s]) => ({ key: k, xp: (s && (s.xp != null ? s.xp : s.experience)) || 0 }))
         .sort((a, b) => b.xp - a.xp)
         .slice(0, 3);
       if (entries.length === 0) return '<div class="text-slate-400">No skills</div>';
-      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 skills (total)</div>');
-      entries.forEach((e) => { lines.push('<div>' + escapeHtml(skillLabel(e.key)) + ': ' + formatNum(e.xp) + ' XP</div>'); });
-    } else return '<div class="text-slate-400">No data</div>';
-    return lines.join('');
+      header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 skills (total)</div>';
+      return header + entries.map((e) => {
+        const icon = skillIconSrc(e.key);
+        const name = escapeHtml(skillLabel(e.key));
+        const val = formatNum(e.xp) + ' XP';
+        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums">' + escapeHtml(val) + '</span></div>';
+      }).join('');
+    }
+    return '<div class="text-slate-400">No data</div>';
   }
   function buildBossTooltipContent(username) {
     const player = playerData[username];
     const deltas = last24hDeltas[username];
     const isLast24 = homeViewMode === 'last24';
-    let lines = [];
+    let entries = [];
     if (isLast24 && deltas && deltas.bossDeltas) {
-      const entries = Object.entries(deltas.bossDeltas)
+      entries = Object.entries(deltas.bossDeltas)
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .filter((e) => e.delta > 0)
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
       if (entries.length === 0) return '<div class="text-slate-400">No boss kills in last 24h</div>';
-      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 bosses (24h)</div>');
-      entries.forEach((e) => { lines.push('<div class="text-green-400/90">' + escapeHtml(formatBossKey(e.key)) + ': +' + formatNum(e.delta) + ' KC</div>'); });
-    } else if (player && player.bosses) {
-      const entries = Object.entries(player.bosses)
+      const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (24h)</div>';
+      return header + entries.map((e) => {
+        const icon = bossImageSrc(e.key);
+        const name = escapeHtml(formatBossKey(e.key));
+        const val = '+' + formatNum(e.delta) + ' KC';
+        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain rounded-sm" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums text-green-400/90">' + escapeHtml(val) + '</span></div>';
+      }).join('');
+    }
+    if (player && player.bosses) {
+      entries = Object.entries(player.bosses)
         .map(([k, b]) => ({ key: k, kc: (b && (b.count != null ? b.count : b.kc)) || 0 }))
         .filter((e) => e.kc > 0)
         .sort((a, b) => b.kc - a.kc)
         .slice(0, 3);
       if (entries.length === 0) return '<div class="text-slate-400">No boss kills</div>';
-      lines.push('<div class="font-semibold text-slate-300 mb-1">Top 3 bosses (total)</div>');
-      entries.forEach((e) => { lines.push('<div>' + escapeHtml(formatBossKey(e.key)) + ': ' + formatNum(e.kc) + ' KC</div>'); });
-    } else return '<div class="text-slate-400">No data</div>';
-    return lines.join('');
+      const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (total)</div>';
+      return header + entries.map((e) => {
+        const icon = bossImageSrc(e.key);
+        const name = escapeHtml(formatBossKey(e.key));
+        const val = formatNum(e.kc) + ' KC';
+        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain rounded-sm" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums">' + escapeHtml(val) + '</span></div>';
+      }).join('');
+    }
+    return '<div class="text-slate-400">No data</div>';
   }
   async function fetchAndBuildLootTooltipContent(username) {
     const cacheKey = username + (homeViewMode === 'last24' ? ':24' : ':all');
@@ -440,11 +504,11 @@
       const data = await res.json();
       const drops = Array.isArray(data.drops) ? data.drops : [];
       if (drops.length === 0) return '<div class="text-slate-400">No loot recorded</div>';
-      let html = '<div class="font-semibold text-slate-300 mb-1">Top 3 by value</div>';
+      let html = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 by value</div>';
       drops.slice(0, 3).forEach((d) => {
         const val = Number(d.total_value_gp) || 0;
-        const valStr = val >= 1e6 ? (val / 1e6).toFixed(2) + 'M' : formatNum(val);
-        html += '<div>' + escapeHtml(d.item_name || '—') + ': ' + valStr + ' gp</div>';
+        const valStr = (val >= 1e6 ? (val / 1e6).toFixed(2) + 'M' : formatNum(val)) + ' gp';
+        html += '<div class="flex items-center gap-2 py-0.5"><span class="flex-1 text-left">' + escapeHtml(d.item_name || '—') + '</span><span class="text-right tabular-nums">' + escapeHtml(valStr) + '</span></div>';
       });
       lootTopDropsCache[cacheKey] = html;
       return html;
@@ -625,9 +689,9 @@
     const xpLabelEl = document.getElementById('home-chart-xp-label');
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     const lootLabelEl = document.getElementById('home-chart-loot-label');
-    if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP in last 24 hours' : 'Total XP (all characters)';
-    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC in last 24 hours' : 'Boss KC (all characters)';
-    if (lootLabelEl) lootLabelEl.textContent = isLast24 ? 'Loot value in last 24 hours' : 'Loot value (all characters)';
+    if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP' : 'Total XP (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC' : 'Boss KC (all characters)';
+    if (lootLabelEl) lootLabelEl.textContent = isLast24 ? 'Loot value' : 'Loot value (all characters)';
   }
 
   function paintHomeCharts(history, mode, lootHistory) {
@@ -943,5 +1007,6 @@
     if (e.target === addModal) closeAddModal();
   });
 
+  setHomeViewMode('last24');
   loadFromSnapshots();
 })();

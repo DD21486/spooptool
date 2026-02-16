@@ -632,7 +632,6 @@
     }
   }
 
-  document.getElementById('btn-view-chart').addEventListener('click', openChartModal);
   document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
   document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });
   document.querySelectorAll('.chart-range-btn').forEach((btn) => {
