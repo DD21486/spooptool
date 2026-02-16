@@ -43,8 +43,8 @@
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
-  <div class="max-w-7xl mx-auto px-4 py-6">
-    <header class="flex justify-end items-center mb-2">
+  <div class="max-w-7xl mx-auto px-4 pt-3 pb-6 relative">
+    <header class="absolute top-3 right-4 flex justify-end items-center z-10">
       <button type="button" id="btn-settings" class="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800" title="Settings – copy loot webhook URL" aria-label="Settings">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
       </button>
@@ -52,9 +52,9 @@
         Add character
       </button>
     </header>
-    <div class="flex flex-col items-center mb-2">
+    <div class="flex flex-col items-center mb-1">
       <pre id="ascii-title" class="m-0" aria-hidden="true"><!-- filled by script --></pre>
-      <p class="text-slate-500 mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1" style="font-size: 12px;">
+      <p class="text-slate-500 mt-1 flex flex-wrap items-center justify-center gap-x-3 gap-y-1" style="font-size: 12px;">
         <span>Next data fetch in: <span id="home-capture-countdown" class="font-mono">—</span></span>
         <span id="home-refresh-wrap" class="hidden">
           <button type="button" id="home-refresh-btn" class="text-sky-400 hover:text-sky-300 hover:underline text-xs font-medium ml-1">Refresh</button>
@@ -62,12 +62,12 @@
         <span class="text-slate-600">|</span>
         <span>Don't forget to log out in-game to update your account data.</span>
       </p>
-      <nav class="flex gap-1 mt-3" role="tablist" aria-label="Home view">
+      <nav class="flex gap-1 mt-2" role="tablist" aria-label="Home view">
         <button type="button" id="tab-total" role="tab" aria-selected="true" class="px-4 py-2 rounded-lg text-sm font-medium bg-sky-600 text-white">Total</button>
         <button type="button" id="tab-last24" role="tab" aria-selected="false" class="px-4 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Last 24</button>
       </nav>
     </div>
-    <div class="mt-2">
+    <div class="mt-1">
     <script>
       (function () {
         var lines = [
