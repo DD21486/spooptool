@@ -14,11 +14,21 @@
       from { opacity: 0; }
       to { opacity: 1; }
     }
+    #trophy-ascii-title {
+      font-family: ui-monospace, monospace;
+      font-size: clamp(0.25rem, 1.2vw, 0.5rem);
+      line-height: 1.15;
+      color: #94a3b8;
+      white-space: pre;
+      overflow-x: auto;
+      text-align: center;
+      margin: 0 0 1rem 0;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
-  <div class="max-w-6xl mx-auto px-4 py-6">
-    <header class="flex items-center justify-between gap-6 mb-6">
+  <div class="max-w-6xl mx-auto px-4 pt-3 pb-6">
+    <header class="flex items-center justify-between gap-6 mb-3">
       <a href="/" class="text-sky-400 hover:text-sky-300 hover:underline text-sm shrink-0">← SpoopTool</a>
       <div id="champions-list" class="hidden min-w-0 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2">
         <p class="text-xs text-slate-500 mb-1.5">Champions</p>
@@ -26,7 +36,11 @@
       </div>
     </header>
 
-    <h1 class="text-2xl font-bold text-slate-100 mb-6">Boss Trophy Room</h1>
+    <pre id="trophy-ascii-title" class="text-center" aria-hidden="true"> ______     ______     ______     ______        ______     ______     ______     __    __    
+/\  == \   /\  __ \   /\  ___\   /\  ___\      /\  == \   /\  __ \   /\  __ \   /\ "-./  \   
+\ \  __<   \ \ \/\ \  \ \___  \  \ \___  \     \ \  __<   \ \ \/\ \  \ \ \/\ \  \ \ \-./\ \  
+ \ \_____\  \ \_____\  \/\_____\  \/\_____\     \ \_\ \_\  \ \_____\  \ \_____\  \ \_\ \ \_\ 
+  \/_____/   \/_____/   \/_____/   \/_____/      \/_/ /_/   \/_____/   \/_____/   \/_/  \/_/ </pre>
 
     <div id="trophy-loading" class="py-12 text-slate-500 text-center">Loading…</div>
     <div id="trophy-error" class="hidden py-12 text-red-400 text-center text-sm"></div>
