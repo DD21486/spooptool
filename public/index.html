@@ -26,17 +26,28 @@
     @keyframes ascii-fade-in {
       to { opacity: 1; }
     }
+    #ascii-title .ascii-char.ascii-shimmer {
+      animation: ascii-fade-in 0.08s ease-out forwards, ascii-shimmer 2s ease-in-out;
+    }
+    @keyframes ascii-shimmer {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
   <div class="max-w-7xl mx-auto px-4 py-6">
     <div class="flex flex-col items-center mb-6">
       <pre id="ascii-title" class="m-0" aria-hidden="true"><!-- filled by script --></pre>
-      <p id="home-last-updated" class="text-slate-500 mt-2" style="font-size: 12px;">Last updated @ —</p>
+      <p class="text-slate-500 mt-2" style="font-size: 12px;">
+        <span id="home-last-updated">Last updated @ —</span>
+        <span class="text-slate-600 mx-2">|</span>
+        <span>Next 15min capture: <span id="home-capture-countdown" class="font-mono">—</span></span>
+      </p>
     </div>
     <script>
       (function () {
-        var art = [
+        var lines = [
           '  /$$$$$$  /$$$$$$$   /$$$$$$   /$$$$$$  /$$$$$$$  /$$$$$$$$ /$$$$$$   /$$$$$$  /$$            ',
           ' /$$__  $$| $$__  $$ /$$__  $$ /$$__  $$| $$__  $$|__  $$__//$$__  $$ /$$__  $$| $$            ',
           '| $$  \\__/| $$  \\ $$| $$  \\ $$| $$  \\ $$| $$  \\ $$   | $$  | $$  \\ $$| $$  \\ $$| $$            ',
@@ -45,18 +56,29 @@
           ' /$$  \\ $$| $$      | $$  | $$| $$  | $$| $$         | $$  | $$  | $$| $$  | $$| $$            ',
           '|  $$$$$$/| $$      |  $$$$$$/|  $$$$$$/| $$         | $$  |  $$$$$$/|  $$$$$$/| $$$$$$$$      ',
           ' \\______/ |__/       \\______/  \\______/ |__/         |__/   \\______/  \\______/ |________/      '
-        ].join('\n');
+        ];
         var el = document.getElementById('ascii-title');
-        var total = art.length;
         var durationMs = 3000;
         var html = '';
-        for (var i = 0; i < total; i++) {
-          var ch = art[i];
-          var delay = (i / total) * durationMs;
-          var escaped = ch === '&' ? '&amp;' : ch === '<' ? '&lt;' : ch === '>' ? '&gt;' : ch;
-          html += '<span class="ascii-char" style="animation-delay:' + delay + 'ms">' + escaped + '</span>';
+        function esc(c) { return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c; }
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i];
+          var delay = (i / lines.length) * durationMs;
+          for (var j = 0; j < line.length; j++) {
+            html += '<span class="ascii-char" style="animation-delay:' + delay + 'ms">' + esc(line[j]) + '</span>';
+          }
+          if (i < lines.length - 1) html += '\n';
         }
         el.innerHTML = html;
+
+        var chars = el.querySelectorAll('.ascii-char');
+        function triggerShimmer() {
+          var idx = Math.floor(Math.random() * chars.length);
+          var span = chars[idx];
+          span.classList.add('ascii-shimmer');
+          setTimeout(function () { span.classList.remove('ascii-shimmer'); }, 2000);
+        }
+        var shimmerInterval = setInterval(triggerShimmer, 500);
       })();
     </script>
     <header class="flex flex-wrap items-center justify-between gap-4 mb-6">

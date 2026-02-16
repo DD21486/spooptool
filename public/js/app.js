@@ -42,10 +42,50 @@
   const filterRightBoss = document.getElementById('filter-right-boss');
   const errorEl = document.getElementById('error-message');
   const homeLastUpdated = document.getElementById('home-last-updated');
+  const homeCaptureCountdown = document.getElementById('home-capture-countdown');
 
   function setHomeLastUpdated() {
     if (homeLastUpdated) homeLastUpdated.textContent = 'Last updated @ ' + new Date().toLocaleTimeString();
   }
+
+  function getNextFifteenMin() {
+    const now = new Date();
+    const min = now.getMinutes();
+    const nextMin = (Math.floor(min / 15) + 1) * 15;
+    const next = new Date(now);
+    if (nextMin >= 60) {
+      next.setHours(next.getHours() + 1);
+      next.setMinutes(0);
+    } else {
+      next.setMinutes(nextMin);
+    }
+    next.setSeconds(0);
+    next.setMilliseconds(0);
+    return next;
+  }
+
+  function formatCountdown(ms) {
+    if (ms <= 0) return '0:00';
+    const totalSec = Math.floor(ms / 1000);
+    const s = totalSec % 60;
+    const m = Math.floor(totalSec / 60) % 60;
+    const h = Math.floor(totalSec / 3600);
+    if (h > 0) return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    return m + ':' + String(s).padStart(2, '0');
+  }
+
+  function tickCaptureCountdown() {
+    if (!homeCaptureCountdown) return;
+    const next = getNextFifteenMin();
+    const ms = next - Date.now();
+    homeCaptureCountdown.textContent = formatCountdown(ms);
+  }
+
+  function startCaptureCountdown() {
+    tickCaptureCountdown();
+    setInterval(tickCaptureCountdown, 1000);
+  }
+  if (homeCaptureCountdown) startCaptureCountdown();
 
   function showError(msg) {
     errorEl.textContent = msg || '';
