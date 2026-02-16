@@ -27,11 +27,18 @@
       to { opacity: 1; }
     }
     #ascii-title .ascii-char.ascii-shimmer {
-      animation: ascii-fade-in 0.08s ease-out forwards, ascii-shimmer 2s ease-in-out;
+      animation: ascii-shimmer 2s ease-in-out;
     }
     @keyframes ascii-shimmer {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.3; }
+    }
+    #ascii-title .ascii-char.ascii-flash {
+      animation: ascii-flash 0.8s ease-in-out;
+    }
+    @keyframes ascii-flash {
+      0%, 100% { color: #94a3b8; }
+      50% { color: var(--flash-color, #fff); }
     }
   </style>
 </head>
@@ -71,21 +78,45 @@
         }
         el.innerHTML = html;
 
-        var chars = el.querySelectorAll('.ascii-char');
+        var allChars = el.querySelectorAll('.ascii-char');
+        var visibleChars = [];
+        for (var i = 0; i < allChars.length; i++) {
+          var text = (allChars[i].textContent || '').trim();
+          if (text.length > 0) visibleChars.push(allChars[i]);
+        }
+
+        var flashColors = ['#ffffff', '#38bdf8', '#fbbf24', '#a3e635', '#f472b6', '#c084fc', '#2dd4bf'];
+
         function triggerShimmer() {
-          var idx = Math.floor(Math.random() * chars.length);
-          var span = chars[idx];
+          if (visibleChars.length === 0) return;
+          var span = visibleChars[Math.floor(Math.random() * visibleChars.length)];
+          span.classList.remove('ascii-shimmer');
+          span.offsetHeight;
           span.classList.add('ascii-shimmer');
           setTimeout(function () { span.classList.remove('ascii-shimmer'); }, 2000);
         }
-        var shimmerInterval = setInterval(triggerShimmer, 500);
+
+        function triggerFlash() {
+          if (visibleChars.length === 0) return;
+          var span = visibleChars[Math.floor(Math.random() * visibleChars.length)];
+          span.style.setProperty('--flash-color', flashColors[Math.floor(Math.random() * flashColors.length)]);
+          span.classList.remove('ascii-flash');
+          span.offsetHeight;
+          span.classList.add('ascii-flash');
+          setTimeout(function () { span.classList.remove('ascii-flash'); }, 800);
+        }
+
+        function startShimmer() {
+          triggerShimmer();
+          setInterval(triggerShimmer, 500);
+          triggerFlash();
+          setInterval(triggerFlash, 600);
+        }
+        setTimeout(startShimmer, durationMs + 400);
       })();
     </script>
     <header class="flex flex-wrap items-center justify-between gap-4 mb-6">
       <div class="flex items-center gap-3">
-        <button type="button" id="btn-refresh" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-sm font-medium">
-          Update all
-        </button>
         <button type="button" id="btn-add" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">
           Add character
         </button>

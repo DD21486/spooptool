@@ -486,44 +486,6 @@
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
-  const btnRefresh = document.getElementById('btn-refresh');
-  const REFRESH_COOLDOWN_SEC = 60;
-  let refreshCooldownTimer = null;
-
-  function setRefreshCooldown() {
-    if (refreshCooldownTimer) return;
-    let secs = REFRESH_COOLDOWN_SEC;
-    btnRefresh.disabled = true;
-    btnRefresh.classList.add('cursor-not-allowed', 'opacity-80');
-    function tick() {
-      secs--;
-      btnRefresh.textContent = secs > 0 ? `Update all (${secs}s)` : 'Update all';
-      if (secs <= 0) {
-        clearInterval(refreshCooldownTimer);
-        refreshCooldownTimer = null;
-        btnRefresh.disabled = false;
-        btnRefresh.classList.remove('cursor-not-allowed', 'opacity-80');
-        return;
-      }
-    }
-    tick();
-    refreshCooldownTimer = setInterval(tick, 1000);
-  }
-
-  btnRefresh.addEventListener('click', async function () {
-    if (btnRefresh.disabled) return;
-    btnRefresh.disabled = true;
-    btnRefresh.classList.add('cursor-not-allowed', 'opacity-80');
-    btnRefresh.textContent = 'Updating…';
-    try {
-      await loadAll();
-      setRefreshCooldown();
-    } catch (e) {
-      btnRefresh.disabled = false;
-      btnRefresh.classList.remove('cursor-not-allowed', 'opacity-80');
-      btnRefresh.textContent = 'Update all';
-    }
-  });
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);
   modalUsername.addEventListener('keydown', function (e) {
