@@ -200,16 +200,15 @@
             '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
             '<span class="text-slate-200 font-medium text-sm truncate">' + escapeHtml(champion.username) + '</span>' +
             '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
+            '</div>' +
+            '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + (nextClosest ? escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')' : 'none') + '</p>' +
             '</div>';
-          if (nextClosest) {
-            championHtml += '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')</p>';
-          }
-          championHtml += '</div>';
         } else {
           championHtml =
             '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
             '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
-            '<p class="text-slate-500 text-sm">—</p></div>';
+            '<p class="text-slate-500 text-sm">—</p>' +
+            '<p class="text-xs text-slate-500 mt-1">Next Closest: none</p></div>';
         }
         card.innerHTML =
           '<div class="card-body p-4">' +
