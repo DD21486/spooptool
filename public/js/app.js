@@ -43,6 +43,10 @@
   const errorEl = document.getElementById('error-message');
   const homeLastUpdated = document.getElementById('home-last-updated');
   const homeCaptureCountdown = document.getElementById('home-capture-countdown');
+  const tabTotal = document.getElementById('tab-total');
+  const tabLast24 = document.getElementById('tab-last24');
+
+  let homeViewMode = 'total';
 
   function setHomeLastUpdated() {
     if (homeLastUpdated) homeLastUpdated.textContent = 'Last updated @ ' + new Date().toLocaleTimeString();
@@ -142,8 +146,13 @@
     const rows = characterList.map(username => ({
       username,
       value: leftTableValue(playerData[username], filter),
+      xpDelta: (last24hDeltas[username] && last24hDeltas[username].xpDelta != null) ? last24hDeltas[username].xpDelta : 0,
     })).filter(r => r.value != null);
-    rows.sort((a, b) => (b.value - a.value));
+    if (homeViewMode === 'last24') {
+      rows.sort((a, b) => (b.xpDelta - a.xpDelta));
+    } else {
+      rows.sort((a, b) => (b.value - a.value));
+    }
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
@@ -173,8 +182,13 @@
     const rows = characterList.map(username => ({
       username,
       kc: getRightBossKc(playerData[username], bossKey),
+      kcDelta: (last24hDeltas[username] && last24hDeltas[username].bossKcDelta != null) ? last24hDeltas[username].bossKcDelta : 0,
     }));
-    rows.sort((a, b) => (b.kc - a.kc));
+    if (homeViewMode === 'last24') {
+      rows.sort((a, b) => (b.kcDelta - a.kcDelta));
+    } else {
+      rows.sort((a, b) => (b.kc - a.kc));
+    }
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
@@ -326,19 +340,30 @@
 
         const xpTotalEl = document.getElementById('home-chart-xp-total');
         const bossTotalEl = document.getElementById('home-chart-boss-total');
+        const xpLabelEl = document.getElementById('home-chart-xp-label');
+        const bossLabelEl = document.getElementById('home-chart-boss-label');
         if (history.length === 0) {
           if (xpTotalEl) xpTotalEl.textContent = '—';
           if (bossTotalEl) bossTotalEl.textContent = '—';
+          if (xpLabelEl) xpLabelEl.textContent = homeViewMode === 'last24' ? 'XP gain in last 24h' : 'Total XP (all characters)';
+          if (bossLabelEl) bossLabelEl.textContent = homeViewMode === 'last24' ? 'Boss KC gain in last 24h' : 'Total boss kills (all characters)';
           return;
         }
 
-        const xpValues = history.map((h) => h.totalXp);
-        const bossValues = history.map((h) => h.totalBossKc);
+        const isLast24 = homeViewMode === 'last24';
+        const xpValues = isLast24
+          ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalXp) - Number(history[0].totalXp))))
+          : history.map((h) => h.totalXp);
+        const bossValues = isLast24
+          ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalBossKc) - Number(history[0].totalBossKc))))
+          : history.map((h) => h.totalBossKc);
         const lastXp = xpValues[xpValues.length - 1];
         const lastBoss = bossValues[bossValues.length - 1];
 
         if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
         if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
+        if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'XP gain in last 24h' : 'Total XP (all characters)';
+        if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC gain in last 24h' : 'Total boss kills (all characters)';
 
         function rangeFromLast(lastVal, fallbackMax, padPct) {
           const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
@@ -377,7 +402,7 @@
             data: {
               labels,
               datasets: [{
-                label: 'Total XP',
+                label: isLast24 ? 'XP gain (24h)' : 'Total XP',
                 data: xpValues,
                 borderColor: 'rgb(56, 189, 248)',
                 backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -396,7 +421,7 @@
             data: {
               labels,
               datasets: [{
-                label: 'Total KC',
+                label: isLast24 ? 'KC gain (24h)' : 'Total KC',
                 data: bossValues,
                 borderColor: 'rgb(56, 189, 248)',
                 backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -411,6 +436,26 @@
         }
       })
       .catch(() => {});
+  }
+
+  function setHomeViewMode(mode) {
+    homeViewMode = mode;
+    if (tabTotal && tabLast24) {
+      const isTotal = mode === 'total';
+      tabTotal.classList.toggle('bg-sky-600', isTotal);
+      tabTotal.classList.toggle('text-white', isTotal);
+      tabTotal.classList.toggle('bg-slate-700', !isTotal);
+      tabTotal.classList.toggle('text-slate-300', !isTotal);
+      tabTotal.setAttribute('aria-selected', String(isTotal));
+      tabLast24.classList.toggle('bg-sky-600', !isTotal);
+      tabLast24.classList.toggle('text-white', !isTotal);
+      tabLast24.classList.toggle('bg-slate-700', isTotal);
+      tabLast24.classList.toggle('text-slate-300', isTotal);
+      tabLast24.setAttribute('aria-selected', String(!isTotal));
+    }
+    renderLeft();
+    renderRight();
+    loadHomeCharts();
   }
 
   const addModal = document.getElementById('add-character-modal');
@@ -485,6 +530,9 @@
   });
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
+
+  if (tabTotal) tabTotal.addEventListener('click', () => setHomeViewMode('total'));
+  if (tabLast24) tabLast24.addEventListener('click', () => setHomeViewMode('last24'));
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);

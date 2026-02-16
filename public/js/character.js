@@ -46,6 +46,17 @@
     if (n == null || n === undefined) return '—';
     return Number(n).toLocaleString();
   }
+  /** Last 15-minute boundary that has passed (e.g. 3:37 → 3:30). */
+  function getLastFifteenMinInterval() {
+    const d = new Date();
+    const min = d.getMinutes();
+    const rounded = Math.floor(min / 15) * 15;
+    const out = new Date(d);
+    out.setMinutes(rounded);
+    out.setSeconds(0);
+    out.setMilliseconds(0);
+    return out;
+  }
   function escapeHtml(s) {
     const div = document.createElement('div');
     div.textContent = s;
@@ -96,7 +107,8 @@
     document.title = (data.name || name) + ' – SpoopTool';
     charName.textContent = data.name || name;
     charMode.textContent = (data.mode || 'main').replace(/\b\w/g, c => c.toUpperCase());
-    lastUpdated.textContent = 'Last updated: ' + new Date().toLocaleString();
+    const lastCapture = getLastFifteenMinInterval();
+    lastUpdated.textContent = 'Last capture: ' + lastCapture.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
 
     const skills = data.skills || {};
     const skillOrder = ['overall', 'attack', 'hitpoints', 'mining', 'strength', 'agility', 'smithing', 'defence', 'herblore', 'fishing', 'ranged', 'thieving', 'cooking', 'prayer', 'crafting', 'firemaking', 'magic', 'fletching', 'woodcutting', 'runecraft', 'slayer', 'farming', 'construction', 'hunter'];
@@ -239,10 +251,6 @@
     emptyEl.classList.add('hidden');
     emptyEl.textContent = 'No snapshot data for this range. Snapshots are taken periodically; try again later.';
     canvasWrap.classList.add('hidden');
-    if (chartInstance) {
-      chartInstance.destroy();
-      chartInstance = null;
-    }
     setChartRangeActive(hours);
 
     let url = API + '/player-history?name=' + encodeURIComponent(name) + '&hours=' + hours;
@@ -255,6 +263,10 @@
         const history = (data.history || []).slice();
         if (history.length === 0) {
           emptyEl.classList.remove('hidden');
+          if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+          }
           return;
         }
         canvasWrap.classList.remove('hidden');
@@ -269,9 +281,20 @@
         const dataMin = Math.min(...values);
         const dataMax = Math.max(...values);
         const range = dataMax - dataMin;
-        const pad = range > 0 ? range * 0.01 : Math.max(1, dataMin * 0.01);
-        const yMin = range > 0 ? dataMin - pad : dataMin - pad;
-        const yMax = range > 0 ? dataMax + pad : dataMax + pad;
+        const pad = range > 0 ? range * 0.01 : Math.max(1, (dataMax || 1) * 0.01);
+        const yMin = dataMin - pad;
+        const yMax = dataMax + pad;
+        const label = (data.seriesLabel != null ? data.seriesLabel : opts.seriesLabel) || seriesLabel;
+
+        if (chartInstance) {
+          chartInstance.data.labels = labels;
+          chartInstance.data.datasets[0].label = label;
+          chartInstance.data.datasets[0].data = values;
+          chartInstance.options.scales.y.min = yMin;
+          chartInstance.options.scales.y.max = yMax;
+          chartInstance.update('none');
+          return;
+        }
 
         const ctx = document.getElementById('chart-canvas').getContext('2d');
         chartInstance = new Chart(ctx, {
@@ -279,7 +302,7 @@
           data: {
             labels,
             datasets: [{
-              label: data.seriesLabel || seriesLabel,
+              label,
               data: values,
               borderColor: 'rgb(56, 189, 248)',
               backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -290,6 +313,7 @@
           options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: false,
             interaction: { intersect: false, mode: 'index' },
             plugins: {
               legend: { display: false },
@@ -340,7 +364,6 @@
     }
   }
 
-  document.getElementById('btn-update').addEventListener('click', load);
   document.getElementById('btn-view-chart').addEventListener('click', openChartModal);
   document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
   document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });
