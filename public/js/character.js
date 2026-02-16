@@ -299,6 +299,14 @@
     paintLootChart(lootHistory);
 
     const spriteUrl = (id) => API + '/loot-icon?id=' + Number(id);
+    function coinTierForValue(gp) {
+      const v = Number(gp) || 0;
+      if (v <= 80000) return 'coins_1';
+      if (v <= 150000) return 'coins_2';
+      if (v <= 400000) return 'coins_3';
+      if (v <= 1100000) return 'coins_4';
+      return 'coins_5';
+    }
     lootTbody.innerHTML = drops.length === 0
       ? '<tr><td colspan="4" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
@@ -309,11 +317,15 @@
             : '';
           const nameCell = '<td class="px-4 py-2 text-slate-200"><div class="flex items-center gap-2">' + iconHtml + '<span>' + escapeHtml(d.item_name || '') + '</span></div></td>';
           const fromCell = '<td class="px-4 py-2 text-slate-400">' + escapeHtml(d.source || '—') + '</td>';
+          const qtyCell = '<td class="px-4 py-2 text-right font-mono"><span class="text-slate-500">x</span><span class="text-slate-300">' + escapeHtml(String(d.quantity)) + '</span></td>';
+          const coinTier = coinTierForValue(d.total_value_gp);
+          const coinImg = '<img src="/assets/' + escapeHtml(coinTier) + '.png" alt="" width="16" height="16" class="w-4 h-4 object-contain shrink-0" loading="lazy" onerror="this.style.display=\'none\'">';
+          const valueCell = '<td class="px-4 py-2 text-right font-mono text-slate-200"><div class="flex items-center justify-end gap-1.5">' + coinImg + '<span>' + escapeHtml(valueStr) + '</span></div></td>';
           return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
             nameCell +
             fromCell +
-            '<td class="px-4 py-2 text-right font-mono text-slate-300">' + escapeHtml(String(d.quantity)) + '</td>' +
-            '<td class="px-4 py-2 text-right font-mono text-slate-200">' + escapeHtml(valueStr) + '</td>' +
+            qtyCell +
+            valueCell +
             '</tr>';
         }).join('');
 
