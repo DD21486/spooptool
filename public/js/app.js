@@ -353,12 +353,19 @@
       const d = new Date(h.at);
       return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
     });
-    const xpValues = isLast24
-      ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalXp) - Number(history[0].totalXp))))
-      : history.map((h) => Number(h.totalXp));
-    const bossValues = isLast24
-      ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalBossKc) - Number(history[0].totalBossKc))))
-      : history.map((h) => Number(h.totalBossKc));
+    let xpValues;
+    let bossValues;
+    if (isLast24) {
+      const baseIdx = history.findIndex((h) => Number(h.totalXp) > 0 || Number(h.totalBossKc) > 0);
+      const base = baseIdx >= 0 ? history[baseIdx] : history[0];
+      const baseXp = Number(base.totalXp) || 0;
+      const baseBoss = Number(base.totalBossKc) || 0;
+      xpValues = history.map((h) => Math.max(0, Number(h.totalXp) - baseXp));
+      bossValues = history.map((h) => Math.max(0, Number(h.totalBossKc) - baseBoss));
+    } else {
+      xpValues = history.map((h) => Number(h.totalXp));
+      bossValues = history.map((h) => Number(h.totalBossKc));
+    }
     const lastXp = xpValues[xpValues.length - 1];
     const lastBoss = bossValues[bossValues.length - 1];
 
