@@ -325,7 +325,7 @@
 
   let homeChartXp = null;
   let homeChartBoss = null;
-  let homeChartLoadId = 0;
+  let cachedHomeHistory = null;
 
   function setHomeChartLabels(isLast24) {
     const xpLabelEl = document.getElementById('home-chart-xp-label');
@@ -334,116 +334,114 @@
     if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Total boss kills in last 24 hours' : 'Total boss kills (all characters)';
   }
 
+  function paintHomeCharts(history, mode) {
+    const isLast24 = mode === 'last24';
+    const xpTotalEl = document.getElementById('home-chart-xp-total');
+    const bossTotalEl = document.getElementById('home-chart-boss-total');
+
+    if (homeChartXp) { homeChartXp.destroy(); homeChartXp = null; }
+    if (homeChartBoss) { homeChartBoss.destroy(); homeChartBoss = null; }
+
+    if (!history || history.length === 0) {
+      if (xpTotalEl) xpTotalEl.textContent = '—';
+      if (bossTotalEl) bossTotalEl.textContent = '—';
+      setHomeChartLabels(isLast24);
+      return;
+    }
+
+    const labels = history.map((h) => {
+      const d = new Date(h.at);
+      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+    });
+    const xpValues = isLast24
+      ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalXp) - Number(history[0].totalXp))))
+      : history.map((h) => Number(h.totalXp));
+    const bossValues = isLast24
+      ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalBossKc) - Number(history[0].totalBossKc))))
+      : history.map((h) => Number(h.totalBossKc));
+    const lastXp = xpValues[xpValues.length - 1];
+    const lastBoss = bossValues[bossValues.length - 1];
+
+    if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + (isLast24 ? ' XP (24h)' : ' XP');
+    if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + (isLast24 ? ' kills (24h)' : ' kills');
+    setHomeChartLabels(isLast24);
+
+    function rangeFromLast(lastVal, fallbackMax, padPct) {
+      const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
+      const pad = max * padPct;
+      return { min: Math.max(0, max - pad), max: max + pad };
+    }
+    const xpRange = rangeFromLast(lastXp, 10, 0.003);
+    const bossRange = rangeFromLast(lastBoss, 10, 0.01);
+    const formatInt = (v) => Math.round(Number(v)).toLocaleString();
+    const chartOpts = (yMin, yMax, tickCallback) => ({
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { intersect: false, mode: 'index' },
+      plugins: { legend: { display: false } },
+      scales: {
+        x: {
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
+        },
+        y: {
+          min: yMin,
+          max: yMax,
+          grid: { color: 'rgba(148, 163, 184, 0.2)' },
+          ticks: { color: '#94a3b8', callback: tickCallback, font: { size: 10 } },
+        },
+      },
+    });
+
+    const ctxXp = document.getElementById('home-chart-xp');
+    const ctxBoss = document.getElementById('home-chart-boss');
+    if (ctxXp && ctxXp.getContext) {
+      homeChartXp = new Chart(ctxXp.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: isLast24 ? 'XP gain (24h)' : 'Total XP',
+            data: xpValues,
+            borderColor: 'rgb(56, 189, 248)',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: chartOpts(xpRange.min, xpRange.max, formatInt),
+      });
+    }
+    if (ctxBoss && ctxBoss.getContext) {
+      homeChartBoss = new Chart(ctxBoss.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: isLast24 ? 'KC gain (24h)' : 'Total KC',
+            data: bossValues,
+            borderColor: 'rgb(56, 189, 248)',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 0,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: chartOpts(bossRange.min, bossRange.max, formatInt),
+      });
+    }
+  }
+
   function loadHomeCharts() {
-    const requestedMode = homeViewMode;
-    const loadId = ++homeChartLoadId;
     fetch(API + '/aggregate-history?hours=24')
       .then((res) => res.json())
       .then((data) => {
-        if (loadId !== homeChartLoadId) return;
         const history = (data.history || []).slice();
-        const labels = history.map((h) => {
-          const d = new Date(h.at);
-          return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-        });
-
-        if (homeChartXp) { homeChartXp.destroy(); homeChartXp = null; }
-        if (homeChartBoss) { homeChartBoss.destroy(); homeChartBoss = null; }
-
-        const xpTotalEl = document.getElementById('home-chart-xp-total');
-        const bossTotalEl = document.getElementById('home-chart-boss-total');
-        const xpLabelEl = document.getElementById('home-chart-xp-label');
-        const bossLabelEl = document.getElementById('home-chart-boss-label');
-        if (history.length === 0) {
-          if (xpTotalEl) xpTotalEl.textContent = '—';
-          if (bossTotalEl) bossTotalEl.textContent = '—';
-          setHomeChartLabels(requestedMode === 'last24');
-          return;
-        }
-
-        const isLast24 = requestedMode === 'last24';
-        const xpValues = isLast24
-          ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalXp) - Number(history[0].totalXp))))
-          : history.map((h) => h.totalXp);
-        const bossValues = isLast24
-          ? history.map((h, i) => (i === 0 ? 0 : Math.max(0, Number(h.totalBossKc) - Number(history[0].totalBossKc))))
-          : history.map((h) => h.totalBossKc);
-        const lastXp = xpValues[xpValues.length - 1];
-        const lastBoss = bossValues[bossValues.length - 1];
-
-        if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + (isLast24 ? ' XP (24h)' : ' XP');
-        if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + (isLast24 ? ' kills (24h)' : ' kills');
-        setHomeChartLabels(isLast24);
-
-        function rangeFromLast(lastVal, fallbackMax, padPct) {
-          const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
-          const pad = max * padPct;
-          return { min: Math.max(0, max - pad), max: max + pad };
-        }
-        const xpRange = rangeFromLast(lastXp, 10, 0.003);
-        const bossRange = rangeFromLast(lastBoss, 10, 0.01);
-
-        const formatInt = (v) => Math.round(Number(v)).toLocaleString();
-
-        const chartOpts = (yMin, yMax, tickCallback) => ({
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { intersect: false, mode: 'index' },
-          plugins: { legend: { display: false } },
-          scales: {
-            x: {
-              grid: { color: 'rgba(148, 163, 184, 0.2)' },
-              ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
-            },
-            y: {
-              min: yMin,
-              max: yMax,
-              grid: { color: 'rgba(148, 163, 184, 0.2)' },
-              ticks: { color: '#94a3b8', callback: tickCallback, font: { size: 10 } },
-            },
-          },
-        });
-
-        const ctxXp = document.getElementById('home-chart-xp');
-        const ctxBoss = document.getElementById('home-chart-boss');
-        if (ctxXp && ctxXp.getContext) {
-          homeChartXp = new Chart(ctxXp.getContext('2d'), {
-            type: 'line',
-            data: {
-              labels,
-              datasets: [{
-                label: isLast24 ? 'XP gain (24h)' : 'Total XP',
-                data: xpValues,
-                borderColor: 'rgb(56, 189, 248)',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                fill: true,
-                tension: 0.2,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-              }],
-            },
-            options: chartOpts(xpRange.min, xpRange.max, formatInt),
-          });
-        }
-        if (ctxBoss && ctxBoss.getContext) {
-          homeChartBoss = new Chart(ctxBoss.getContext('2d'), {
-            type: 'line',
-            data: {
-              labels,
-              datasets: [{
-                label: isLast24 ? 'KC gain (24h)' : 'Total KC',
-                data: bossValues,
-                borderColor: 'rgb(56, 189, 248)',
-                backgroundColor: 'rgba(56, 189, 248, 0.1)',
-                fill: true,
-                tension: 0.2,
-                pointRadius: 0,
-                pointHoverRadius: 6,
-              }],
-            },
-            options: chartOpts(bossRange.min, bossRange.max, formatInt),
-          });
-        }
+        cachedHomeHistory = history;
+        paintHomeCharts(history, homeViewMode);
       })
       .catch(() => {});
   }
@@ -467,7 +465,11 @@
     }
     renderLeft();
     renderRight();
-    loadHomeCharts();
+    if (cachedHomeHistory) {
+      paintHomeCharts(cachedHomeHistory, mode);
+    } else {
+      loadHomeCharts();
+    }
   }
 
   const addModal = document.getElementById('add-character-modal');
