@@ -57,7 +57,7 @@
   let homeTooltipHideTimer = null;
 
   const CRON_TZ = 'America/New_York';
-  /** Next :00 in America/New_York (hourly cron schedule). */
+  /** Next :00 in America/New_York (hourly; actual trigger is cron-job.org). */
   function getNextCronRun() {
     const now = Date.now();
     const formatter = new Intl.DateTimeFormat('en-CA', {

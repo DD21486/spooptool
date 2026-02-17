@@ -1,8 +1,8 @@
 /**
  * Snapshot job: fetch current Hiscores for each character and store in character_snapshots.
  * Call with Authorization: Bearer <CRON_SECRET> (or ?secret=CRON_SECRET).
- * - Vercel Cron (Hobby: once/day): set in vercel.json and add CRON_SECRET in env.
- * - For every 30 min on Hobby: use external cron (e.g. cron-job.org) to POST/GET this URL with the secret.
+ * - Vercel Cron: vercel.json runs this hourly (0 * * * *). Add CRON_SECRET in env.
+ * - Snapshots are append-only; all queries use "latest" or "last N hours". Loot is saved only via Dink webhook (no cron).
  */
 
 const { neon } = require('@neondatabase/serverless');
