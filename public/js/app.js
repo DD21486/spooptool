@@ -765,6 +765,36 @@
     if (lootLabelEl) lootLabelEl.textContent = isDelta ? 'Loot value' : 'Loot value (all characters)';
   }
 
+  /** For Today view: build fixed 24h axis (12am–midnight) and map history into hourly slots; future hours are null so the line stops at current time. */
+  function buildToday24hAxis(history, baseXp, baseBoss) {
+    const now = new Date();
+    const currentHour = now.getHours();
+    const labels = [];
+    for (let i = 0; i < 24; i++) {
+      const d = new Date(2000, 0, 1, i, 0, 0);
+      labels.push(d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
+    }
+    const xpSlots = new Array(24).fill(null);
+    const bossSlots = new Array(24).fill(null);
+    for (const h of history) {
+      const d = new Date(h.at);
+      const lh = d.getHours();
+      xpSlots[lh] = Math.max(0, (Number(h.totalXp) || 0) - baseXp);
+      bossSlots[lh] = Math.max(0, (Number(h.totalBossKc) || 0) - baseBoss);
+    }
+    for (let i = 1; i < 24; i++) {
+      if (xpSlots[i] == null) xpSlots[i] = xpSlots[i - 1];
+      if (bossSlots[i] == null) bossSlots[i] = bossSlots[i - 1];
+    }
+    if (xpSlots[0] == null) xpSlots[0] = 0;
+    if (bossSlots[0] == null) bossSlots[0] = 0;
+    for (let i = currentHour + 1; i < 24; i++) {
+      xpSlots[i] = null;
+      bossSlots[i] = null;
+    }
+    return { labels, xpValues: xpSlots, bossValues: bossSlots };
+  }
+
   function paintHomeCharts(history, mode, lootHistory) {
     const isLast24 = mode === 'last24';
     const isToday = mode === 'today';
@@ -782,28 +812,48 @@
       if (bossTotalEl) bossTotalEl.textContent = '—';
       if (lootTotalEl) lootTotalEl.textContent = '—';
       setHomeChartLabels(mode);
-      paintHomeLootChart(lootHistory || []);
+      paintHomeLootChart(lootHistory || [], mode);
       return;
     }
 
-    const labels = history.map((h) => {
-      const d = new Date(h.at);
-      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    });
+    let labels;
     let xpValues;
     let bossValues;
-    if (isDelta) {
+    if (isToday) {
       const base = history[0];
       const baseXp = base ? Number(base.totalXp) || 0 : 0;
       const baseBoss = base ? Number(base.totalBossKc) || 0 : 0;
-      xpValues = history.map((h) => Math.max(0, (Number(h.totalXp) || 0) - baseXp));
-      bossValues = history.map((h) => Math.max(0, (Number(h.totalBossKc) || 0) - baseBoss));
+      const built = buildToday24hAxis(history, baseXp, baseBoss);
+      labels = built.labels;
+      xpValues = built.xpValues;
+      bossValues = built.bossValues;
     } else {
-      xpValues = history.map((h) => Number(h.totalXp));
-      bossValues = history.map((h) => Number(h.totalBossKc));
+      labels = history.map((h) => {
+        const d = new Date(h.at);
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      });
+      if (isDelta) {
+        const base = history[0];
+        const baseXp = base ? Number(base.totalXp) || 0 : 0;
+        const baseBoss = base ? Number(base.totalBossKc) || 0 : 0;
+        xpValues = history.map((h) => Math.max(0, (Number(h.totalXp) || 0) - baseXp));
+        bossValues = history.map((h) => Math.max(0, (Number(h.totalBossKc) || 0) - baseBoss));
+      } else {
+        xpValues = history.map((h) => Number(h.totalXp));
+        bossValues = history.map((h) => Number(h.totalBossKc));
+      }
     }
-    const lastXp = xpValues[xpValues.length - 1];
-    const lastBoss = bossValues[bossValues.length - 1];
+
+    let lastXp = xpValues[xpValues.length - 1];
+    let lastBoss = bossValues[bossValues.length - 1];
+    if (isToday) {
+      for (let i = 23; i >= 0; i--) {
+        if (xpValues[i] != null) { lastXp = xpValues[i]; break; }
+      }
+      for (let i = 23; i >= 0; i--) {
+        if (bossValues[i] != null) { lastBoss = bossValues[i]; break; }
+      }
+    }
 
     if (isToday) {
       const sumXp = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
@@ -862,7 +912,7 @@
         data: {
           labels,
           datasets: [{
-            label: isLast24 ? 'XP gain (24h)' : 'Total XP',
+            label: isToday ? 'XP gain (today)' : (isLast24 ? 'XP gain (24h)' : 'Total XP'),
             data: xpValues,
             borderColor: 'rgb(56, 189, 248)',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -881,7 +931,7 @@
         data: {
           labels,
           datasets: [{
-            label: isLast24 ? 'KC gain (24h)' : 'Total KC',
+            label: isToday ? 'KC gain (today)' : (isLast24 ? 'KC gain (24h)' : 'Total KC'),
             data: bossValues,
             borderColor: 'rgb(56, 189, 248)',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -894,28 +944,58 @@
         options: chartOpts(bossRange.min, bossRange.max, formatInt),
       });
     }
-    paintHomeLootChart(lootHistory || []);
+    paintHomeLootChart(lootHistory || [], mode);
   }
 
-  function paintHomeLootChart(lootHistory) {
+  function paintHomeLootChart(lootHistory, homeViewMode) {
     const lootTotalEl = document.getElementById('home-chart-loot-total');
     if (homeChartLoot) { homeChartLoot.destroy(); homeChartLoot = null; }
     if (!lootHistory || lootHistory.length === 0) {
       if (lootTotalEl) lootTotalEl.textContent = '—';
       return;
     }
-    const labels = lootHistory.map((h) => {
-      const d = new Date(h.at);
-      return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-    });
-    let values = lootHistory.map((h) => Number(h.value) || 0);
-    const now = new Date();
-    const lastBucket = lootHistory.length ? new Date(lootHistory[lootHistory.length - 1].at) : null;
-    if (lastBucket && (now - lastBucket) > 45 * 60 * 1000) {
-      labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
-      values = values.concat(values[values.length - 1]);
+    const isToday = homeViewMode === 'today';
+    let labels;
+    let values;
+    if (isToday) {
+      labels = [];
+      for (let i = 0; i < 24; i++) {
+        const d = new Date(2000, 0, 1, i, 0, 0);
+        labels.push(d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
+      }
+      const valueSlots = new Array(24).fill(null);
+      for (const h of lootHistory) {
+        const d = new Date(h.at);
+        const lh = d.getHours();
+        valueSlots[lh] = Number(h.value) || 0;
+      }
+      for (let i = 1; i < 24; i++) {
+        if (valueSlots[i] == null) valueSlots[i] = valueSlots[i - 1];
+      }
+      if (valueSlots[0] == null) valueSlots[0] = 0;
+      const now = new Date();
+      const currentHour = now.getHours();
+      for (let i = currentHour + 1; i < 24; i++) valueSlots[i] = null;
+      values = valueSlots;
+    } else {
+      labels = lootHistory.map((h) => {
+        const d = new Date(h.at);
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      });
+      values = lootHistory.map((h) => Number(h.value) || 0);
+      const now = new Date();
+      const lastBucket = lootHistory.length ? new Date(lootHistory[lootHistory.length - 1].at) : null;
+      if (lastBucket && (now - lastBucket) > 45 * 60 * 1000) {
+        labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
+        values = values.concat(values[values.length - 1]);
+      }
     }
-    const lastVal = values[values.length - 1];
+    let lastVal = values[values.length - 1];
+    if (isToday) {
+      for (let i = 23; i >= 0; i--) {
+        if (values[i] != null) { lastVal = values[i]; break; }
+      }
+    }
     const maxVal = Math.max(...values, 1);
     const pad = maxVal * 0.05;
     const ctxLoot = document.getElementById('home-chart-loot');

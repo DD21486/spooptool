@@ -2,7 +2,7 @@
  * GET /api/loot?player=Username&limit=20&hours=24|168
  * - totalDrops, totalValueGp: for the period when hours is set (24 or 168), else all-time.
  * - lootHistory: when hours set, bucketed cumulative value for the chart (only when hours present).
- * - drops: top N most valuable drops, grouped by item (sum quantity + value), all-time, not filtered by hours.
+ * - drops: top N most valuable drops, grouped by item; when hours=24|168, drops are limited to that period (and optional source); each drop has affects_luck true if source matches a boss in luck_baseline for this character.
  *
  * POST /api/loot
  * Ingest from Dink: multipart/form-data with payload_json (type LOOT).
@@ -262,42 +262,130 @@ module.exports = async function handler(req, res) {
       `;
       const sources = sourceRows.map((r) => r.source);
 
+      let characterId = null;
+      const charRows = await sql`
+        SELECT id FROM characters WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player})) LIMIT 1
+      `;
+      if (charRows.length) characterId = charRows[0].id;
+      const luckBossKeys = new Set();
+      if (characterId) {
+        const baselineRows = await sql`
+          SELECT DISTINCT LOWER(TRIM(boss_key)) AS boss_key
+          FROM luck_baseline
+          WHERE character_id = ${characterId}
+        `;
+        baselineRows.forEach((r) => { if (r.boss_key) luckBossKeys.add(r.boss_key); });
+      }
+
       let grouped;
       try {
-        grouped = await sql`
-          SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-            (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
-          FROM loot_drops
-          WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-          GROUP BY item_id, item_name
-          ORDER BY total_value_gp DESC
-          LIMIT ${limit}
-        `;
+        grouped = periodFilter != null
+          ? (sourceFilter != null
+            ? await sql`
+                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                FROM loot_drops
+                WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                  AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  AND TRIM(source) = TRIM(${sourceFilter})
+                GROUP BY item_id, item_name
+                ORDER BY total_value_gp DESC
+                LIMIT ${limit}
+              `
+            : await sql`
+                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                FROM loot_drops
+                WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                  AND at >= NOW() - make_interval(hours => ${periodFilter})
+                GROUP BY item_id, item_name
+                ORDER BY total_value_gp DESC
+                LIMIT ${limit}
+              `)
+          : (sourceFilter != null
+            ? await sql`
+                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                FROM loot_drops
+                WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                  AND TRIM(source) = TRIM(${sourceFilter})
+                GROUP BY item_id, item_name
+                ORDER BY total_value_gp DESC
+                LIMIT ${limit}
+              `
+            : await sql`
+                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                FROM loot_drops
+                WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                GROUP BY item_id, item_name
+                ORDER BY total_value_gp DESC
+                LIMIT ${limit}
+              `);
       } catch (groupErr) {
         const msg = (groupErr && groupErr.message) || String(groupErr);
         if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
-          grouped = await sql`
-            SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-              (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
-            FROM loot_drops
-            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-            GROUP BY item_name
-            ORDER BY total_value_gp DESC
-            LIMIT ${limit}
-          `;
+          grouped = periodFilter != null
+            ? (sourceFilter != null
+              ? await sql`
+                  SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  GROUP BY item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  GROUP BY item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `)
+            : (sourceFilter != null
+              ? await sql`
+                  SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  GROUP BY item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                  GROUP BY item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `);
           grouped = grouped.map((r) => ({ ...r, item_id: null }));
         } else {
           throw groupErr;
         }
       }
 
-      const drops = grouped.map((r) => ({
-        item_id: r.item_id != null ? r.item_id : null,
-        item_name: r.item_name,
-        quantity: r.quantity,
-        total_value_gp: Number(r.total_value_gp),
-        source: r.source != null ? r.source : null,
-      }));
+      const drops = grouped.map((r) => {
+        const src = r.source != null ? String(r.source).trim() : '';
+        const affectsLuck = src !== '' && luckBossKeys.has(src.toLowerCase());
+        return {
+          item_id: r.item_id != null ? r.item_id : null,
+          item_name: r.item_name,
+          quantity: r.quantity,
+          total_value_gp: Number(r.total_value_gp),
+          source: r.source != null ? r.source : null,
+          affects_luck: affectsLuck,
+        };
+      });
 
       res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
       return res.status(200).json({

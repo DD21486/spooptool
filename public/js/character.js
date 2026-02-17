@@ -403,6 +403,10 @@
 
     paintLootChart(lootHistory);
 
+    const rangeLabel = lootPeriodHours === 24 ? 'Last 24 hours' : (lootPeriodHours === 168 ? 'Last 7 days' : 'all time');
+    const lootTopHeading = document.getElementById('loot-top-heading');
+    if (lootTopHeading) lootTopHeading.textContent = 'Top 20 most valuable (' + rangeLabel + ')';
+
     const spriteUrl = (id) => API + '/loot-icon?id=' + Number(id);
     function coinTierForValue(gp) {
       const v = Number(gp) || 0;
@@ -412,8 +416,13 @@
       if (v <= 1100000) return 'Coins_4';
       return 'Coins_5';
     }
+    const luckCell = (d) => {
+      const affects = d.affects_luck === true;
+      return '<td class="px-4 py-2 text-center" title="' + (affects ? 'Affects luck meter (boss drop)' : 'Does not affect luck meter') + '">' +
+        (affects ? '<span class="text-sky-400 font-medium">Yes</span>' : '<span class="text-slate-500">—</span>') + '</td>';
+    };
     lootTbody.innerHTML = drops.length === 0
-      ? '<tr><td colspan="4" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
+      ? '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
           const valueStr = d.total_value_gp >= 1e6 ? (d.total_value_gp / 1e6).toFixed(2) + 'M' : formatNum(d.total_value_gp);
           const itemId = d.item_id != null && !Number.isNaN(Number(d.item_id)) ? Number(d.item_id) : null;
@@ -432,6 +441,7 @@
             fromCell +
             qtyCell +
             valueCell +
+            luckCell(d) +
             '</tr>';
         }).join('');
 
