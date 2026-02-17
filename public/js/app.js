@@ -3,6 +3,7 @@
 
   function updateCronStatusOrb(cronHealth) {
     const orb = document.getElementById('cron-status-orb');
+    const tooltipEl = document.getElementById('cron-status-orb-tooltip');
     if (!orb) return;
     const ok = cronHealth && cronHealth.ok === true;
     orb.classList.remove('bg-slate-500', 'bg-emerald-500', 'bg-red-500');
@@ -14,7 +15,24 @@
       : 'Red =\nLast Fetch Failure\n' + timeStr;
     orb.title = tip;
     orb.setAttribute('aria-label', ok ? 'Cron status: OK' : 'Cron status: stale or failed');
+    if (tooltipEl) tooltipEl.textContent = tip;
   }
+
+  (function setupCronOrbHover() {
+    const wrap = document.getElementById('cron-status-orb-wrap');
+    const tooltipEl = document.getElementById('cron-status-orb-tooltip');
+    if (!wrap || !tooltipEl) return;
+    let showTimer = null;
+    wrap.addEventListener('mouseenter', function () {
+      showTimer = setTimeout(function () {
+        tooltipEl.classList.remove('hidden');
+      }, 200);
+    });
+    wrap.addEventListener('mouseleave', function () {
+      if (showTimer) clearTimeout(showTimer);
+      tooltipEl.classList.add('hidden');
+    });
+  })();
 
   if (typeof Chart !== 'undefined') {
     Chart.register({
