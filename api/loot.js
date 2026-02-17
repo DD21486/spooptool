@@ -86,10 +86,11 @@ async function sendBigDropToDiscord(webhookUrl, { username, items, source, killC
   if (killCount != null) fields.push({ name: 'Kill count', value: String(killCount), inline: true });
   if (rarest) fields.push({ name: 'Rarity', value: rarest, inline: false });
 
+  const playerLabel = username && username.trim() ? username.trim() : 'Unknown';
   const body = {
     embeds: [
       {
-        title: '💰 Big drop',
+        title: `💰 Big drop — ${playerLabel}`,
         description: description.length > 4096 ? description.slice(0, 4093) + '...' : description,
         fields: fields.slice(0, 25),
         color: 0x58b157,
