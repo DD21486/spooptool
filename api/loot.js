@@ -10,7 +10,7 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
-const { parseRarityToExpectedKills, getLuckDelta } = require('../lib/luck');
+const { expectedKillsFromRarity, getLuckDelta } = require('../lib/luck');
 const { insertActivity } = require('../lib/activity-log');
 
 function cors(res) {
@@ -488,7 +488,7 @@ module.exports = async function handler(req, res) {
         }
       }
 
-      if (characterId && source && killCount != null && rarest) {
+      if (characterId && source && killCount != null && extra.rarestProbability != null) {
         try {
           const baselineRows = await sql`
             SELECT kill_count FROM luck_baseline
@@ -498,7 +498,7 @@ module.exports = async function handler(req, res) {
           const baselineKc = baselineRows.length ? Math.max(0, parseInt(baselineRows[0].kill_count, 10) || 0) : 0;
           if (killCount > baselineKc) {
             const effectiveKc = killCount - baselineKc;
-            const expected = parseRarityToExpectedKills(rarest);
+            const expected = expectedKillsFromRarity(extra.rarestProbability);
             if (expected != null && expected >= 1) {
               const ratio = effectiveKc / expected;
               const charLuck = await sql`SELECT luck_score FROM characters WHERE id = ${characterId} LIMIT 1`;

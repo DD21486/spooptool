@@ -49,8 +49,9 @@ function buildSnapshotData(player) {
   const bosses = {};
   for (const [key, b] of Object.entries(player.main.bosses || {})) {
     if (b && typeof b === 'object') {
-      const count = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
-      bosses[key] = { rank: b.rank, count: typeof count === 'number' && count >= 0 ? count : 0 };
+      const raw = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
+      const count = typeof raw === 'number' ? raw : parseInt(raw, 10);
+      bosses[key] = { rank: b.rank, count: Number.isFinite(count) && count >= 0 ? count : 0 };
     }
   }
   return { skills, bosses };
@@ -75,7 +76,10 @@ module.exports = async function handler(req, res) {
     return res.status(200).json({ ok: true, snapshots: 0, message: 'No characters' });
   }
 
-  const limit = Math.min(parseInt(req.query.limit, 10) || characters.length, 20);
+  const limitParam = parseInt(req.query.limit, 10);
+  const limit = Number.isNaN(limitParam) || limitParam < 1
+    ? Math.min(characters.length, 100)
+    : Math.min(limitParam, 100);
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
   const setLuckBaseline = req.query.set_luck_baseline === '1' || req.query.set_luck_baseline === 'true';
   characters = characters.slice(offset, offset + limit);
