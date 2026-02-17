@@ -27,7 +27,6 @@
   const skillLabel = (key) => (key || '').replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   let characterList = [];
   let playerData = {};
-  let last24hDeltas = {};
   let bossKeys = [];
   let skillKeys = ['overall'];
 
@@ -47,12 +46,15 @@
   const homeCaptureCountdown = document.getElementById('home-capture-countdown');
   const homeRefreshWrap = document.getElementById('home-refresh-wrap');
   const tabTotal = document.getElementById('tab-total');
+  const tabToday = document.getElementById('tab-today');
   const tabLast24 = document.getElementById('tab-last24');
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
 
   let homeViewMode = 'last24';
+  let last24hDeltas = {};
+  let todayDeltas = {};
   let lootTopDropsCache = {};
   let homeTooltipHideTimer = null;
 
@@ -265,9 +267,14 @@
     const filter = getFilter();
     leftLoading.classList.add('hidden');
     leftTbody.innerHTML = '';
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : last24hDeltas;
     if (homeViewMode === 'last24') {
       leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Last 24 Hr' : skillLabel(filter.key) + ' (24h)';
+    } else if (homeViewMode === 'today') {
+      leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
+      if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Today' : skillLabel(filter.key) + ' (today)';
     } else {
       leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
@@ -275,8 +282,8 @@
 
     const skillKey = filter.type === 'skill' ? filter.key : 'overall';
     const rows = characterList.map(username => {
-      const d = last24hDeltas[username];
-      const delta = homeViewMode === 'last24' && d
+      const d = deltaSource[username];
+      const delta = isDelta && d
         ? (d.skillDeltas && skillKey in d.skillDeltas ? d.skillDeltas[skillKey] : d.xpDelta)
         : 0;
       return {
@@ -285,7 +292,7 @@
         xpDelta: delta != null ? delta : 0,
       };
     }).filter(r => r.value != null);
-    if (homeViewMode === 'last24') {
+    if (isDelta) {
       rows.sort((a, b) => (b.xpDelta - a.xpDelta));
     } else {
       rows.sort((a, b) => (b.value - a.value));
@@ -293,7 +300,7 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const displayValue = homeViewMode === 'last24'
+      const displayValue = isDelta
         ? (r.xpDelta != null && r.xpDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.xpDelta)}</span>` : '—')
         : (r.value != null ? formatNum(r.value) : '—');
       const valueCell = `<span class="home-value-cell cursor-help" data-table="xp" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
@@ -314,9 +321,10 @@
     lootLoading.classList.add('hidden');
     lootTbody.innerHTML = '';
     const isLast24 = homeViewMode === 'last24';
-    const list = isLast24 ? lootLeaderboard24 : lootLeaderboardTotal;
+    const isToday = homeViewMode === 'today';
+    const list = isToday ? lootLeaderboardToday : (isLast24 ? lootLeaderboard24 : lootLeaderboardTotal);
     if (lootTitle) lootTitle.textContent = 'Loot value';
-    if (lootValueTh) lootValueTh.textContent = isLast24 ? 'Value (24h)' : 'Value';
+    if (lootValueTh) lootValueTh.textContent = isToday ? 'Value (today)' : (isLast24 ? 'Value (24h)' : 'Value');
     const getValue = (username) => {
       const p = list.find((x) => (x.username || '').toLowerCase() === (username || '').toLowerCase());
       return p ? Number(p.totalValueGp) || 0 : 0;
@@ -348,21 +356,19 @@
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
     const bossKey = (filterRightBoss && filterRightBoss.value) || '';
-    if (rightTitle) {
-      if (homeViewMode === 'last24') {
-        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
-      } else {
-        rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
-      }
-    }
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : last24hDeltas;
+    if (rightTitle) rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
     if (rightValueTh) {
-      rightValueTh.textContent = homeViewMode === 'last24'
-        ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
-        : (bossKey ? formatBossKey(bossKey) : 'Total KC');
+      rightValueTh.textContent = homeViewMode === 'today'
+        ? (bossKey ? formatBossKey(bossKey) + ' (today)' : 'Today')
+        : (homeViewMode === 'last24'
+          ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
+          : (bossKey ? formatBossKey(bossKey) : 'Total KC'));
     }
     const rows = characterList.map(username => {
-      const d = last24hDeltas[username];
-      const kcDelta = homeViewMode === 'last24' && d
+      const d = deltaSource[username];
+      const kcDelta = isDelta && d
         ? (bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : d.bossKcDelta)
         : 0;
       return {
@@ -371,7 +377,7 @@
         kcDelta: kcDelta != null ? kcDelta : 0,
       };
     });
-    if (homeViewMode === 'last24') {
+    if (isDelta) {
       rows.sort((a, b) => (b.kcDelta - a.kcDelta));
     } else {
       rows.sort((a, b) => (b.kc - a.kc));
@@ -379,7 +385,7 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const displayValue = homeViewMode === 'last24'
+      const displayValue = isDelta
         ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
         : formatNum(r.kc);
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
@@ -422,18 +428,22 @@
   }
   function buildXpTooltipContent(username) {
     const player = playerData[username];
-    const deltas = last24hDeltas[username];
+    const deltas24 = last24hDeltas[username];
+    const deltasToday = todayDeltas[username];
     const isLast24 = homeViewMode === 'last24';
+    const isToday = homeViewMode === 'today';
+    const deltas = isToday ? deltasToday : deltas24;
+    const periodLabel = isToday ? 'today' : '24h';
     let header = '';
     let entries = [];
-    if (isLast24 && deltas && deltas.skillDeltas) {
+    if ((isLast24 || isToday) && deltas && deltas.skillDeltas) {
       entries = Object.entries(deltas.skillDeltas)
         .filter(([k]) => k !== 'overall')
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
-      if (entries.length === 0) return '<div class="text-slate-400">No skill gains in last 24h</div>';
-      header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 skills (24h)</div>';
+      if (entries.length === 0) return '<div class="text-slate-400">No skill gains ' + (isToday ? 'today' : 'in last 24h') + '</div>';
+      header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 skills (' + periodLabel + ')</div>';
       return header + entries.map((e) => {
         const icon = skillIconSrc(e.key);
         const name = escapeHtml(skillLabel(e.key));
@@ -460,17 +470,21 @@
   }
   function buildBossTooltipContent(username) {
     const player = playerData[username];
-    const deltas = last24hDeltas[username];
+    const deltas24 = last24hDeltas[username];
+    const deltasToday = todayDeltas[username];
     const isLast24 = homeViewMode === 'last24';
+    const isToday = homeViewMode === 'today';
+    const deltas = isToday ? deltasToday : deltas24;
+    const periodLabel = isToday ? 'today' : '24h';
     let entries = [];
-    if (isLast24 && deltas && deltas.bossDeltas) {
+    if ((isLast24 || isToday) && deltas && deltas.bossDeltas) {
       entries = Object.entries(deltas.bossDeltas)
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .filter((e) => e.delta > 0)
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
-      if (entries.length === 0) return '<div class="text-slate-400">No boss kills in last 24h</div>';
-      const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (24h)</div>';
+      if (entries.length === 0) return '<div class="text-slate-400">No boss kills ' + (isToday ? 'today' : 'in last 24h') + '</div>';
+      const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (' + periodLabel + ')</div>';
       return header + entries.map((e) => {
         const icon = bossImageSrc(e.key);
         const name = escapeHtml(formatBossKey(e.key));
@@ -496,9 +510,12 @@
     return '<div class="text-slate-400">No data</div>';
   }
   async function fetchAndBuildLootTooltipContent(username) {
-    const cacheKey = username + (homeViewMode === 'last24' ? ':24' : ':all');
+    const suffix = homeViewMode === 'today' ? ':today' : (homeViewMode === 'last24' ? ':24' : ':all');
+    const cacheKey = username + suffix;
     if (lootTopDropsCache[cacheKey]) return lootTopDropsCache[cacheKey];
-    const url = API + '/loot?player=' + encodeURIComponent(username) + '&limit=3' + (homeViewMode === 'last24' ? '&hours=24' : '');
+    const todayParam = homeViewMode === 'today' ? '&today=1' : '';
+    const hoursParam = homeViewMode === 'last24' ? '&hours=24' : '';
+    const url = API + '/loot?player=' + encodeURIComponent(username) + '&limit=3' + hoursParam + todayParam;
     try {
       const res = await fetch(url);
       const data = await res.json();
@@ -581,18 +598,30 @@
     rightTbody.innerHTML = '';
     if (lootTbody) lootTbody.innerHTML = '';
     try {
-      const [dataRes, deltasRes, lootTotalRes, loot24Res] = await Promise.all([
+      const [dataRes, deltasRes, deltasTodayRes, lootTotalRes, loot24Res, lootTodayRes] = await Promise.all([
         fetch(API + '/characters-with-snapshots'),
         fetch(API + '/characters-deltas?hours=24'),
+        fetch(API + '/characters-deltas?today=1'),
         fetch(API + '/loot?leaderboard=1'),
         fetch(API + '/loot?leaderboard=1&hours=24'),
+        fetch(API + '/loot?leaderboard=1&today=1'),
       ]);
       if (!dataRes.ok) throw new Error('Failed to load data');
       const data = await dataRes.json();
       const deltasData = await deltasRes.json().catch(() => ({}));
+      const deltasTodayData = await deltasTodayRes.json().catch(() => ({}));
       last24hDeltas = {};
       (deltasData.deltas || []).forEach((d) => {
         last24hDeltas[d.username] = {
+          xpDelta: d.xpDelta,
+          bossKcDelta: d.bossKcDelta,
+          skillDeltas: d.skillDeltas || {},
+          bossDeltas: d.bossDeltas || {},
+        };
+      });
+      todayDeltas = {};
+      (deltasTodayData.deltas || []).forEach((d) => {
+        todayDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
           skillDeltas: d.skillDeltas || {},
@@ -614,8 +643,10 @@
       }
       const lootTotalData = await lootTotalRes.json().catch(() => ({}));
       const loot24Data = await loot24Res.json().catch(() => ({}));
+      const lootTodayData = await lootTodayRes.json().catch(() => ({}));
       lootLeaderboardTotal = Array.isArray(lootTotalData.players) ? lootTotalData.players : [];
       lootLeaderboard24 = Array.isArray(loot24Data.players) ? loot24Data.players : [];
+      lootLeaderboardToday = Array.isArray(lootTodayData.players) ? lootTodayData.players : [];
       populateFilterSkill();
       populateFilterBoss();
       renderLeft();
@@ -720,18 +751,24 @@
   let cachedLootHistory = null;
   let lootLeaderboardTotal = [];
   let lootLeaderboard24 = [];
+  let lootLeaderboardToday = [];
+  let cachedHomeHistoryToday = null;
+  let cachedLootHistoryToday = null;
 
-  function setHomeChartLabels(isLast24) {
+  function setHomeChartLabels(mode) {
+    const isDelta = mode === 'last24' || mode === 'today';
     const xpLabelEl = document.getElementById('home-chart-xp-label');
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     const lootLabelEl = document.getElementById('home-chart-loot-label');
-    if (xpLabelEl) xpLabelEl.textContent = isLast24 ? 'Total XP' : 'Total XP (all characters)';
-    if (bossLabelEl) bossLabelEl.textContent = isLast24 ? 'Boss KC' : 'Boss KC (all characters)';
-    if (lootLabelEl) lootLabelEl.textContent = isLast24 ? 'Loot value' : 'Loot value (all characters)';
+    if (xpLabelEl) xpLabelEl.textContent = isDelta ? 'Total XP' : 'Total XP (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isDelta ? 'Boss KC' : 'Boss KC (all characters)';
+    if (lootLabelEl) lootLabelEl.textContent = isDelta ? 'Loot value' : 'Loot value (all characters)';
   }
 
   function paintHomeCharts(history, mode, lootHistory) {
     const isLast24 = mode === 'last24';
+    const isToday = mode === 'today';
+    const isDelta = isLast24 || isToday;
     const xpTotalEl = document.getElementById('home-chart-xp-total');
     const bossTotalEl = document.getElementById('home-chart-boss-total');
     const lootTotalEl = document.getElementById('home-chart-loot-total');
@@ -744,7 +781,7 @@
       if (xpTotalEl) xpTotalEl.textContent = '—';
       if (bossTotalEl) bossTotalEl.textContent = '—';
       if (lootTotalEl) lootTotalEl.textContent = '—';
-      setHomeChartLabels(isLast24);
+      setHomeChartLabels(mode);
       paintHomeLootChart(lootHistory || []);
       return;
     }
@@ -755,8 +792,7 @@
     });
     let xpValues;
     let bossValues;
-    if (isLast24) {
-      // Use the first bucket (start of 24h window) as base so the chart shows true rolling 24h gain
+    if (isDelta) {
       const base = history[0];
       const baseXp = base ? Number(base.totalXp) || 0 : 0;
       const baseBoss = base ? Number(base.totalBossKc) || 0 : 0;
@@ -769,7 +805,14 @@
     const lastXp = xpValues[xpValues.length - 1];
     const lastBoss = bossValues[bossValues.length - 1];
 
-    if (isLast24) {
+    if (isToday) {
+      const sumXp = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboardToday.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (today)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (today)';
+      if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (today)';
+    } else if (isLast24) {
       const sumXp = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
       const sumBoss = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
       const sumLoot = lootLeaderboard24.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
@@ -782,7 +825,7 @@
       if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp';
     }
-    setHomeChartLabels(isLast24);
+    setHomeChartLabels(mode);
 
     function rangeFromLast(lastVal, fallbackMax, padPct) {
       const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
@@ -926,27 +969,55 @@
       .catch(() => {});
   }
 
+  function loadHomeChartsToday() {
+    fetch(API + '/aggregate-history?today=1')
+      .then((res) => res.json())
+      .then((data) => {
+        const history = (data.history || []).slice();
+        cachedHomeHistoryToday = history;
+        cachedLootHistoryToday = (data.lootHistory || []).slice();
+        paintHomeCharts(history, 'today', cachedLootHistoryToday);
+      })
+      .catch(() => {});
+  }
+
   function setHomeViewMode(mode) {
     homeViewMode = mode;
+    setHomeChartLabels(mode);
+    const isTotal = mode === 'total';
+    const isToday = mode === 'today';
     const isLast24 = mode === 'last24';
-    setHomeChartLabels(isLast24);
-    if (tabTotal && tabLast24) {
-      const isTotal = mode === 'total';
+    if (tabTotal) {
       tabTotal.classList.toggle('bg-sky-600', isTotal);
       tabTotal.classList.toggle('text-white', isTotal);
       tabTotal.classList.toggle('bg-slate-700', !isTotal);
       tabTotal.classList.toggle('text-slate-300', !isTotal);
       tabTotal.setAttribute('aria-selected', String(isTotal));
-      tabLast24.classList.toggle('bg-sky-600', !isTotal);
-      tabLast24.classList.toggle('text-white', !isTotal);
-      tabLast24.classList.toggle('bg-slate-700', isTotal);
-      tabLast24.classList.toggle('text-slate-300', isTotal);
-      tabLast24.setAttribute('aria-selected', String(!isTotal));
+    }
+    if (tabToday) {
+      tabToday.classList.toggle('bg-sky-600', isToday);
+      tabToday.classList.toggle('text-white', isToday);
+      tabToday.classList.toggle('bg-slate-700', !isToday);
+      tabToday.classList.toggle('text-slate-300', !isToday);
+      tabToday.setAttribute('aria-selected', String(isToday));
+    }
+    if (tabLast24) {
+      tabLast24.classList.toggle('bg-sky-600', isLast24);
+      tabLast24.classList.toggle('text-white', isLast24);
+      tabLast24.classList.toggle('bg-slate-700', !isLast24);
+      tabLast24.classList.toggle('text-slate-300', !isLast24);
+      tabLast24.setAttribute('aria-selected', String(isLast24));
     }
     renderLeft();
     renderRight();
     renderLoot();
-    if (cachedHomeHistory) {
+    if (mode === 'today') {
+      if (cachedHomeHistoryToday != null) {
+        paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
+      } else {
+        loadHomeChartsToday();
+      }
+    } else if (cachedHomeHistory) {
       paintHomeCharts(cachedHomeHistory, mode, cachedLootHistory);
     } else {
       loadHomeCharts();
@@ -1027,6 +1098,7 @@
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
   if (tabTotal) tabTotal.addEventListener('click', () => setHomeViewMode('total'));
+  if (tabToday) tabToday.addEventListener('click', () => setHomeViewMode('today'));
   if (tabLast24) tabLast24.addEventListener('click', () => setHomeViewMode('last24'));
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
