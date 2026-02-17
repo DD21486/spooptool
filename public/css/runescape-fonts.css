@@ -35,5 +35,5 @@ body {
 
 /* Keep monospace at 16px-equivalent so it doesn’t scale up with the root */
 .font-mono {
-  font-size: 0.8889rem; /* 16px when root is 18px */
+  font-size: 13px;
 }
