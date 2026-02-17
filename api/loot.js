@@ -10,7 +10,7 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
-const { expectedKillsFromRarity, getLuckDelta } = require('../lib/luck');
+const { expectedKillsFromRarity, getLuckDelta, scaleLuckDeltaByRarity } = require('../lib/luck');
 const { insertActivity } = require('../lib/activity-log');
 
 function cors(res) {
@@ -283,7 +283,8 @@ module.exports = async function handler(req, res) {
           ? (sourceFilter != null
             ? await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                  (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND at >= NOW() - make_interval(hours => ${periodFilter})
@@ -294,7 +295,8 @@ module.exports = async function handler(req, res) {
               `
             : await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                  (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND at >= NOW() - make_interval(hours => ${periodFilter})
@@ -305,7 +307,8 @@ module.exports = async function handler(req, res) {
           : (sourceFilter != null
             ? await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                  (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND TRIM(source) = TRIM(${sourceFilter})
@@ -315,7 +318,8 @@ module.exports = async function handler(req, res) {
               `
             : await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
-                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                  (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                  (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                 GROUP BY item_id, item_name
@@ -368,7 +372,7 @@ module.exports = async function handler(req, res) {
                   ORDER BY total_value_gp DESC
                   LIMIT ${limit}
                 `);
-          grouped = grouped.map((r) => ({ ...r, item_id: null }));
+          grouped = grouped.map((r) => ({ ...r, item_id: null, luck_delta: null }));
         } else {
           throw groupErr;
         }
@@ -377,6 +381,7 @@ module.exports = async function handler(req, res) {
       const drops = grouped.map((r) => {
         const src = r.source != null ? String(r.source).trim() : '';
         const affectsLuck = src !== '' && luckBossKeys.has(src.toLowerCase());
+        const luckDelta = r.luck_delta != null && Number.isFinite(Number(r.luck_delta)) ? Number(r.luck_delta) : null;
         return {
           item_id: r.item_id != null ? r.item_id : null,
           item_name: r.item_name,
@@ -384,6 +389,7 @@ module.exports = async function handler(req, res) {
           total_value_gp: Number(r.total_value_gp),
           source: r.source != null ? r.source : null,
           affects_luck: affectsLuck,
+          luck_delta: luckDelta,
         };
       });
 
@@ -436,9 +442,41 @@ module.exports = async function handler(req, res) {
       `;
       const characterId = charRow.length ? charRow[0].id : null;
 
+      // Compute luck delta before inserts so we can store it on each row (1/100–1/500 medium, 1/500–1/1500 high, 1/1500+ extreme)
+      let appliedLuckDelta = null;
+      let newLuckScore = null;
+      const prob = extra.rarestProbability;
+      const probNum = typeof prob === 'number' ? prob : parseFloat(prob, 10);
+      const isGuaranteedDrop = prob != null && Number.isFinite(probNum) && probNum >= 0.99;
+      if (characterId && source && killCount != null && prob != null && !isGuaranteedDrop) {
+        try {
+          const baselineRows = await sql`
+            SELECT kill_count FROM luck_baseline
+            WHERE character_id = ${characterId} AND LOWER(TRIM(boss_key)) = LOWER(TRIM(${source}))
+            LIMIT 1
+          `;
+          const baselineKc = baselineRows.length ? Math.max(0, parseInt(baselineRows[0].kill_count, 10) || 0) : 0;
+          if (killCount > baselineKc) {
+            const effectiveKc = killCount - baselineKc;
+            const expected = expectedKillsFromRarity(prob);
+            if (expected != null && expected > 32) {
+              const ratio = effectiveKc / expected;
+              const charLuck = await sql`SELECT luck_score FROM characters WHERE id = ${characterId} LIMIT 1`;
+              const currentScore = charLuck.length ? (parseInt(charLuck[0].luck_score, 10) || 0) : 0;
+              const { delta } = getLuckDelta(ratio, currentScore);
+              appliedLuckDelta = scaleLuckDeltaByRarity(delta, expected);
+              newLuckScore = Math.max(-100, Math.min(100, currentScore + appliedLuckDelta));
+            }
+          }
+        } catch (luckErr) {
+          console.error('Luck meter update skipped', luckErr?.message || luckErr);
+        }
+      }
+
       let inserted = 0;
       let payloadTotalValueGp = 0;
       let tableHasItemId = true;
+      let tableHasLuckDelta = true;
       for (const item of items) {
         const itemName = (item.name || 'Unknown').trim().substring(0, 255);
         const itemId = item.id != null ? parseInt(item.id, 10) : null;
@@ -447,24 +485,36 @@ module.exports = async function handler(req, res) {
         const totalValueGp = qty * priceEach;
         payloadTotalValueGp += totalValueGp;
 
-        if (tableHasItemId) {
+        if (tableHasItemId && tableHasLuckDelta) {
           try {
             await sql`
-              INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
-              VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+              INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text, luck_delta)
+              VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest}, ${appliedLuckDelta})
             `;
           } catch (insertErr) {
             const msg = (insertErr && insertErr.message) || String(insertErr);
             if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
               tableHasItemId = false;
+              tableHasLuckDelta = msg.includes('luck_delta') ? false : tableHasLuckDelta;
               await sql`
                 INSERT INTO loot_drops (character_id, username, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
                 VALUES (${characterId}, ${username}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+              `;
+            } else if (msg.includes('luck_delta')) {
+              tableHasLuckDelta = false;
+              await sql`
+                INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+                VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
               `;
             } else {
               throw insertErr;
             }
           }
+        } else if (tableHasItemId) {
+          await sql`
+            INSERT INTO loot_drops (character_id, username, item_id, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
+            VALUES (${characterId}, ${username}, ${Number.isNaN(itemId) ? null : itemId}, ${itemName}, ${qty}, ${totalValueGp}, ${source}, ${killCount}, ${rarest})
+          `;
         } else {
           await sql`
             INSERT INTO loot_drops (character_id, username, item_name, quantity, total_value_gp, source, kill_count, rarity_text)
@@ -472,6 +522,10 @@ module.exports = async function handler(req, res) {
           `;
         }
         inserted += 1;
+      }
+
+      if (newLuckScore != null) {
+        await sql`UPDATE characters SET luck_score = ${newLuckScore} WHERE id = ${characterId}`;
       }
 
       if (payloadTotalValueGp >= DISCORD_BIG_DROP_THRESHOLD_GP) {
@@ -485,31 +539,6 @@ module.exports = async function handler(req, res) {
             rarest,
             totalValueGp: payloadTotalValueGp,
           });
-        }
-      }
-
-      if (characterId && source && killCount != null && extra.rarestProbability != null) {
-        try {
-          const baselineRows = await sql`
-            SELECT kill_count FROM luck_baseline
-            WHERE character_id = ${characterId} AND LOWER(TRIM(boss_key)) = LOWER(TRIM(${source}))
-            LIMIT 1
-          `;
-          const baselineKc = baselineRows.length ? Math.max(0, parseInt(baselineRows[0].kill_count, 10) || 0) : 0;
-          if (killCount > baselineKc) {
-            const effectiveKc = killCount - baselineKc;
-            const expected = expectedKillsFromRarity(extra.rarestProbability);
-            if (expected != null && expected >= 1) {
-              const ratio = effectiveKc / expected;
-              const charLuck = await sql`SELECT luck_score FROM characters WHERE id = ${characterId} LIMIT 1`;
-              const currentScore = charLuck.length ? (parseInt(charLuck[0].luck_score, 10) || 0) : 0;
-              const { delta } = getLuckDelta(ratio, currentScore);
-              const newScore = Math.max(-100, Math.min(100, currentScore + delta));
-              await sql`UPDATE characters SET luck_score = ${newScore} WHERE id = ${characterId}`;
-            }
-          }
-        } catch (luckErr) {
-          console.error('Luck meter update skipped', luckErr?.message || luckErr);
         }
       }
 

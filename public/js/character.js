@@ -417,9 +417,18 @@
       return 'Coins_5';
     }
     const luckCell = (d) => {
-      const affects = d.affects_luck === true;
-      return '<td class="px-4 py-2 text-center" title="' + (affects ? 'Affects luck meter (boss drop)' : 'Does not affect luck meter') + '">' +
-        (affects ? '<span class="text-sky-400 font-medium">Yes</span>' : '<span class="text-slate-500">—</span>') + '</td>';
+      const delta = d.luck_delta != null && Number.isFinite(Number(d.luck_delta)) ? Number(d.luck_delta) : null;
+      let content = '<span class="text-slate-500">—</span>';
+      let title = 'Does not affect luck meter';
+      if (delta !== null) {
+        const s = delta > 0 ? '+' + delta : String(delta);
+        content = '<span class="font-mono font-medium ' + (delta > 0 ? 'text-emerald-400' : 'text-rose-400') + '">(' + s + ')</span>';
+        title = 'Luck change: ' + s;
+      } else if (d.affects_luck === true) {
+        content = '<span class="text-slate-500">—</span>';
+        title = 'Boss drop (no change this time)';
+      }
+      return '<td class="px-4 py-2 text-center" title="' + escapeHtml(title) + '">' + content + '</td>';
     };
     lootTbody.innerHTML = drops.length === 0
       ? '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
