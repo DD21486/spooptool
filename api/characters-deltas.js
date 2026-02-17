@@ -55,36 +55,46 @@ module.exports = async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     const chars = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
-    const rows = today
+    const firstRows = today
       ? await sql`
-          SELECT character_id, at, data
+          SELECT DISTINCT ON (character_id) character_id, at, data
           FROM character_snapshots
           WHERE at >= date_trunc('day', NOW())
           ORDER BY character_id, at ASC
         `
       : await sql`
-          SELECT character_id, at, data
+          SELECT DISTINCT ON (character_id) character_id, at, data
           FROM character_snapshots
           WHERE at >= NOW() - make_interval(hours => ${hours})
           ORDER BY character_id, at ASC
         `;
+    const lastRows = today
+      ? await sql`
+          SELECT DISTINCT ON (character_id) character_id, at, data
+          FROM character_snapshots
+          WHERE at >= date_trunc('day', NOW())
+          ORDER BY character_id, at DESC
+        `
+      : await sql`
+          SELECT DISTINCT ON (character_id) character_id, at, data
+          FROM character_snapshots
+          WHERE at >= NOW() - make_interval(hours => ${hours})
+          ORDER BY character_id, at DESC
+        `;
 
-    const byChar = {};
-    for (const r of rows) {
-      const cid = r.character_id;
-      if (!byChar[cid]) byChar[cid] = [];
-      byChar[cid].push(r);
-    }
+    const firstByChar = {};
+    for (const r of firstRows) firstByChar[r.character_id] = r;
+    const lastByChar = {};
+    for (const r of lastRows) lastByChar[r.character_id] = r;
 
     const deltas = chars.map((c) => {
-      const snaps = byChar[c.id] || [];
-      if (snaps.length === 0) {
+      const first = firstByChar[c.id];
+      const last = lastByChar[c.id];
+      if (!first || !last) {
         return { username: c.username, xpDelta: 0, bossKcDelta: 0, skillDeltas: {}, bossDeltas: {} };
       }
-      const first = snaps[0];
-      const last = snaps[snaps.length - 1];
-      const firstData = first.data || {};
-      const lastData = last.data || {};
+      const firstData = first && first.data ? first.data : {};
+      const lastData = last && last.data ? last.data : {};
       const firstXp = xpFromData(firstData);
       const lastXp = xpFromData(lastData);
       const firstKc = totalBossKcFromData(firstData);

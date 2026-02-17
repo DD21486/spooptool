@@ -33,20 +33,29 @@ module.exports = async function handler(req, res) {
     if (!chars.length) return res.status(404).json({ error: 'Character not found' });
     const characterId = chars[0].id;
 
-    const rows = await sql`
+    const firstRow = await sql`
       SELECT at, data
       FROM character_snapshots
       WHERE character_id = ${characterId}
         AND at >= NOW() - make_interval(hours => ${hours})
       ORDER BY at ASC
+      LIMIT 1
+    `;
+    const lastRow = await sql`
+      SELECT at, data
+      FROM character_snapshots
+      WHERE character_id = ${characterId}
+        AND at >= NOW() - make_interval(hours => ${hours})
+      ORDER BY at DESC
+      LIMIT 1
     `;
 
     const skillDeltas = {};
     const bossDeltas = {};
 
-    if (rows.length >= 2) {
-      const first = rows[0].data;
-      const last = rows[rows.length - 1].data;
+    if (firstRow.length && lastRow.length) {
+      const first = firstRow[0].data;
+      const last = lastRow[0].data;
       const firstSkills = (first && first.skills) || {};
       const lastSkills = (last && last.skills) || {};
       const skillKeys = new Set([...Object.keys(firstSkills), ...Object.keys(lastSkills)]);

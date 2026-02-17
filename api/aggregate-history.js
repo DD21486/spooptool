@@ -10,15 +10,6 @@ function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 }
 
-function totalBossKcFromData(data) {
-  if (!data || !data.bosses) return 0;
-  let sum = 0;
-  for (const b of Object.values(data.bosses)) {
-    if (b && typeof b.count === 'number') sum += b.count;
-  }
-  return sum;
-}
-
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
@@ -39,7 +30,9 @@ module.exports = async function handler(req, res) {
     if (today) {
       start = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
       rows = await sql`
-        SELECT character_id, at, data
+        SELECT character_id, at,
+          (data->'skills'->'overall'->>'xp')::bigint AS xp,
+          (SELECT COALESCE(SUM((elem->'count')::int), 0) FROM jsonb_each(data->'bosses') AS t(k, elem)) AS boss_kc
         FROM character_snapshots
         WHERE at >= date_trunc('day', NOW())
         ORDER BY at ASC
@@ -48,7 +41,9 @@ module.exports = async function handler(req, res) {
       const fetchHours = hours + 1;
       start = new Date(now.getTime() - hours * 60 * 60 * 1000);
       rows = await sql`
-        SELECT character_id, at, data
+        SELECT character_id, at,
+          (data->'skills'->'overall'->>'xp')::bigint AS xp,
+          (SELECT COALESCE(SUM((elem->'count')::int), 0) FROM jsonb_each(data->'bosses') AS t(k, elem)) AS boss_kc
         FROM character_snapshots
         WHERE at >= NOW() - make_interval(hours => ${fetchHours})
         ORDER BY at ASC
@@ -69,11 +64,8 @@ module.exports = async function handler(req, res) {
         const characterRows = rows.filter((r) => r.character_id === cid && new Date(r.at) <= bucketEnd);
         if (characterRows.length === 0) continue;
         const latest = characterRows[characterRows.length - 1];
-        const data = latest.data;
-        if (data && data.skills && data.skills.overall && data.skills.overall.xp != null) {
-          totalXp += Number(data.skills.overall.xp);
-        }
-        totalBossKc += totalBossKcFromData(data);
+        totalXp += Number(latest.xp) || 0;
+        totalBossKc += Number(latest.boss_kc) || 0;
       }
       return {
         at: bucketEnd.toISOString(),

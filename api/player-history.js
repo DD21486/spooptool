@@ -34,42 +34,55 @@ module.exports = async function handler(req, res) {
     if (!chars.length) return res.status(404).json({ error: 'Character not found' });
     const characterId = chars[0].id;
 
+    const formatLabel = (key) => (key || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+
+    if (boss) {
+      const rows = await sql`
+        SELECT at, (data->'bosses'->${boss}->>'count')::int AS value
+        FROM character_snapshots
+        WHERE character_id = ${characterId}
+          AND at >= NOW() - make_interval(hours => ${hours})
+        ORDER BY at ASC
+      `;
+      const history = rows.map((r) => ({
+        at: r.at instanceof Date ? r.at.toISOString() : r.at,
+        value: r.value != null ? Number(r.value) : 0,
+      }));
+      res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+      return res.status(200).json({ history, seriesLabel: formatLabel(boss) + ' KC' });
+    }
+
+    if (skill) {
+      const rows = await sql`
+        SELECT at, COALESCE(
+          (data->'skills'->${skill}->>'xp')::bigint,
+          (data->'skills'->${skill}->>'experience')::bigint,
+          0
+        ) AS value
+        FROM character_snapshots
+        WHERE character_id = ${characterId}
+          AND at >= NOW() - make_interval(hours => ${hours})
+        ORDER BY at ASC
+      `;
+      const history = rows.map((r) => ({
+        at: r.at instanceof Date ? r.at.toISOString() : r.at,
+        value: r.value != null ? Number(r.value) : 0,
+      }));
+      res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+      return res.status(200).json({ history, seriesLabel: formatLabel(skill) + ' XP' });
+    }
+
     const rows = await sql`
-      SELECT at, data
+      SELECT at, (data->'skills'->'overall'->>'xp')::bigint AS total_xp
       FROM character_snapshots
       WHERE character_id = ${characterId}
         AND at >= NOW() - make_interval(hours => ${hours})
       ORDER BY at ASC
     `;
-
-    const formatLabel = (key) => (key || '').replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
-
-    if (boss) {
-      const history = rows.map((r) => {
-        const data = r.data && r.data.bosses && r.data.bosses[boss];
-        const val = data && typeof data.count === 'number' ? data.count : 0;
-        return { at: r.at instanceof Date ? r.at.toISOString() : r.at, value: val };
-      });
-      return res.status(200).json({ history, seriesLabel: formatLabel(boss) + ' KC' });
-    }
-
-    if (skill) {
-      const history = rows.map((r) => {
-        const data = r.data && r.data.skills && r.data.skills[skill];
-        const val = data && (data.xp != null || data.experience != null)
-          ? Number(data.xp != null ? data.xp : data.experience)
-          : 0;
-        return { at: r.at instanceof Date ? r.at.toISOString() : r.at, value: val };
-      });
-      return res.status(200).json({ history, seriesLabel: formatLabel(skill) + ' XP' });
-    }
-
-    const history = rows.map((r) => {
-      const xp = r.data && r.data.skills && r.data.skills.overall && (r.data.skills.overall.xp != null)
-        ? Number(r.data.skills.overall.xp)
-        : 0;
-      return { at: r.at instanceof Date ? r.at.toISOString() : r.at, totalXp: xp };
-    });
+    const history = rows.map((r) => ({
+      at: r.at instanceof Date ? r.at.toISOString() : r.at,
+      totalXp: r.total_xp != null ? Number(r.total_xp) : 0,
+    }));
 
     res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json({ history });
