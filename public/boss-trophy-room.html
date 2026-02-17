@@ -44,7 +44,23 @@
 
     <div id="trophy-loading" class="py-12 text-slate-500 text-center">Loading…</div>
     <div id="trophy-error" class="hidden py-12 text-red-400 text-center text-sm"></div>
-    <div id="trophy-grid" class="hidden grid gap-4 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"></div>
+
+    <section id="trophy-trending-section" class="hidden mb-6">
+      <h2 class="text-sm font-semibold text-slate-400 mb-3">Trending Bosses</h2>
+      <div id="trophy-trending-grid" class="grid grid-cols-5 gap-4"></div>
+    </section>
+
+    <section id="trophy-all-section" class="hidden">
+      <div class="flex items-center justify-between gap-4 mb-3">
+        <h2 class="text-sm font-semibold text-slate-400">All Bosses</h2>
+        <select id="trophy-all-sort" class="text-xs rounded border border-slate-600 bg-slate-800 text-slate-300 px-2 py-1.5 focus:ring-1 focus:ring-sky-500" aria-label="Sort bosses">
+          <option value="a-z">Alphabetical A-Z</option>
+          <option value="z-a">Alphabetical Z-A</option>
+          <option value="most">Most Killed</option>
+        </select>
+      </div>
+      <div id="trophy-grid" class="grid gap-4 grid-cols-[repeat(auto-fill,minmax(200px,1fr))]"></div>
+    </section>
 
     <p id="trophy-empty" class="hidden py-12 text-slate-500 text-center text-sm">No characters or boss data yet. Add characters on the home page.</p>
   </div>
@@ -114,12 +130,58 @@
     return typeof n === 'number' && n >= 0 ? n : 0;
   }
 
-  fetch(API + '/characters-with-snapshots')
-    .then(function (res) {
-      if (!res.ok) throw new Error('Failed to load data');
-      return res.json();
-    })
-    .then(function (data) {
+  function buildBossCard(bossKey, bossStats, index) {
+      var stat = bossStats[bossKey];
+      if (!stat) return null;
+      var total = stat.total;
+      var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
+      var champion = byChar.length > 0 ? byChar[0] : null;
+      var nextClosest = byChar.length >= 2 ? byChar[1] : null;
+      var name = formatBossKey(bossKey);
+      var imgSrc = bossImageSrc(bossKey);
+      var totalStr = formatNum(total);
+      var championHtml = '';
+      if (champion) {
+        championHtml =
+          '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
+          '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
+          '<div class="flex items-center gap-1.5 min-w-0">' +
+          '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
+          '<span class="text-slate-200 font-medium text-sm truncate">' + escapeHtml(champion.username) + '</span>' +
+          '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
+          '</div>' +
+          '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + (nextClosest ? escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')' : 'none') + '</p>' +
+          '</div>';
+      } else {
+        championHtml =
+          '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
+          '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
+          '<p class="text-slate-500 text-sm">—</p>' +
+          '<p class="text-xs text-slate-500 mt-1">Next Closest: none</p></div>';
+      }
+      var card = document.createElement('div');
+      card.className = 'trophy-card rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden';
+      card.style.animationDelay = (index * 0.1) + 's';
+      card.innerHTML =
+        '<div class="card-body p-4">' +
+          '<h2 class="text-sm font-semibold text-slate-100 mb-2 truncate" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</h2>' +
+          '<div class="flex justify-center mb-3">' +
+            '<img src="' + escapeHtml(imgSrc) + '" alt="" class="w-[100px] h-[100px] object-contain rounded-sm" width="100" height="100" loading="lazy" onerror="this.style.display=\'none\'" />' +
+          '</div>' +
+          '<p class="text-xs text-slate-500 mb-1">Times Killed By The Boys</p>' +
+          '<p class="text-sm text-slate-300 font-mono mb-3">' + escapeHtml(totalStr) + '</p>' +
+          championHtml +
+        '</div>';
+      return card;
+    }
+
+  Promise.all([
+    fetch(API + '/characters-with-snapshots').then(function (r) { if (!r.ok) throw new Error('Failed to load data'); return r.json(); }),
+    fetch(API + '/characters-deltas?hours=24').then(function (r) { return r.ok ? r.json() : { deltas: [] }; })
+  ])
+    .then(function (results) {
+      var data = results[0];
+      var deltasData = results[1] || {};
       var list = data.characters || [];
       var bossStats = {};
       list.forEach(function (c) {
@@ -135,16 +197,20 @@
         });
       });
 
-      var bossKeys = Object.keys(bossStats).sort();
+      var allBossKeys = Object.keys(bossStats).sort();
       var loadingEl = document.getElementById('trophy-loading');
       var errorEl = document.getElementById('trophy-error');
       var gridEl = document.getElementById('trophy-grid');
+      var trendingSectionEl = document.getElementById('trophy-trending-section');
+      var trendingGridEl = document.getElementById('trophy-trending-grid');
+      var allSectionEl = document.getElementById('trophy-all-section');
+      var sortSelectEl = document.getElementById('trophy-all-sort');
       var emptyEl = document.getElementById('trophy-empty');
       var championsListEl = document.getElementById('champions-list');
       var championsListRowsEl = document.getElementById('champions-list-rows');
 
       var championCountByUser = {};
-      bossKeys.forEach(function (bossKey) {
+      allBossKeys.forEach(function (bossKey) {
         var byChar = bossStats[bossKey].byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
         var champ = byChar.length > 0 ? byChar[0].username : null;
         if (champ) {
@@ -170,58 +236,53 @@
       }
 
       loadingEl.classList.add('hidden');
-      if (bossKeys.length === 0) {
+      if (allBossKeys.length === 0) {
         emptyEl.classList.remove('hidden');
         return;
       }
 
-      gridEl.classList.remove('hidden');
-      gridEl.innerHTML = '';
-
-      bossKeys.forEach(function (bossKey, index) {
-        var stat = bossStats[bossKey];
-        var total = stat.total;
-        var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
-        var champion = byChar.length > 0 ? byChar[0] : null;
-        var nextClosest = byChar.length >= 2 ? byChar[1] : null;
-
-        var card = document.createElement('div');
-        card.className = 'trophy-card rounded-xl border border-slate-700 bg-slate-800/80 overflow-hidden';
-        card.style.animationDelay = (index * 0.1) + 's';
-        var name = formatBossKey(bossKey);
-        var imgSrc = bossImageSrc(bossKey);
-        var totalStr = formatNum(total);
-        var championHtml = '';
-        if (champion) {
-          championHtml =
-            '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
-            '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
-            '<div class="flex items-center gap-1.5 min-w-0">' +
-            '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
-            '<span class="text-slate-200 font-medium text-sm truncate">' + escapeHtml(champion.username) + '</span>' +
-            '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
-            '</div>' +
-            '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + (nextClosest ? escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')' : 'none') + '</p>' +
-            '</div>';
-        } else {
-          championHtml =
-            '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
-            '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
-            '<p class="text-slate-500 text-sm">—</p>' +
-            '<p class="text-xs text-slate-500 mt-1">Next Closest: none</p></div>';
-        }
-        card.innerHTML =
-          '<div class="card-body p-4">' +
-            '<h2 class="text-sm font-semibold text-slate-100 mb-2 truncate" title="' + escapeHtml(name) + '">' + escapeHtml(name) + '</h2>' +
-            '<div class="flex justify-center mb-3">' +
-              '<img src="' + escapeHtml(imgSrc) + '" alt="" class="w-[100px] h-[100px] object-contain rounded-sm" width="100" height="100" loading="lazy" onerror="this.style.display=\'none\'" />' +
-            '</div>' +
-            '<p class="text-xs text-slate-500 mb-1">Times Killed By The Boys</p>' +
-            '<p class="text-sm text-slate-300 font-mono mb-3">' + escapeHtml(totalStr) + '</p>' +
-            championHtml +
-          '</div>';
-        gridEl.appendChild(card);
+      var deltas = deltasData.deltas || [];
+      var kills24hByBoss = {};
+      deltas.forEach(function (d) {
+        var bd = d.bossDeltas || {};
+        Object.keys(bd).forEach(function (bossKey) {
+          kills24hByBoss[bossKey] = (kills24hByBoss[bossKey] || 0) + (Number(bd[bossKey]) || 0);
+        });
       });
+      var trendingBossKeys = Object.keys(kills24hByBoss)
+        .sort(function (a, b) { return (kills24hByBoss[b] || 0) - (kills24hByBoss[a] || 0); })
+        .slice(0, 5);
+
+      if (trendingBossKeys.length > 0 && trendingSectionEl && trendingGridEl) {
+        trendingSectionEl.classList.remove('hidden');
+        trendingGridEl.innerHTML = '';
+        trendingBossKeys.forEach(function (bossKey, idx) {
+          if (!bossStats[bossKey]) return;
+          var card = buildBossCard(bossKey, bossStats, idx);
+          if (card) trendingGridEl.appendChild(card);
+        });
+      }
+
+      allSectionEl.classList.remove('hidden');
+
+      function getAllBossKeysSorted(sortValue) {
+        if (sortValue === 'z-a') return allBossKeys.slice().sort().reverse();
+        if (sortValue === 'most') return allBossKeys.slice().sort(function (a, b) { return (bossStats[b].total || 0) - (bossStats[a].total || 0); });
+        return allBossKeys.slice().sort();
+      }
+
+      function renderAllBosses() {
+        var sortValue = sortSelectEl ? sortSelectEl.value : 'a-z';
+        var keys = getAllBossKeysSorted(sortValue);
+        gridEl.innerHTML = '';
+        keys.forEach(function (bossKey, index) {
+          var card = buildBossCard(bossKey, bossStats, index);
+          if (card) gridEl.appendChild(card);
+        });
+      }
+
+      renderAllBosses();
+      if (sortSelectEl) sortSelectEl.addEventListener('change', renderAllBosses);
     })
     .catch(function (err) {
       document.getElementById('trophy-loading').classList.add('hidden');
