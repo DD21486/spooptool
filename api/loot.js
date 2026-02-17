@@ -10,6 +10,7 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
+const { parseRarityToExpectedKills, getLuckDelta } = require('../lib/luck');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -386,6 +387,31 @@ module.exports = async function handler(req, res) {
             rarest,
             totalValueGp: payloadTotalValueGp,
           });
+        }
+      }
+
+      if (characterId && source && killCount != null && rarest) {
+        try {
+          const baselineRows = await sql`
+            SELECT kill_count FROM luck_baseline
+            WHERE character_id = ${characterId} AND LOWER(TRIM(boss_key)) = LOWER(TRIM(${source}))
+            LIMIT 1
+          `;
+          const baselineKc = baselineRows.length ? Math.max(0, parseInt(baselineRows[0].kill_count, 10) || 0) : 0;
+          if (killCount > baselineKc) {
+            const effectiveKc = killCount - baselineKc;
+            const expected = parseRarityToExpectedKills(rarest);
+            if (expected != null && expected >= 1) {
+              const ratio = effectiveKc / expected;
+              const charLuck = await sql`SELECT luck_score FROM characters WHERE id = ${characterId} LIMIT 1`;
+              const currentScore = charLuck.length ? (parseInt(charLuck[0].luck_score, 10) || 0) : 0;
+              const { delta } = getLuckDelta(ratio, currentScore);
+              const newScore = Math.max(-100, Math.min(100, currentScore + delta));
+              await sql`UPDATE characters SET luck_score = ${newScore} WHERE id = ${characterId}`;
+            }
+          }
+        } catch (luckErr) {
+          console.error('Luck meter update skipped', luckErr?.message || luckErr);
         }
       }
 

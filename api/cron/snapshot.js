@@ -76,6 +76,7 @@ module.exports = async function handler(req, res) {
 
   const limit = Math.min(parseInt(req.query.limit, 10) || characters.length, 20);
   const offset = Math.max(0, parseInt(req.query.offset, 10) || 0);
+  const setLuckBaseline = req.query.set_luck_baseline === '1' || req.query.set_luck_baseline === 'true';
   characters = characters.slice(offset, offset + limit);
 
   let written = 0;
@@ -106,12 +107,47 @@ module.exports = async function handler(req, res) {
     if (i < batches.length - 1) await delay(DELAY_MS_BETWEEN_BATCHES);
   }
 
+  let baselineUpdated = 0;
+  if (setLuckBaseline) {
+    try {
+      const latest = await sql`
+        SELECT DISTINCT ON (character_id) character_id, data
+        FROM character_snapshots
+        ORDER BY character_id, at DESC
+      `;
+      for (const row of latest) {
+        const bosses = (row.data && row.data.bosses) || {};
+        for (const [bossKey, b] of Object.entries(bosses)) {
+          if (!b || typeof b !== 'object') continue;
+          const kc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+          if (!Number.isFinite(kc) || kc < 0) continue;
+          try {
+            await sql`
+              INSERT INTO luck_baseline (character_id, boss_key, kill_count, snapshot_at)
+              VALUES (${row.character_id}, ${bossKey.trim().substring(0, 128)}, ${kc}, NOW())
+              ON CONFLICT (character_id, boss_key) DO UPDATE SET
+                kill_count = EXCLUDED.kill_count,
+                snapshot_at = EXCLUDED.snapshot_at
+            `;
+            baselineUpdated += 1;
+          } catch (_) {
+            /* table or column may not exist yet */
+          }
+        }
+      }
+    } catch (baselineErr) {
+      console.error('set_luck_baseline failed', baselineErr?.message || baselineErr);
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     snapshots: written,
     characters: characters.length,
     offset,
     limit,
+    setLuckBaseline: setLuckBaseline || undefined,
+    baselineRows: setLuckBaseline ? baselineUpdated : undefined,
     errors: errors.length ? errors : undefined,
   });
 };

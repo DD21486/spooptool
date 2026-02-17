@@ -24,18 +24,39 @@ module.exports = async function handler(req, res) {
 
   try {
     const sql = neon(process.env.DATABASE_URL);
-    const rows = await sql`
-      SELECT c.username, c.game_mode, cs.data
-      FROM characters c
-      LEFT JOIN LATERAL (
-        SELECT data FROM character_snapshots
-        WHERE character_id = c.id
-        ORDER BY at DESC
+    let rows;
+    try {
+      rows = await sql`
+        SELECT c.username, c.game_mode, COALESCE(c.luck_score, 0) AS luck_score, cs.data
+        FROM characters c
+        LEFT JOIN LATERAL (
+          SELECT data FROM character_snapshots
+          WHERE character_id = c.id
+          ORDER BY at DESC
+          LIMIT 1
+        ) cs ON true
+        WHERE LOWER(TRIM(c.username)) = LOWER(TRIM(${name}))
         LIMIT 1
-      ) cs ON true
-      WHERE LOWER(TRIM(c.username)) = LOWER(TRIM(${name}))
-      LIMIT 1
-    `;
+      `;
+    } catch (colErr) {
+      if (colErr && (colErr.message || '').includes('luck_score')) {
+        rows = await sql`
+          SELECT c.username, c.game_mode, cs.data
+          FROM characters c
+          LEFT JOIN LATERAL (
+            SELECT data FROM character_snapshots
+            WHERE character_id = c.id
+            ORDER BY at DESC
+            LIMIT 1
+          ) cs ON true
+          WHERE LOWER(TRIM(c.username)) = LOWER(TRIM(${name}))
+          LIMIT 1
+        `;
+        if (rows.length) rows[0].luck_score = 0;
+      } else {
+        throw colErr;
+      }
+    }
     if (!rows.length) {
       return res.status(404).json({ error: 'Character not found' });
     }
@@ -49,6 +70,7 @@ module.exports = async function handler(req, res) {
       mode: r.game_mode || 'main',
       skills,
       bosses,
+      luckScore: Number(r.luck_score) || 0,
     };
     res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
     return res.status(200).json(out);

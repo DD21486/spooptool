@@ -42,6 +42,21 @@
         </div>
       </section>
 
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6" aria-label="Luck meter">
+        <div class="px-4 py-3 flex items-center justify-between gap-2 text-sm">
+          <span class="text-slate-500 font-medium">Unlucky</span>
+          <span class="text-slate-400 font-medium">Normal</span>
+          <span class="text-slate-500 font-medium">Lucky</span>
+        </div>
+        <div class="px-4 pb-4 relative">
+          <div class="h-2 rounded-full bg-slate-700 w-full" role="presentation"></div>
+          <div id="luck-needle" class="absolute top-0 bottom-4 w-4 flex justify-center transition-all duration-200 pointer-events-none" style="left: 50%; transform: translateX(-50%);" aria-hidden="true">
+            <div class="w-1 h-full rounded-full bg-sky-400 shadow-sm"></div>
+          </div>
+        </div>
+        <p class="px-4 pb-3 text-center text-slate-500 text-sm" id="luck-value">0</p>
+      </section>
+
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Boss kills</h2>
         <div class="overflow-x-auto max-h-96">

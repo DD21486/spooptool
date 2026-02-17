@@ -224,6 +224,16 @@
     const lastCapture = getLastCronRunInNY();
     lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
+    const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
+    const luckNeedle = document.getElementById('luck-needle');
+    const luckValue = document.getElementById('luck-value');
+    if (luckNeedle) {
+      const pct = 50 + (luckScore / 100) * 50;
+      luckNeedle.style.left = Math.max(0, Math.min(100, pct)) + '%';
+      luckNeedle.style.transform = 'translateX(-50%)';
+    }
+    if (luckValue) luckValue.textContent = luckScore > 0 ? '+' + luckScore : String(luckScore);
+
     const skills = data.skills || {};
     const skillOrder = ['overall', 'attack', 'hitpoints', 'mining', 'strength', 'agility', 'smithing', 'defence', 'herblore', 'fishing', 'ranged', 'thieving', 'cooking', 'prayer', 'crafting', 'firemaking', 'magic', 'fletching', 'woodcutting', 'runecraft', 'slayer', 'farming', 'construction', 'hunter'];
     const keys = Object.keys(skills).filter(k => k !== 'overall').sort((a, b) => {
