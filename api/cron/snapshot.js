@@ -7,7 +7,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
-const { insertActivity, pruneTo30 } = require('../lib/activity-log');
+const { insertActivity, pruneTo30 } = require('../../lib/activity-log');
 
 /** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
 const DELAY_MS_BETWEEN_BATCHES = 1500;
