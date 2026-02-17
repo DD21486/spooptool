@@ -336,8 +336,12 @@
       labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
       values = values.concat(lastValue);
     }
-    const maxVal = Math.max(...values, 1);
-    const pad = maxVal * 0.05;
+    const dataMin = Math.min(...values, 0);
+    const dataMax = Math.max(...values, 1);
+    const range = dataMax - dataMin;
+    const pad = range > 0 ? range * 0.01 : Math.max(dataMax * 0.01, 1);
+    const yMin = Math.max(0, dataMin - pad);
+    const yMax = dataMax + pad;
     const ctx = canvas.getContext('2d');
     lootChartInstance = new Chart(ctx, {
       type: 'line',
@@ -366,8 +370,8 @@
             ticks: { color: '#94a3b8', maxTicksLimit: 6, font: { size: 10 } },
           },
           y: {
-            min: Math.max(0, values[0] - pad),
-            max: maxVal + pad,
+            min: yMin,
+            max: yMax,
             grid: { color: 'rgba(148, 163, 184, 0.2)' },
             ticks: { color: '#94a3b8', callback: (v) => Number(v).toLocaleString(), font: { size: 10 } },
           },

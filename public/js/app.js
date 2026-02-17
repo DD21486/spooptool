@@ -877,13 +877,16 @@
     }
     setHomeChartLabels(mode);
 
-    function rangeFromLast(lastVal, fallbackMax, padPct) {
-      const max = lastVal != null && lastVal > 0 ? lastVal : fallbackMax;
-      const pad = max * padPct;
-      return { min: Math.max(0, max - pad), max: max + pad };
+    function rangeFromSeries(values, fallbackMax) {
+      const nums = values.filter((v) => v != null && !Number.isNaN(Number(v))).map(Number);
+      const dataMin = nums.length ? Math.min(...nums, 0) : 0;
+      const dataMax = nums.length ? Math.max(...nums, fallbackMax) : fallbackMax;
+      const range = dataMax - dataMin;
+      const pad = range > 0 ? range * 0.01 : Math.max(dataMax * 0.01, 1);
+      return { min: Math.max(0, dataMin - pad), max: dataMax + pad };
     }
-    const xpRange = rangeFromLast(lastXp, 10, 0.003);
-    const bossRange = rangeFromLast(lastBoss, 10, 0.01);
+    const xpRange = rangeFromSeries(xpValues, 10);
+    const bossRange = rangeFromSeries(bossValues, 10);
     const formatInt = (v) => Math.round(Number(v)).toLocaleString();
     const chartOpts = (yMin, yMax, tickCallback) => ({
       responsive: true,
@@ -990,14 +993,13 @@
         values = values.concat(values[values.length - 1]);
       }
     }
-    let lastVal = values[values.length - 1];
-    if (isToday) {
-      for (let i = 23; i >= 0; i--) {
-        if (values[i] != null) { lastVal = values[i]; break; }
-      }
-    }
-    const maxVal = Math.max(...values, 1);
-    const pad = maxVal * 0.05;
+    const numericValues = values.filter((v) => v != null && !Number.isNaN(Number(v))).map(Number);
+    const dataMin = numericValues.length ? Math.min(...numericValues, 0) : 0;
+    const dataMax = numericValues.length ? Math.max(...numericValues, 1) : 1;
+    const range = dataMax - dataMin;
+    const pad = range > 0 ? range * 0.01 : Math.max(dataMax * 0.01, 1);
+    const yMin = Math.max(0, dataMin - pad);
+    const yMax = dataMax + pad;
     const ctxLoot = document.getElementById('home-chart-loot');
     if (ctxLoot && ctxLoot.getContext) {
       homeChartLoot = new Chart(ctxLoot.getContext('2d'), {
@@ -1026,8 +1028,8 @@
               ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
             },
             y: {
-              min: Math.max(0, (lastVal != null ? lastVal : maxVal) - pad),
-              max: (lastVal != null ? lastVal : maxVal) + pad,
+              min: yMin,
+              max: yMax,
               grid: { color: 'rgba(148, 163, 184, 0.2)' },
               ticks: { color: '#94a3b8', callback: (v) => (Number(v) >= 1e6 ? (Number(v) / 1e6).toFixed(1) + 'M' : Math.round(Number(v)).toLocaleString()), font: { size: 10 } },
             },
