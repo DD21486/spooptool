@@ -910,13 +910,28 @@
     }
     setHomeChartLabels(mode);
 
+    /** Y-axis range from series. When min is 0 and data is mostly above zero, zoom into the positive range so the chart is readable. */
     function rangeFromSeries(values, fallbackMax) {
       const nums = values.filter((v) => v != null && !Number.isNaN(Number(v))).map(Number);
-      const dataMin = nums.length ? Math.min(...nums, 0) : 0;
+      const dataMin = nums.length ? Math.min(...nums) : 0;
       const dataMax = nums.length ? Math.max(...nums, fallbackMax) : fallbackMax;
       const range = dataMax - dataMin;
       const pad = range > 0 ? range * 0.01 : Math.max(dataMax * 0.01, 1);
-      return { min: Math.max(0, dataMin - pad), max: dataMax + pad };
+      let yMin = dataMin - pad;
+      if (dataMin === 0 && dataMax > 0 && range > 0) {
+        const positive = nums.filter((n) => n > 0);
+        if (positive.length > 0) {
+          const minPositive = Math.min(...positive);
+          const rangePositive = dataMax - minPositive;
+          const padP = rangePositive > 0 ? rangePositive * 0.01 : Math.max(dataMax * 0.01, 1);
+          yMin = Math.max(0, minPositive - padP);
+        } else {
+          yMin = 0;
+        }
+      } else {
+        yMin = Math.max(0, yMin);
+      }
+      return { min: yMin, max: dataMax + pad };
     }
     const xpRange = rangeFromSeries(xpValues, 10);
     const bossRange = rangeFromSeries(bossValues, 10);
@@ -1027,11 +1042,24 @@
       }
     }
     const numericValues = values.filter((v) => v != null && !Number.isNaN(Number(v))).map(Number);
-    const dataMin = numericValues.length ? Math.min(...numericValues, 0) : 0;
+    const dataMin = numericValues.length ? Math.min(...numericValues) : 0;
     const dataMax = numericValues.length ? Math.max(...numericValues, 1) : 1;
     const range = dataMax - dataMin;
     const pad = range > 0 ? range * 0.01 : Math.max(dataMax * 0.01, 1);
-    const yMin = Math.max(0, dataMin - pad);
+    let yMin = dataMin - pad;
+    if (dataMin === 0 && dataMax > 0 && range > 0) {
+      const positive = numericValues.filter((n) => n > 0);
+      if (positive.length > 0) {
+        const minPositive = Math.min(...positive);
+        const rangePositive = dataMax - minPositive;
+        const padP = rangePositive > 0 ? rangePositive * 0.01 : Math.max(dataMax * 0.01, 1);
+        yMin = Math.max(0, minPositive - padP);
+      } else {
+        yMin = 0;
+      }
+    } else {
+      yMin = Math.max(0, yMin);
+    }
     const yMax = dataMax + pad;
     const ctxLoot = document.getElementById('home-chart-loot');
     if (ctxLoot && ctxLoot.getContext) {
