@@ -1,6 +1,6 @@
 {
   "buildCommand": "echo 'Static + serverless'",
   "outputDirectory": "public",
-  "crons": [{ "path": "/api/cron/snapshot", "schedule": "0 12 * * *" }],
+  "crons": [{ "path": "/api/cron/snapshot", "schedule": "0 * * * *" }],
   "rewrites": [{ "source": "/api/loot-webhook-url", "destination": "/api/loot?webhook=1" }]
 }
