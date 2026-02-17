@@ -8,9 +8,10 @@
     orb.classList.remove('bg-slate-500', 'bg-emerald-500', 'bg-red-500');
     orb.classList.add(ok ? 'bg-emerald-500' : 'bg-red-500');
     const lastRun = cronHealth && cronHealth.lastRunAt ? new Date(cronHealth.lastRunAt) : null;
+    const timeStr = lastRun ? lastRun.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' }) : '—';
     const tip = ok
-      ? (lastRun ? 'Data fresh (last snapshot ' + (lastRun.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) + ')' : 'Cron OK')
-      : 'Snapshot cron stale or failed — data may be outdated';
+      ? 'Green =\nLast Fetch Succeeded\n' + timeStr
+      : 'Red =\nLast Fetch Failure\n' + timeStr;
     orb.title = tip;
     orb.setAttribute('aria-label', ok ? 'Cron status: OK' : 'Cron status: stale or failed');
   }
