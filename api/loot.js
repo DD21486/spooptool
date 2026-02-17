@@ -60,7 +60,7 @@ function send500(res, detail) {
   return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
 }
 
-const DISCORD_BIG_DROP_THRESHOLD_GP = 5_000; // temporary; was 400k
+const DISCORD_BIG_DROP_THRESHOLD_GP = 300_000;
 
 /**
  * POST to Discord incoming webhook with an embed for a big loot drop.
