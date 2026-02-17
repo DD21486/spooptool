@@ -1,6 +1,20 @@
 (function () {
   const API = '/api';
 
+  function updateCronStatusOrb(cronHealth) {
+    const orb = document.getElementById('cron-status-orb');
+    if (!orb) return;
+    const ok = cronHealth && cronHealth.ok === true;
+    orb.classList.remove('bg-slate-500', 'bg-emerald-500', 'bg-red-500');
+    orb.classList.add(ok ? 'bg-emerald-500' : 'bg-red-500');
+    const lastRun = cronHealth && cronHealth.lastRunAt ? new Date(cronHealth.lastRunAt) : null;
+    const tip = ok
+      ? (lastRun ? 'Data fresh (last snapshot ' + (lastRun.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })) + ')' : 'Cron OK')
+      : 'Snapshot cron stale or failed — data may be outdated';
+    orb.title = tip;
+    orb.setAttribute('aria-label', ok ? 'Cron status: OK' : 'Cron status: stale or failed');
+  }
+
   if (typeof Chart !== 'undefined') {
     Chart.register({
       id: 'verticalHoverLine',
@@ -1047,6 +1061,7 @@
         cachedHomeHistory = history;
         cachedLootHistory = (data.lootHistory || []).slice();
         paintHomeCharts(history, homeViewMode, cachedLootHistory);
+        if (data.cronHealth) updateCronStatusOrb(data.cronHealth);
       })
       .catch(() => {});
   }
@@ -1059,6 +1074,7 @@
         cachedHomeHistoryToday = history;
         cachedLootHistoryToday = (data.lootHistory || []).slice();
         paintHomeCharts(history, 'today', cachedLootHistoryToday);
+        if (data.cronHealth) updateCronStatusOrb(data.cronHealth);
       })
       .catch(() => {});
   }

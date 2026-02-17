@@ -183,6 +183,15 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  try {
+    await sql`
+      INSERT INTO cron_heartbeat (job_name, last_run_at) VALUES ('snapshot', NOW())
+      ON CONFLICT (job_name) DO UPDATE SET last_run_at = NOW()
+    `;
+  } catch (heartbeatErr) {
+    /* table may not exist yet; don't fail the response */
+  }
+
   return res.status(200).json({
     ok: true,
     snapshots: written,

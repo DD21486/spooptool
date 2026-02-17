@@ -101,8 +101,22 @@ module.exports = async function handler(req, res) {
       console.error('aggregate-history lootHistory', lootErr);
     }
 
+    let cronHealth = { ok: false, lastRunAt: null };
+    try {
+      const heartbeatRows = await sql`SELECT last_run_at FROM cron_heartbeat WHERE job_name = 'snapshot' LIMIT 1`;
+      const lastRunAt = heartbeatRows.length ? heartbeatRows[0].last_run_at : null;
+      const staleMs = 2.5 * 60 * 60 * 1000;
+      const atMs = lastRunAt ? new Date(lastRunAt).getTime() : 0;
+      cronHealth = {
+        ok: atMs > 0 && Date.now() - atMs < staleMs,
+        lastRunAt: lastRunAt ? new Date(lastRunAt).toISOString() : null,
+      };
+    } catch (_) {
+      /* cron_heartbeat table may not exist */
+    }
+
     res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
-    return res.status(200).json({ history, lootHistory });
+    return res.status(200).json({ history, lootHistory, cronHealth });
   } catch (err) {
     console.error('/api/aggregate-history', err);
     return res.status(500).json({ error: 'Failed to load aggregate history' });
