@@ -192,6 +192,58 @@ module.exports = async function handler(req, res) {
     /* table may not exist yet; don't fail the response */
   }
 
+  const leaderWebhookUrl = (process.env.DISCORD_LEADERBOARD_WEBHOOK_URL || '').trim();
+  if (leaderWebhookUrl && leaderWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
+    try {
+      const leaderRows = await sql`
+        WITH latest AS (
+          SELECT DISTINCT ON (character_id) character_id, data
+          FROM character_snapshots
+          ORDER BY character_id, at DESC
+        ),
+        totals AS (
+          SELECT character_id,
+            (SELECT COALESCE(SUM((elem->>'count')::int), 0) FROM jsonb_each(data->'bosses') AS t(k, elem)) AS total_kc
+          FROM latest
+        )
+        SELECT c.username
+        FROM totals t
+        JOIN characters c ON c.id = t.character_id
+        ORDER BY t.total_kc DESC NULLS LAST
+        LIMIT 1
+      `;
+      const currentLeader = leaderRows.length && leaderRows[0].username ? String(leaderRows[0].username).trim() : null;
+      const stateRows = await sql`SELECT value FROM leaderboard_state WHERE key = 'boss_kill_leader' LIMIT 1`;
+      const previousLeader = stateRows.length && stateRows[0].value != null ? String(stateRows[0].value).trim() : null;
+      if (currentLeader) {
+        if (previousLeader != null && previousLeader !== '' && currentLeader !== previousLeader) {
+          const body = {
+            embeds: [
+              {
+                title: '🏆 Boss kill leader changed',
+                description: `**${currentLeader}** has overtaken **${previousLeader}** for the most boss kills!`,
+                color: 0xf59e0b,
+                footer: { text: 'SpoopTool' },
+              },
+            ],
+          };
+          const resp = await fetch(leaderWebhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) console.error('Discord leaderboard webhook failed', resp.status);
+        }
+        await sql`
+          INSERT INTO leaderboard_state (key, value, updated_at) VALUES ('boss_kill_leader', ${currentLeader}, NOW())
+          ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+        `;
+      }
+    } catch (leaderErr) {
+      console.error('Boss leader / Discord notify', leaderErr?.message || leaderErr);
+    }
+  }
+
   return res.status(200).json({
     ok: true,
     snapshots: written,
