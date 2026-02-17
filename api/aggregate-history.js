@@ -25,6 +25,8 @@ module.exports = async function handler(req, res) {
 
   const hours = Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
   const bucketMinutes = 15;
+  // Fetch from slightly before the window so the first bucket has a baseline (for rolling 24h deltas)
+  const fetchHours = hours + 1;
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
@@ -35,7 +37,7 @@ module.exports = async function handler(req, res) {
     const rows = await sql`
       SELECT character_id, at, data
       FROM character_snapshots
-      WHERE at >= NOW() - make_interval(hours => ${hours})
+      WHERE at >= NOW() - make_interval(hours => ${fetchHours})
       ORDER BY at ASC
     `;
 

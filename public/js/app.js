@@ -720,12 +720,12 @@
     let xpValues;
     let bossValues;
     if (isLast24) {
-      const baseIdx = history.findIndex((h) => Number(h.totalXp) > 0 || Number(h.totalBossKc) > 0);
-      const base = baseIdx >= 0 ? history[baseIdx] : history[0];
-      const baseXp = Number(base.totalXp) || 0;
-      const baseBoss = Number(base.totalBossKc) || 0;
-      xpValues = history.map((h) => Math.max(0, Number(h.totalXp) - baseXp));
-      bossValues = history.map((h) => Math.max(0, Number(h.totalBossKc) - baseBoss));
+      // Use the first bucket (start of 24h window) as base so the chart shows true rolling 24h gain
+      const base = history[0];
+      const baseXp = base ? Number(base.totalXp) || 0 : 0;
+      const baseBoss = base ? Number(base.totalBossKc) || 0 : 0;
+      xpValues = history.map((h) => Math.max(0, (Number(h.totalXp) || 0) - baseXp));
+      bossValues = history.map((h) => Math.max(0, (Number(h.totalBossKc) || 0) - baseBoss));
     } else {
       xpValues = history.map((h) => Number(h.totalXp));
       bossValues = history.map((h) => Number(h.totalBossKc));
