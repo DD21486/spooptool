@@ -26,4 +26,5 @@
 
 body {
   font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  font-size: 18px; /* +2px from default 16px so RuneStar matches monospace scale */
 }
