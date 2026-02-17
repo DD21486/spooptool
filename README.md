@@ -44,3 +44,5 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 1. **Neon:** Run `sql/migration_loot_drops.sql` in the SQL Editor.
 2. **Vercel:** Add env var `LOOT_WEBHOOK_SECRET` (e.g. `openssl rand -hex 24`). The Settings cog on the homepage shows the full webhook URL for users to copy.
 3. **Dink:** In the Loot notifier, add the webhook URL (from Settings) as a second URL or in Webhook Overrides. Dink will POST loot events to your app; character pages show a Loot section (drop count, total value, last 20 drops).
+
+**Big drops → Discord:** To post only high-value drops to your Discord loot channel, add env var `DISCORD_LOOT_WEBHOOK_URL` with your channel’s [incoming webhook](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) URL. SpoopTool logs every drop it receives; when a single drop event totals **≥ 400k gp**, it also sends that drop to Discord (one embed per event). Use Dink’s 50k threshold so SpoopTool only receives notable loot; Discord then gets only the 400k+ events.

@@ -60,6 +60,59 @@ function send500(res, detail) {
   return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
 }
 
+const DISCORD_BIG_DROP_THRESHOLD_GP = 200_000; // temporary; was 400k
+
+/**
+ * POST to Discord incoming webhook with an embed for a big loot drop.
+ * Does not throw; logs errors so the main handler can still return 201.
+ */
+async function sendBigDropToDiscord(webhookUrl, { username, items, source, killCount, rarest, totalValueGp }) {
+  if (!webhookUrl || typeof webhookUrl !== 'string') return;
+  const url = webhookUrl.trim();
+  if (!url.startsWith('https://discord.com/api/webhooks/')) return;
+
+  const formatGp = (n) => (n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'M' : (n >= 1_000 ? (n / 1_000).toFixed(1) + 'K' : String(n)));
+  const lines = items.map((item) => {
+    const total = (item.quantity || 1) * (item.priceEach || 0);
+    const qty = item.quantity && item.quantity > 1 ? ` x${item.quantity}` : '';
+    return `• **${item.name || 'Unknown'}**${qty} — ${formatGp(total)} gp`;
+  });
+  const description = lines.join('\n');
+  const fields = [
+    { name: 'Total value', value: `${formatGp(totalValueGp)} gp`, inline: true },
+    { name: 'Player', value: username || '—', inline: true },
+  ];
+  if (source) fields.push({ name: 'Source', value: source, inline: true });
+  if (killCount != null) fields.push({ name: 'Kill count', value: String(killCount), inline: true });
+  if (rarest) fields.push({ name: 'Rarity', value: rarest, inline: false });
+
+  const body = {
+    embeds: [
+      {
+        title: '💰 Big drop',
+        description: description.length > 4096 ? description.slice(0, 4093) + '...' : description,
+        fields: fields.slice(0, 25),
+        color: 0x58b157,
+        footer: { text: 'SpoopTool' },
+      },
+    ],
+  };
+
+  try {
+    const resp = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!resp.ok) {
+      const text = await resp.text();
+      console.error('Discord webhook failed', resp.status, text?.slice(0, 200));
+    }
+  } catch (e) {
+    console.error('Discord webhook error', e?.message || e);
+  }
+}
+
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
@@ -284,6 +337,7 @@ module.exports = async function handler(req, res) {
       const characterId = charRow.length ? charRow[0].id : null;
 
       let inserted = 0;
+      let payloadTotalValueGp = 0;
       let tableHasItemId = true;
       for (const item of items) {
         const itemName = (item.name || 'Unknown').trim().substring(0, 255);
@@ -291,6 +345,7 @@ module.exports = async function handler(req, res) {
         const qty = Math.max(1, parseInt(item.quantity, 10) || 1);
         const priceEach = parseInt(item.priceEach, 10) || 0;
         const totalValueGp = qty * priceEach;
+        payloadTotalValueGp += totalValueGp;
 
         if (tableHasItemId) {
           try {
@@ -317,6 +372,20 @@ module.exports = async function handler(req, res) {
           `;
         }
         inserted += 1;
+      }
+
+      if (payloadTotalValueGp >= DISCORD_BIG_DROP_THRESHOLD_GP) {
+        const discordUrl = process.env.DISCORD_LOOT_WEBHOOK_URL || '';
+        if (discordUrl) {
+          await sendBigDropToDiscord(discordUrl, {
+            username,
+            items,
+            source,
+            killCount,
+            rarest,
+            totalValueGp: payloadTotalValueGp,
+          });
+        }
       }
 
       return res.status(201).json({ ok: true, inserted });
