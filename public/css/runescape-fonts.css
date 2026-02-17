@@ -1,0 +1,29 @@
+/* RuneStar OSRS fonts – https://github.com/RuneStar/fonts (CC0-1.0) */
+
+@font-face {
+  font-family: "RuneScape Plain 12";
+  src: url("../fonts/RuneScape-Plain-12.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "RuneScape Bold 12";
+  src: url("../fonts/RuneScape-Bold-12.otf") format("opentype");
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "RuneScape Plain 11";
+  src: url("../fonts/RuneScape-Plain-11.otf") format("opentype");
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+body {
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+}

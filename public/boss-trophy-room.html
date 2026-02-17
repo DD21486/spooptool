@@ -6,6 +6,7 @@
   <title>Boss Trophy Room – SpoopTool</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
   <style>
     .trophy-card { min-height: 100%; display: flex; flex-direction: column; opacity: 0; animation: trophy-fade-in 0.35s ease-out forwards; }
     .trophy-card .card-body { flex: 1; display: flex; flex-direction: column; }
@@ -130,7 +131,7 @@
     return typeof n === 'number' && n >= 0 ? n : 0;
   }
 
-  function buildBossCard(bossKey, bossStats, index) {
+  function buildBossCard(bossKey, bossStats, index, kc24h) {
       var stat = bossStats[bossKey];
       if (!stat) return null;
       var total = stat.total;
@@ -140,6 +141,7 @@
       var name = formatBossKey(bossKey);
       var imgSrc = bossImageSrc(bossKey);
       var totalStr = formatNum(total);
+      var kc24hStr = (kc24h != null && Number(kc24h) >= 0) ? ' <span class="text-slate-500">(' + formatNum(kc24h) + ' KC 24hrs)</span>' : '';
       var championHtml = '';
       if (champion) {
         championHtml =
@@ -169,7 +171,7 @@
             '<img src="' + escapeHtml(imgSrc) + '" alt="" class="w-[100px] h-[100px] object-contain rounded-sm" width="100" height="100" loading="lazy" onerror="this.style.display=\'none\'" />' +
           '</div>' +
           '<p class="text-xs text-slate-500 mb-1">Times Killed By The Boys</p>' +
-          '<p class="text-sm text-slate-300 font-mono mb-3">' + escapeHtml(totalStr) + '</p>' +
+          '<p class="text-sm text-slate-300 font-mono mb-3">' + escapeHtml(totalStr) + kc24hStr + '</p>' +
           championHtml +
         '</div>';
       return card;
@@ -258,7 +260,7 @@
         trendingGridEl.innerHTML = '';
         trendingBossKeys.forEach(function (bossKey, idx) {
           if (!bossStats[bossKey]) return;
-          var card = buildBossCard(bossKey, bossStats, idx);
+          var card = buildBossCard(bossKey, bossStats, idx, kills24hByBoss[bossKey] || 0);
           if (card) trendingGridEl.appendChild(card);
         });
       }
