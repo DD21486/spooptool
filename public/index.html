@@ -256,6 +256,23 @@
     </div>
     </div>
 
+    <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="Recent activity">
+      <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Recent activity</h2>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-slate-700 bg-slate-800/80">
+              <th class="text-left px-4 py-2 text-slate-400 font-medium w-28">Time</th>
+              <th class="text-left px-4 py-2 text-slate-400 font-medium w-24">Character</th>
+              <th class="text-left px-4 py-2 text-slate-400 font-medium">What happened</th>
+            </tr>
+          </thead>
+          <tbody id="activity-tbody"></tbody>
+        </table>
+      </div>
+      <p id="activity-empty" class="px-4 py-6 text-slate-500 text-center text-sm hidden">No recent activity yet.</p>
+    </section>
+
     <p id="error-message" class="mt-4 text-red-400 text-sm hidden"></p>
   </div>
 

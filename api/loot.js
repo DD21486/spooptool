@@ -11,6 +11,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 const { parseRarityToExpectedKills, getLuckDelta } = require('../lib/luck');
+const { insertActivity } = require('../lib/activity-log');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -414,6 +415,10 @@ module.exports = async function handler(req, res) {
           console.error('Luck meter update skipped', luckErr?.message || luckErr);
         }
       }
+
+      const formatGpShort = (n) => (n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'M' : (n >= 1_000 ? (n / 1_000).toFixed(1) + 'K' : String(n)));
+      const lootDesc = items.map((i) => (i.name || 'Unknown') + (i.quantity > 1 ? ' x' + i.quantity : '')).join(', ') + ' (' + formatGpShort(payloadTotalValueGp) + ' gp)' + (source ? ' from ' + source : '');
+      await insertActivity(sql, { username, type: 'loot', description: lootDesc });
 
       return res.status(201).json({ ok: true, inserted });
     }

@@ -621,6 +621,7 @@
       renderLeft();
       renderRight();
       renderLoot();
+      renderActivity(data.activity || []);
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -628,6 +629,41 @@
       leftLoading.textContent = 'Error loading.';
       rightLoading.textContent = 'Error loading.';
     }
+  }
+
+  function formatActivityTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    const now = Date.now();
+    const ms = now - d.getTime();
+    if (ms < 60000) return 'just now';
+    if (ms < 3600000) return Math.floor(ms / 60000) + 'm ago';
+    if (ms < 86400000) return Math.floor(ms / 3600000) + 'h ago';
+    if (ms < 604800000) return Math.floor(ms / 86400000) + 'd ago';
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+
+  function renderActivity(activity) {
+    const tbody = document.getElementById('activity-tbody');
+    const emptyEl = document.getElementById('activity-empty');
+    if (!tbody) return;
+    if (!activity || activity.length === 0) {
+      tbody.innerHTML = '';
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+    const typeLabel = (t) => (t === 'loot' ? 'Loot' : 'XP/KC');
+    const typeClass = (t) => (t === 'loot' ? 'bg-amber-600/80 text-slate-100' : 'bg-sky-600/80 text-slate-100');
+    tbody.innerHTML = activity.map((a) => {
+      const time = formatActivityTime(a.at);
+      const badge = '<span class="inline-block px-1.5 py-0.5 rounded text-xs font-medium ' + typeClass(a.type) + '">' + typeLabel(a.type) + '</span>';
+      return '<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">' +
+        '<td class="px-4 py-2 text-slate-400 whitespace-nowrap">' + time + '</td>' +
+        '<td class="px-4 py-2 font-medium">' + (a.username || '—') + '</td>' +
+        '<td class="px-4 py-2">' + badge + ' <span class="text-slate-300">' + (a.description || '').replace(/</g, '&lt;') + '</span></td>' +
+        '</tr>';
+    }).join('');
   }
 
   /** Load from Hiscores API (used when user clicks Update all). */

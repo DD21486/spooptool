@@ -7,6 +7,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
+const { insertActivity, pruneTo30 } = require('../lib/activity-log');
 
 /** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
 const DELAY_MS_BETWEEN_BATCHES = 1500;
@@ -105,6 +106,44 @@ module.exports = async function handler(req, res) {
       else if (r.username) errors.push({ username: r.username, error: r.error });
     }
     if (i < batches.length - 1) await delay(DELAY_MS_BETWEEN_BATCHES);
+  }
+
+  try {
+    for (const row of characters) {
+      const snapRows = await sql`
+        SELECT data FROM character_snapshots
+        WHERE character_id = ${row.id}
+        ORDER BY at DESC
+        LIMIT 2
+      `;
+      if (snapRows.length < 2) continue;
+      const prev = snapRows[1].data || {};
+      const curr = snapRows[0].data || {};
+      const prevSkills = prev.skills || {};
+      const currSkills = curr.skills || {};
+      const prevBosses = prev.bosses || {};
+      const currBosses = curr.bosses || {};
+      const prevXp = (prevSkills.overall && (prevSkills.overall.xp != null ? prevSkills.overall.xp : prevSkills.overall.experience)) || 0;
+      const currXp = (currSkills.overall && (currSkills.overall.xp != null ? currSkills.overall.xp : currSkills.overall.experience)) || 0;
+      const xpDelta = Math.max(0, Number(currXp) - Number(prevXp));
+      const bossDeltas = [];
+      for (const [key, b] of Object.entries(currBosses)) {
+        if (!b || typeof b !== 'object') continue;
+        const currKc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+        const prevKc = (prevBosses[key] && (prevBosses[key].count != null ? prevBosses[key].count : prevBosses[key].kc)) != null ? (prevBosses[key].count ?? prevBosses[key].kc) : 0;
+        const delta = Math.max(0, Number(currKc) - Number(prevKc));
+        if (delta > 0) bossDeltas.push({ key, delta });
+      }
+      if (xpDelta === 0 && bossDeltas.length === 0) continue;
+      const parts = [];
+      if (xpDelta > 0) parts.push('+' + (xpDelta >= 1e6 ? (xpDelta / 1e6).toFixed(1) + 'M' : xpDelta >= 1e3 ? (xpDelta / 1e3).toFixed(1) + 'K' : xpDelta) + ' overall XP');
+      bossDeltas.forEach(({ key, delta }) => parts.push('+' + delta + ' ' + key));
+      const description = parts.join(', ');
+      await insertActivity(sql, { username: row.username, type: 'xp_kc', description });
+    }
+    await pruneTo30(sql);
+  } catch (activityErr) {
+    console.error('activity_log xp_kc', activityErr?.message || activityErr);
   }
 
   let baselineUpdated = 0;

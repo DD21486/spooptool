@@ -39,8 +39,26 @@ module.exports = async function handler(req, res) {
       latestSnapshot: r.latest_snapshot ? { skills: r.latest_snapshot.skills || {}, bosses: r.latest_snapshot.bosses || {} } : null,
     }));
 
+    let activity = [];
+    try {
+      const activityRows = await sql`
+        SELECT at, username, type, description
+        FROM activity_log
+        ORDER BY at DESC
+        LIMIT 30
+      `;
+      activity = activityRows.map((a) => ({
+        at: a.at,
+        username: a.username,
+        type: a.type,
+        description: a.description,
+      }));
+    } catch (_) {
+      /* table may not exist */
+    }
+
     res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
-    return res.status(200).json({ characters });
+    return res.status(200).json({ characters, activity });
   } catch (err) {
     console.error('/api/characters-with-snapshots', err);
     return res.status(500).json({ error: 'Failed to load characters' });
