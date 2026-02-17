@@ -24,7 +24,11 @@
   font-display: swap;
 }
 
+/* Base size +2px so RuneStar text matches monospace scale (rem is relative to html) */
+html {
+  font-size: 18px;
+}
+
 body {
   font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
-  font-size: 18px; /* +2px from default 16px so RuneStar matches monospace scale */
 }
