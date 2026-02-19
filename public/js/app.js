@@ -78,7 +78,7 @@
   const errorEl = document.getElementById('error-message');
   const homeCaptureCountdown = document.getElementById('home-capture-countdown');
   const homeRefreshWrap = document.getElementById('home-refresh-wrap');
-  const tabTotal = document.getElementById('tab-total');
+  const tabWeek = document.getElementById('tab-week');
   const tabToday = document.getElementById('tab-today');
   const tabLast24 = document.getElementById('tab-last24');
   const leftValueTh = document.getElementById('left-value-th');
@@ -88,6 +88,7 @@
   let homeViewMode = 'last24';
   let last24hDeltas = {};
   let todayDeltas = {};
+  let weekDeltas = {};
   let lootTopDropsCache = {};
   let homeTooltipHideTimer = null;
 
@@ -300,14 +301,17 @@
     const filter = getFilter();
     leftLoading.classList.add('hidden');
     leftTbody.innerHTML = '';
-    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today';
-    const deltaSource = homeViewMode === 'today' ? todayDeltas : last24hDeltas;
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : last24hDeltas);
     if (homeViewMode === 'last24') {
       leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Last 24 Hr' : skillLabel(filter.key) + ' (24h)';
     } else if (homeViewMode === 'today') {
       leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Today' : skillLabel(filter.key) + ' (today)';
+    } else if (homeViewMode === 'week') {
+      leftTitle.textContent = filter.type === 'overall' ? 'XP' : skillLabel(filter.key);
+      if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'This Week' : skillLabel(filter.key) + ' (this week)';
     } else {
       leftTitle.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
       if (leftValueTh) leftValueTh.textContent = filter.type === 'overall' ? 'Total XP' : skillLabel(filter.key);
@@ -355,9 +359,10 @@
     lootTbody.innerHTML = '';
     const isLast24 = homeViewMode === 'last24';
     const isToday = homeViewMode === 'today';
-    const list = isToday ? lootLeaderboardToday : (isLast24 ? lootLeaderboard24 : lootLeaderboardTotal);
+    const isWeek = homeViewMode === 'week';
+    const list = isToday ? lootLeaderboardToday : (isWeek ? lootLeaderboardWeek : (isLast24 ? lootLeaderboard24 : lootLeaderboardTotal));
     if (lootTitle) lootTitle.textContent = 'Loot value';
-    if (lootValueTh) lootValueTh.textContent = isToday ? 'Value (today)' : (isLast24 ? 'Value (24h)' : 'Value');
+    if (lootValueTh) lootValueTh.textContent = isToday ? 'Value (today)' : (isWeek ? 'Value (this week)' : (isLast24 ? 'Value (24h)' : 'Value'));
     const getValue = (username) => {
       const p = list.find((x) => (x.username || '').toLowerCase() === (username || '').toLowerCase());
       return p ? Number(p.totalValueGp) || 0 : 0;
@@ -389,15 +394,17 @@
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
     const bossKey = (filterRightBoss && filterRightBoss.value) || '';
-    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today';
-    const deltaSource = homeViewMode === 'today' ? todayDeltas : last24hDeltas;
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : last24hDeltas);
     if (rightTitle) rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
     if (rightValueTh) {
       rightValueTh.textContent = homeViewMode === 'today'
         ? (bossKey ? formatBossKey(bossKey) + ' (today)' : 'Today')
-        : (homeViewMode === 'last24'
-          ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
-          : (bossKey ? formatBossKey(bossKey) : 'Total KC'));
+        : homeViewMode === 'week'
+          ? (bossKey ? formatBossKey(bossKey) + ' (this week)' : 'This Week')
+          : (homeViewMode === 'last24'
+            ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
+            : (bossKey ? formatBossKey(bossKey) : 'Total KC'));
     }
     const rows = characterList.map(username => {
       const d = deltaSource[username];
@@ -463,19 +470,21 @@
     const player = playerData[username];
     const deltas24 = last24hDeltas[username];
     const deltasToday = todayDeltas[username];
+    const deltasWeek = weekDeltas[username];
     const isLast24 = homeViewMode === 'last24';
     const isToday = homeViewMode === 'today';
-    const deltas = isToday ? deltasToday : deltas24;
-    const periodLabel = isToday ? 'today' : '24h';
+    const isWeek = homeViewMode === 'week';
+    const deltas = isToday ? deltasToday : (isWeek ? deltasWeek : deltas24);
+    const periodLabel = isToday ? 'today' : (isWeek ? 'this week' : '24h');
     let header = '';
     let entries = [];
-    if ((isLast24 || isToday) && deltas && deltas.skillDeltas) {
+    if ((isLast24 || isToday || isWeek) && deltas && deltas.skillDeltas) {
       entries = Object.entries(deltas.skillDeltas)
         .filter(([k]) => k !== 'overall')
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
-      if (entries.length === 0) return '<div class="text-slate-400">No skill gains ' + (isToday ? 'today' : 'in last 24h') + '</div>';
+      if (entries.length === 0) return '<div class="text-slate-400">No skill gains ' + (isToday ? 'today' : (isWeek ? 'this week' : 'in last 24h')) + '</div>';
       header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 skills (' + periodLabel + ')</div>';
       return header + entries.map((e) => {
         const icon = skillIconSrc(e.key);
@@ -505,18 +514,20 @@
     const player = playerData[username];
     const deltas24 = last24hDeltas[username];
     const deltasToday = todayDeltas[username];
+    const deltasWeek = weekDeltas[username];
     const isLast24 = homeViewMode === 'last24';
     const isToday = homeViewMode === 'today';
-    const deltas = isToday ? deltasToday : deltas24;
-    const periodLabel = isToday ? 'today' : '24h';
+    const isWeek = homeViewMode === 'week';
+    const deltas = isToday ? deltasToday : (isWeek ? deltasWeek : deltas24);
+    const periodLabel = isToday ? 'today' : (isWeek ? 'this week' : '24h');
     let entries = [];
-    if ((isLast24 || isToday) && deltas && deltas.bossDeltas) {
+    if ((isLast24 || isToday || isWeek) && deltas && deltas.bossDeltas) {
       entries = Object.entries(deltas.bossDeltas)
         .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
         .filter((e) => e.delta > 0)
         .sort((a, b) => b.delta - a.delta)
         .slice(0, 3);
-      if (entries.length === 0) return '<div class="text-slate-400">No boss kills ' + (isToday ? 'today' : 'in last 24h') + '</div>';
+      if (entries.length === 0) return '<div class="text-slate-400">No boss kills ' + (isToday ? 'today' : (isWeek ? 'this week' : 'in last 24h')) + '</div>';
       const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (' + periodLabel + ')</div>';
       return header + entries.map((e) => {
         const icon = bossImageSrc(e.key);
@@ -543,12 +554,13 @@
     return '<div class="text-slate-400">No data</div>';
   }
   async function fetchAndBuildLootTooltipContent(username) {
-    const suffix = homeViewMode === 'today' ? ':today' : (homeViewMode === 'last24' ? ':24' : ':all');
+    const suffix = homeViewMode === 'today' ? ':today' : (homeViewMode === 'week' ? ':week' : (homeViewMode === 'last24' ? ':24' : ':all'));
     const cacheKey = username + suffix;
     if (lootTopDropsCache[cacheKey]) return lootTopDropsCache[cacheKey];
     const todayParam = homeViewMode === 'today' ? '&today=1' : '';
+    const weekParam = homeViewMode === 'week' ? '&week=1' : '';
     const hoursParam = homeViewMode === 'last24' ? '&hours=24' : '';
-    const url = API + '/loot?player=' + encodeURIComponent(username) + '&limit=3' + hoursParam + todayParam;
+    const url = API + '/loot?player=' + encodeURIComponent(username) + '&limit=3' + hoursParam + todayParam + weekParam;
     try {
       const res = await fetch(url);
       const data = await res.json();
@@ -631,18 +643,21 @@
     rightTbody.innerHTML = '';
     if (lootTbody) lootTbody.innerHTML = '';
     try {
-      const [dataRes, deltasRes, deltasTodayRes, lootTotalRes, loot24Res, lootTodayRes] = await Promise.all([
+      const [dataRes, deltasRes, deltasTodayRes, deltasWeekRes, lootTotalRes, loot24Res, lootTodayRes, lootWeekRes] = await Promise.all([
         fetch(API + '/characters-with-snapshots'),
         fetch(API + '/characters-deltas?hours=24'),
         fetch(API + '/characters-deltas?today=1'),
+        fetch(API + '/characters-deltas?week=1'),
         fetch(API + '/loot?leaderboard=1'),
         fetch(API + '/loot?leaderboard=1&hours=24'),
         fetch(API + '/loot?leaderboard=1&today=1'),
+        fetch(API + '/loot?leaderboard=1&week=1'),
       ]);
       if (!dataRes.ok) throw new Error('Failed to load data');
       const data = await dataRes.json();
       const deltasData = await deltasRes.json().catch(() => ({}));
       const deltasTodayData = await deltasTodayRes.json().catch(() => ({}));
+      const deltasWeekData = await deltasWeekRes.json().catch(() => ({}));
       last24hDeltas = {};
       (deltasData.deltas || []).forEach((d) => {
         last24hDeltas[d.username] = {
@@ -655,6 +670,15 @@
       todayDeltas = {};
       (deltasTodayData.deltas || []).forEach((d) => {
         todayDeltas[d.username] = {
+          xpDelta: d.xpDelta,
+          bossKcDelta: d.bossKcDelta,
+          skillDeltas: d.skillDeltas || {},
+          bossDeltas: d.bossDeltas || {},
+        };
+      });
+      weekDeltas = {};
+      (deltasWeekData.deltas || []).forEach((d) => {
+        weekDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
           skillDeltas: d.skillDeltas || {},
@@ -677,9 +701,11 @@
       const lootTotalData = await lootTotalRes.json().catch(() => ({}));
       const loot24Data = await loot24Res.json().catch(() => ({}));
       const lootTodayData = await lootTodayRes.json().catch(() => ({}));
+      const lootWeekData = await lootWeekRes.json().catch(() => ({}));
       lootLeaderboardTotal = Array.isArray(lootTotalData.players) ? lootTotalData.players : [];
       lootLeaderboard24 = Array.isArray(loot24Data.players) ? loot24Data.players : [];
       lootLeaderboardToday = Array.isArray(lootTodayData.players) ? lootTodayData.players : [];
+      lootLeaderboardWeek = Array.isArray(lootWeekData.players) ? lootWeekData.players : [];
       populateFilterSkill();
       populateFilterBoss();
       renderLeft();
@@ -785,11 +811,14 @@
   let lootLeaderboardTotal = [];
   let lootLeaderboard24 = [];
   let lootLeaderboardToday = [];
+  let lootLeaderboardWeek = [];
   let cachedHomeHistoryToday = null;
   let cachedLootHistoryToday = null;
+  let cachedHomeHistoryWeek = null;
+  let cachedLootHistoryWeek = null;
 
   function setHomeChartLabels(mode) {
-    const isDelta = mode === 'last24' || mode === 'today';
+    const isDelta = mode === 'last24' || mode === 'today' || mode === 'week';
     const xpLabelEl = document.getElementById('home-chart-xp-label');
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     const lootLabelEl = document.getElementById('home-chart-loot-label');
@@ -831,7 +860,8 @@
   function paintHomeCharts(history, mode, lootHistory) {
     const isLast24 = mode === 'last24';
     const isToday = mode === 'today';
-    const isDelta = isLast24 || isToday;
+    const isWeek = mode === 'week';
+    const isDelta = isLast24 || isToday || isWeek;
     const xpTotalEl = document.getElementById('home-chart-xp-total');
     const bossTotalEl = document.getElementById('home-chart-boss-total');
     const lootTotalEl = document.getElementById('home-chart-loot-total');
@@ -863,7 +893,7 @@
     } else {
       labels = history.map((h) => {
         const d = new Date(h.at);
-        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        return isWeek ? d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
       });
       if (isDelta) {
         const base = history[0];
@@ -887,6 +917,14 @@
         if (bossValues[i] != null) { lastBoss = bossValues[i]; break; }
       }
     }
+    if (isWeek && xpValues.length > 0) {
+      for (let i = xpValues.length - 1; i >= 0; i--) {
+        if (xpValues[i] != null) { lastXp = xpValues[i]; break; }
+      }
+      for (let i = bossValues.length - 1; i >= 0; i--) {
+        if (bossValues[i] != null) { lastBoss = bossValues[i]; break; }
+      }
+    }
 
     if (isToday) {
       const sumXp = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
@@ -895,6 +933,13 @@
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (today)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (today)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (today)';
+    } else if (isWeek) {
+      const sumXp = Object.values(weekDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.values(weekDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboardWeek.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (this week)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (this week)';
+      if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (this week)';
     } else if (isLast24) {
       const sumXp = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
       const sumBoss = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
@@ -963,7 +1008,7 @@
         data: {
           labels,
           datasets: [{
-            label: isToday ? 'XP gain (today)' : (isLast24 ? 'XP gain (24h)' : 'Total XP'),
+            label: isToday ? 'XP gain (today)' : (isWeek ? 'XP gain (this week)' : (isLast24 ? 'XP gain (24h)' : 'Total XP')),
             data: xpValues,
             borderColor: 'rgb(56, 189, 248)',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -982,7 +1027,7 @@
         data: {
           labels,
           datasets: [{
-            label: isToday ? 'KC gain (today)' : (isLast24 ? 'KC gain (24h)' : 'Total KC'),
+            label: isToday ? 'KC gain (today)' : (isWeek ? 'KC gain (this week)' : (isLast24 ? 'KC gain (24h)' : 'Total KC')),
             data: bossValues,
             borderColor: 'rgb(56, 189, 248)',
             backgroundColor: 'rgba(56, 189, 248, 0.1)',
@@ -1126,18 +1171,31 @@
       .catch(() => {});
   }
 
+  function loadHomeChartsWeek() {
+    fetch(API + '/aggregate-history?week=1')
+      .then((res) => res.json())
+      .then((data) => {
+        const history = (data.history || []).slice();
+        cachedHomeHistoryWeek = history;
+        cachedLootHistoryWeek = (data.lootHistory || []).slice();
+        paintHomeCharts(history, 'week', cachedLootHistoryWeek);
+        if (data.cronHealth) updateCronStatusOrb(data.cronHealth);
+      })
+      .catch(() => {});
+  }
+
   function setHomeViewMode(mode) {
     homeViewMode = mode;
     setHomeChartLabels(mode);
-    const isTotal = mode === 'total';
+    const isWeek = mode === 'week';
     const isToday = mode === 'today';
     const isLast24 = mode === 'last24';
-    if (tabTotal) {
-      tabTotal.classList.toggle('bg-sky-600', isTotal);
-      tabTotal.classList.toggle('text-white', isTotal);
-      tabTotal.classList.toggle('bg-slate-700', !isTotal);
-      tabTotal.classList.toggle('text-slate-300', !isTotal);
-      tabTotal.setAttribute('aria-selected', String(isTotal));
+    if (tabWeek) {
+      tabWeek.classList.toggle('bg-sky-600', isWeek);
+      tabWeek.classList.toggle('text-white', isWeek);
+      tabWeek.classList.toggle('bg-slate-700', !isWeek);
+      tabWeek.classList.toggle('text-slate-300', !isWeek);
+      tabWeek.setAttribute('aria-selected', String(isWeek));
     }
     if (tabToday) {
       tabToday.classList.toggle('bg-sky-600', isToday);
@@ -1161,6 +1219,12 @@
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
       } else {
         loadHomeChartsToday();
+      }
+    } else if (mode === 'week') {
+      if (cachedHomeHistoryWeek != null) {
+        paintHomeCharts(cachedHomeHistoryWeek, 'week', cachedLootHistoryWeek);
+      } else {
+        loadHomeChartsWeek();
       }
     } else if (cachedHomeHistory) {
       paintHomeCharts(cachedHomeHistory, mode, cachedLootHistory);
@@ -1242,7 +1306,7 @@
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
 
-  if (tabTotal) tabTotal.addEventListener('click', () => setHomeViewMode('total'));
+  if (tabWeek) tabWeek.addEventListener('click', () => setHomeViewMode('week'));
   if (tabToday) tabToday.addEventListener('click', () => setHomeViewMode('today'));
   if (tabLast24) tabLast24.addEventListener('click', () => setHomeViewMode('last24'));
 

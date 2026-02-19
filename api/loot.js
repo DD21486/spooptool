@@ -148,6 +148,7 @@ module.exports = async function handler(req, res) {
         if (req.query.leaderboard === '1' || req.query.leaderboard === 'true') {
           const hoursParam = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
           const todayParam = req.query.today === '1' || req.query.today === 'true';
+          const weekParam = req.query.week === '1' || req.query.week === 'true';
           const periodFilter = hoursParam === 24 || hoursParam === 168 ? hoursParam : null;
           let rows;
           if (todayParam) {
@@ -155,6 +156,14 @@ module.exports = async function handler(req, res) {
               SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
               FROM loot_drops
               WHERE at >= date_trunc('day', NOW())
+              GROUP BY LOWER(TRIM(username))
+              ORDER BY total_value_gp DESC
+            `;
+          } else if (weekParam) {
+            rows = await sql`
+              SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+              FROM loot_drops
+              WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
               GROUP BY LOWER(TRIM(username))
               ORDER BY total_value_gp DESC
             `;

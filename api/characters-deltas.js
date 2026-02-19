@@ -46,7 +46,8 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
   const today = req.query.today === '1' || req.query.today === 'true';
-  const hours = today ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
+  const week = req.query.week === '1' || req.query.week === 'true';
+  const hours = (today || week) ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
@@ -55,6 +56,7 @@ module.exports = async function handler(req, res) {
   try {
     const sql = neon(process.env.DATABASE_URL);
     const chars = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
+
     const firstRows = today
       ? await sql`
           SELECT DISTINCT ON (character_id) character_id, at, data
@@ -62,11 +64,18 @@ module.exports = async function handler(req, res) {
           WHERE at >= date_trunc('day', NOW())
           ORDER BY character_id, at ASC
         `
-      : await sql`
-          SELECT DISTINCT ON (character_id) character_id, at, data
-          FROM character_snapshots
-          WHERE at >= NOW() - make_interval(hours => ${hours})
-          ORDER BY character_id, at ASC
+      : week
+        ? await sql`
+            SELECT DISTINCT ON (character_id) character_id, at, data
+            FROM character_snapshots
+            WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
+            ORDER BY character_id, at ASC
+          `
+        : await sql`
+            SELECT DISTINCT ON (character_id) character_id, at, data
+            FROM character_snapshots
+            WHERE at >= NOW() - make_interval(hours => ${hours})
+            ORDER BY character_id, at ASC
         `;
     const lastRows = today
       ? await sql`
@@ -75,11 +84,18 @@ module.exports = async function handler(req, res) {
           WHERE at >= date_trunc('day', NOW())
           ORDER BY character_id, at DESC
         `
-      : await sql`
-          SELECT DISTINCT ON (character_id) character_id, at, data
-          FROM character_snapshots
-          WHERE at >= NOW() - make_interval(hours => ${hours})
-          ORDER BY character_id, at DESC
+      : week
+        ? await sql`
+            SELECT DISTINCT ON (character_id) character_id, at, data
+            FROM character_snapshots
+            WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
+            ORDER BY character_id, at DESC
+        `
+        : await sql`
+            SELECT DISTINCT ON (character_id) character_id, at, data
+            FROM character_snapshots
+            WHERE at >= NOW() - make_interval(hours => ${hours})
+            ORDER BY character_id, at DESC
         `;
 
     const firstByChar = {};
