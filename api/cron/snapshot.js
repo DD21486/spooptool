@@ -229,37 +229,58 @@ module.exports = async function handler(req, res) {
           SELECT character_id,
             (SELECT COALESCE(SUM((elem->>'count')::int), 0) FROM jsonb_each(data->'bosses') AS t(k, elem)) AS total_kc
           FROM latest
-        )
+        ),
+        max_kc AS (SELECT MAX(total_kc) AS m FROM totals)
         SELECT c.username
         FROM totals t
         JOIN characters c ON c.id = t.character_id
-        ORDER BY t.total_kc DESC NULLS LAST
-        LIMIT 1
+        CROSS JOIN max_kc
+        WHERE t.total_kc = max_kc.m AND max_kc.m > 0
+        ORDER BY c.username ASC
       `;
-      const currentLeader = leaderRows.length && leaderRows[0].username ? String(leaderRows[0].username).trim() : null;
+      const currentLeaders = (leaderRows || [])
+        .map((r) => (r.username != null ? String(r.username).trim() : ''))
+        .filter(Boolean);
+      const currentLeaderValue = currentLeaders.length > 0 ? currentLeaders.join(',') : null;
       const stateRows = await sql`SELECT value FROM leaderboard_state WHERE key = 'boss_kill_leader' LIMIT 1`;
-      const previousLeader = stateRows.length && stateRows[0].value != null ? String(stateRows[0].value).trim() : null;
-      if (currentLeader) {
-        if (previousLeader != null && previousLeader !== '' && currentLeader !== previousLeader) {
-          const body = {
-            embeds: [
-              {
-                title: '🏆 Boss kill leader changed',
-                description: `**${currentLeader}** has overtaken **${previousLeader}** for the most boss kills!`,
-                color: 0xf59e0b,
-                footer: { text: 'SpoopTool' },
-              },
-            ],
-          };
-          const resp = await fetch(leaderWebhookUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body),
-          });
-          if (!resp.ok) console.error('Discord leaderboard webhook failed', resp.status);
-        }
+      const previousValue = stateRows.length && stateRows[0].value != null ? String(stateRows[0].value).trim() : null;
+      const previousLeaders = previousValue ? previousValue.split(',').map((s) => s.trim()).filter(Boolean).sort() : [];
+      const currentSet = currentLeaders.slice().sort().join(',');
+      const previousSet = previousLeaders.join(',');
+      const leadersChanged = currentSet !== previousSet;
+      if (currentLeaderValue && leadersChanged) {
+        const leaderLabel = currentLeaders.length === 1
+          ? `**${currentLeaders[0]}**`
+          : currentLeaders.length === 2
+            ? `**${currentLeaders[0]}** & **${currentLeaders[1]}**`
+            : currentLeaders.slice(0, -1).map((u) => `**${u}**`).join(', ') + ' & **' + currentLeaders[currentLeaders.length - 1] + '**';
+        const description = currentLeaders.length === 1 && previousLeaders.length >= 1
+          ? `${leaderLabel} has taken the lead for the most boss kills!`
+          : currentLeaders.length >= 2 && previousLeaders.length === 1
+            ? `${leaderLabel} are now tied for the lead!`
+            : currentLeaders.length >= 2
+              ? `${leaderLabel} are the boss kill champions!`
+              : `${leaderLabel} has overtaken the previous leader for the most boss kills!`;
+        const body = {
+          embeds: [
+            {
+              title: '🏆 Boss kill leader changed',
+              description,
+              color: 0xf59e0b,
+              footer: { text: 'SpoopTool' },
+            },
+          ],
+        };
+        const resp = await fetch(leaderWebhookUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) console.error('Discord leaderboard webhook failed', resp.status);
+      }
+      if (currentLeaderValue != null) {
         await sql`
-          INSERT INTO leaderboard_state (key, value, updated_at) VALUES ('boss_kill_leader', ${currentLeader}, NOW())
+          INSERT INTO leaderboard_state (key, value, updated_at) VALUES ('boss_kill_leader', ${currentLeaderValue}, NOW())
           ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
         `;
       }

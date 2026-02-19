@@ -32,7 +32,8 @@
     <header class="flex items-center justify-between gap-6 mb-3">
       <a href="/" class="text-sky-400 hover:text-sky-300 hover:underline text-sm shrink-0">← SpoopTool</a>
       <div id="champions-list" class="hidden min-w-0 rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-2">
-        <p class="text-xs text-slate-500 mb-1.5">Champions</p>
+        <p id="boss-kill-leaders-label" class="text-xs text-slate-500 mb-1 hidden"></p>
+        <p class="text-xs text-slate-500 mb-1.5 mt-2">Champions</p>
         <div id="champions-list-rows" class="flex flex-col gap-0.5"></div>
       </div>
     </header>
@@ -136,21 +137,26 @@
       if (!stat) return null;
       var total = stat.total;
       var byChar = stat.byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
-      var champion = byChar.length > 0 ? byChar[0] : null;
-      var nextClosest = byChar.length >= 2 ? byChar[1] : null;
+      var maxKc = byChar.length > 0 ? byChar[0].kc : 0;
+      var champions = byChar.filter(function (x) { return x.kc === maxKc; });
+      var nextClosest = byChar.find(function (x) { return x.kc < maxKc; }) || null;
       var name = formatBossKey(bossKey);
       var imgSrc = bossImageSrc(bossKey);
       var totalStr = formatNum(total);
       var kc24hStr = (kc24h != null && Number(kc24h) >= 0) ? ' <span class="text-slate-500">(' + formatNum(kc24h) + ' KC 24hrs)</span>' : '';
       var championHtml = '';
-      if (champion) {
+      if (champions.length > 0) {
+        var championLabel = champions.map(function (c) { return escapeHtml(c.username); }).join(' & ');
+        var championStars = champions.map(function () {
+          return '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />';
+        }).join('');
         championHtml =
           '<div class="champion-wrap pt-2 border-t border-slate-600/70">' +
           '<p class="text-xs text-slate-500 mb-1">Current Champion</p>' +
-          '<div class="flex items-center gap-1.5 min-w-0">' +
-          '<img src="/assets/Member_icon.png" alt="" class="w-4 h-4 shrink-0 object-contain" width="16" height="16" />' +
-          '<span class="text-slate-200 font-medium text-sm truncate">' + escapeHtml(champion.username) + '</span>' +
-          '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(champion.kc) + '</span>' +
+          '<div class="flex items-center gap-1.5 min-w-0 flex-wrap">' +
+          championStars +
+          '<span class="text-slate-200 font-medium text-sm truncate">' + championLabel + '</span>' +
+          '<span class="text-slate-400 text-sm tabular-nums shrink-0">: ' + formatNum(maxKc) + '</span>' +
           '</div>' +
           '<p class="text-xs text-slate-500 mt-1">Next Closest: ' + (nextClosest ? escapeHtml(nextClosest.username) + ' (' + formatNum(nextClosest.kc) + ')' : 'none') + '</p>' +
           '</div>';
@@ -211,16 +217,36 @@
       var championsListEl = document.getElementById('champions-list');
       var championsListRowsEl = document.getElementById('champions-list-rows');
 
+      var totalKcByUser = {};
+      list.forEach(function (c) {
+        var username = typeof c === 'string' ? c : c.username;
+        var bosses = (c.latestSnapshot && c.latestSnapshot.bosses) ? c.latestSnapshot.bosses : {};
+        var total = 0;
+        Object.keys(bosses).forEach(function (bossKey) {
+          total += getBossKc(bosses, bossKey);
+        });
+        if (total > 0) totalKcByUser[username] = total;
+      });
+      var maxTotalKc = 0;
+      Object.keys(totalKcByUser).forEach(function (u) { if (totalKcByUser[u] > maxTotalKc) maxTotalKc = totalKcByUser[u]; });
+      var overallLeaders = Object.keys(totalKcByUser).filter(function (u) { return totalKcByUser[u] === maxTotalKc; }).sort();
+      var leadersLabelEl = document.getElementById('boss-kill-leaders-label');
+      if (overallLeaders.length > 0 && leadersLabelEl) {
+        var leadersText = overallLeaders.map(function (u) { return escapeHtml(u); }).join(' & ');
+        leadersLabelEl.textContent = 'Boss kill leader(s): ' + leadersText;
+        leadersLabelEl.classList.remove('hidden');
+      }
+
       var championCountByUser = {};
       allBossKeys.forEach(function (bossKey) {
         var byChar = bossStats[bossKey].byCharacter.filter(function (x) { return x.kc > 0; }).sort(function (a, b) { return b.kc - a.kc; });
-        var champ = byChar.length > 0 ? byChar[0].username : null;
-        if (champ) {
-          championCountByUser[champ] = (championCountByUser[champ] || 0) + 1;
-        }
+        var maxKc = byChar.length > 0 ? byChar[0].kc : 0;
+        byChar.filter(function (x) { return x.kc === maxKc; }).forEach(function (x) {
+          championCountByUser[x.username] = (championCountByUser[x.username] || 0) + 1;
+        });
       });
       var championUsers = Object.keys(championCountByUser).sort(function (a, b) { return championCountByUser[b] - championCountByUser[a]; });
-      if (championUsers.length > 0 && championsListEl && championsListRowsEl) {
+      if ((championUsers.length > 0 || overallLeaders.length > 0) && championsListEl && championsListRowsEl) {
         championsListEl.classList.remove('hidden');
         var iconImg = '<img src="/assets/Member_icon.png" alt="" class="w-3 h-3 shrink-0 object-contain" width="12" height="12" />';
         var maxIcons = 10;
