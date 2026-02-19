@@ -893,7 +893,15 @@
     } else {
       labels = history.map((h) => {
         const d = new Date(h.at);
-        return isWeek ? d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        if (isWeek) {
+          const M = d.getMonth() + 1;
+          const day = d.getDate();
+          const h = d.getHours();
+          const h12 = h % 12 || 12;
+          const ap = h < 12 ? 'a' : 'p';
+          return M + '/' + day + ' ' + h12 + ap;
+        }
+        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
       });
       if (isDelta) {
         const base = history[0];
@@ -1040,50 +1048,72 @@
         options: chartOpts(bossRange.min, bossRange.max, formatInt),
       });
     }
-    paintHomeLootChart(lootHistory || [], mode);
+    const sharedAxis = (mode === 'week' || mode === 'last24') && history && history.length
+      ? { labels, bucketTimes: history.map((h) => h.at) }
+      : null;
+    paintHomeLootChart(lootHistory || [], mode, sharedAxis);
   }
 
-  function paintHomeLootChart(lootHistory, homeViewMode) {
+  /** Cumulative loot value at or before time T from lootHistory (each entry has at, value = cumulative). */
+  function cumulativeLootAt(bucketTime, lootHistory) {
+    if (!lootHistory || lootHistory.length === 0) return 0;
+    const t = new Date(bucketTime).getTime();
+    let best = 0;
+    for (const h of lootHistory) {
+      const at = new Date(h.at).getTime();
+      if (at <= t) best = Number(h.value) || 0;
+    }
+    return best;
+  }
+
+  function paintHomeLootChart(lootHistory, homeViewMode, sharedAxis) {
     const lootTotalEl = document.getElementById('home-chart-loot-total');
     if (homeChartLoot) { homeChartLoot.destroy(); homeChartLoot = null; }
-    if (!lootHistory || lootHistory.length === 0) {
+    const isToday = homeViewMode === 'today';
+    const isWeek = homeViewMode === 'week';
+    const isLast24 = homeViewMode === 'last24';
+    let labels;
+    let values;
+    if (sharedAxis && (isWeek || isLast24)) {
+      labels = sharedAxis.labels;
+      values = sharedAxis.bucketTimes.map((t) => cumulativeLootAt(t, lootHistory || []));
+    } else if (!lootHistory || lootHistory.length === 0) {
       if (lootTotalEl) lootTotalEl.textContent = '—';
       return;
     }
-    const isToday = homeViewMode === 'today';
-    let labels;
-    let values;
-    if (isToday) {
-      labels = [];
-      for (let i = 0; i < 24; i++) {
-        const d = new Date(2000, 0, 1, i, 0, 0);
-        labels.push(d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
-      }
-      const valueSlots = new Array(24).fill(null);
-      for (const h of lootHistory) {
-        const d = new Date(h.at);
-        const lh = d.getHours();
-        valueSlots[lh] = Number(h.value) || 0;
-      }
-      for (let i = 1; i < 24; i++) {
-        if (valueSlots[i] == null) valueSlots[i] = valueSlots[i - 1];
-      }
-      if (valueSlots[0] == null) valueSlots[0] = 0;
-      const now = new Date();
-      const currentHour = now.getHours();
-      for (let i = currentHour + 1; i < 24; i++) valueSlots[i] = null;
-      values = valueSlots;
-    } else {
-      labels = lootHistory.map((h) => {
-        const d = new Date(h.at);
-        return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      });
-      values = lootHistory.map((h) => Number(h.value) || 0);
-      const now = new Date();
-      const lastBucket = lootHistory.length ? new Date(lootHistory[lootHistory.length - 1].at) : null;
-      if (lastBucket && (now - lastBucket) > 45 * 60 * 1000) {
-        labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
-        values = values.concat(values[values.length - 1]);
+    if (labels === undefined) {
+      if (isToday) {
+        labels = [];
+        for (let i = 0; i < 24; i++) {
+          const d = new Date(2000, 0, 1, i, 0, 0);
+          labels.push(d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }));
+        }
+        const valueSlots = new Array(24).fill(null);
+        for (const h of lootHistory) {
+          const d = new Date(h.at);
+          const lh = d.getHours();
+          valueSlots[lh] = Number(h.value) || 0;
+        }
+        for (let i = 1; i < 24; i++) {
+          if (valueSlots[i] == null) valueSlots[i] = valueSlots[i - 1];
+        }
+        if (valueSlots[0] == null) valueSlots[0] = 0;
+        const now = new Date();
+        const currentHour = now.getHours();
+        for (let i = currentHour + 1; i < 24; i++) valueSlots[i] = null;
+        values = valueSlots;
+      } else {
+        labels = lootHistory.map((h) => {
+          const d = new Date(h.at);
+          return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+        });
+        values = lootHistory.map((h) => Number(h.value) || 0);
+        const now = new Date();
+        const lastBucket = lootHistory.length ? new Date(lootHistory[lootHistory.length - 1].at) : null;
+        if (lastBucket && (now - lastBucket) > 45 * 60 * 1000) {
+          labels.push(now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }));
+          values = values.concat(values[values.length - 1]);
+        }
       }
     }
     const numericValues = values.filter((v) => v != null && !Number.isNaN(Number(v))).map(Number);
