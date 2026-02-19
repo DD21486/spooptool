@@ -3,6 +3,10 @@
  * Call with Authorization: Bearer <CRON_SECRET> (or ?secret=CRON_SECRET).
  * - Vercel Cron: vercel.json runs this hourly (0 * * * *). Add CRON_SECRET in env.
  * - Snapshots are append-only; all queries use "latest" or "last N hours". Loot is saved only via Dink webhook (no cron).
+ *
+ * Retention (run after each snapshot run):
+ * - Keep all snapshots from the last 30 days.
+ * - Older than 30 days: keep one snapshot per character per calendar month (the latest in that month) for yearly summaries.
  */
 
 const { neon } = require('@neondatabase/serverless');
@@ -192,6 +196,26 @@ module.exports = async function handler(req, res) {
     /* table may not exist yet; don't fail the response */
   }
 
+  /** Retention: keep last 30 days in full; older than 30 days keep one per character per month (latest in that month). */
+  let pruneDeleted = 0;
+  try {
+    const pruneResult = await sql`
+      WITH keep AS (
+        SELECT DISTINCT ON (character_id, date_trunc('month', at))
+          id
+        FROM character_snapshots
+        WHERE at < NOW() - interval '30 days'
+        ORDER BY character_id, date_trunc('month', at), at DESC
+      )
+      DELETE FROM character_snapshots
+      WHERE at < NOW() - interval '30 days'
+        AND id NOT IN (SELECT id FROM keep)
+    `;
+    pruneDeleted = typeof pruneResult.rowCount === 'number' ? pruneResult.rowCount : 0;
+  } catch (pruneErr) {
+    console.error('snapshot retention prune', pruneErr?.message || pruneErr);
+  }
+
   const leaderWebhookUrl = (process.env.DISCORD_LEADERBOARD_WEBHOOK_URL || '').trim();
   if (leaderWebhookUrl && leaderWebhookUrl.startsWith('https://discord.com/api/webhooks/')) {
     try {
@@ -250,6 +274,7 @@ module.exports = async function handler(req, res) {
     characters: characters.length,
     offset,
     limit,
+    pruneDeleted: pruneDeleted || undefined,
     setLuckBaseline: setLuckBaseline || undefined,
     baselineRows: setLuckBaseline ? baselineUpdated : undefined,
     errors: errors.length ? errors : undefined,

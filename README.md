@@ -35,7 +35,9 @@ To store periodic Hiscores snapshots for progress-over-time and insights:
 3. **Schedule:**
    - **Hobby plan:** Vercel Cron is limited to **once per day**. The app is configured to run the snapshot at 12:00 UTC daily. That gives one snapshot per character per day — good for "yesterday vs today" and weekly trends.
    - **More frequent (e.g. every 30 min) on Hobby:** Use an external cron (e.g. [cron-job.org](https://cron-job.org), free) to call `GET https://your-app.vercel.app/api/cron/snapshot` with header `Authorization: Bearer YOUR_CRON_SECRET` every 30 minutes. Keeps data recent without upgrading Vercel.
-   - **10 min:** Same idea with external cron every 10 min; watch Neon storage (0.5 GB on free) and prune old snapshots if needed (e.g. keep last 30 days).
+   - **10 min:** Same idea with external cron every 10 min.
+
+**Snapshot retention (automatic):** After each snapshot run, the cron prunes old data to stay under Neon’s 0.5 GB limit. It keeps **all snapshots from the last 30 days**, and for data older than 30 days it keeps **one snapshot per character per calendar month** (the latest in that month) for yearly summaries. So you get full resolution for the last 30 days and ~1 snapshot per user per month for as long as you’ve been running (e.g. ~60 MB total for 8 users).
 
 ## Loot (Dink webhook)
 
