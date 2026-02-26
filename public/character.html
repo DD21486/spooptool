@@ -20,7 +20,18 @@
       <div class="mb-1">
         <h1 id="char-name" class="text-2xl font-bold text-slate-100"></h1>
       </div>
-      <p id="char-mode" class="text-slate-500 text-sm mb-6"></p>
+      <p id="char-mode" class="text-slate-500 text-sm mb-4"></p>
+
+      <div class="flex flex-wrap gap-4 mb-6" aria-label="Character stats">
+        <div class="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 min-w-[8rem]">
+          <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of 99's</p>
+          <p id="stat-99s" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+        </div>
+        <div class="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 min-w-[8rem]">
+          <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of Boss Kills</p>
+          <p id="stat-boss-kills" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+        </div>
+      </div>
 
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Skills</h2>

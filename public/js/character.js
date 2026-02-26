@@ -225,6 +225,24 @@
     const lastCapture = getLastCronRunInNY();
     lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
+    const skills = data.skills || {};
+    const count99s = Object.values(skills).filter((s) => {
+      if (!s || typeof s !== 'object') return false;
+      const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      return !Number.isNaN(level) && level >= 99;
+    }).length;
+    const stat99El = document.getElementById('stat-99s');
+    if (stat99El) stat99El.textContent = formatNum(count99s);
+
+    const bosses = data.bosses || {};
+    const totalBossKills = Object.values(bosses).reduce((sum, b) => {
+      if (!b || typeof b !== 'object') return sum;
+      const kc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+      return sum + (typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0);
+    }, 0);
+    const statBossKillsEl = document.getElementById('stat-boss-kills');
+    if (statBossKillsEl) statBossKillsEl.textContent = formatNum(totalBossKills);
+
     const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
     const luckNeedle = document.getElementById('luck-needle');
     const luckValue = document.getElementById('luck-value');
@@ -235,7 +253,6 @@
     }
     if (luckValue) luckValue.textContent = luckScore > 0 ? '+' + luckScore : String(luckScore);
 
-    const skills = data.skills || {};
     const skillOrder = ['overall', 'attack', 'hitpoints', 'mining', 'strength', 'agility', 'smithing', 'defence', 'herblore', 'fishing', 'ranged', 'thieving', 'cooking', 'prayer', 'crafting', 'firemaking', 'magic', 'fletching', 'woodcutting', 'runecraft', 'slayer', 'farming', 'construction', 'hunter'];
     const keys = Object.keys(skills).filter(k => k !== 'overall').sort((a, b) => {
       const ai = skillOrder.indexOf(a);
@@ -289,7 +306,6 @@
       </tr>`;
     }).join('');
 
-    const bosses = data.bosses || {};
     const bossEntries = Object.entries(bosses)
       .filter(([, b]) => b && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
       .sort((a, b) => (b[1].count ?? b[1].kc ?? 0) - (a[1].count ?? a[1].kc ?? 0));
