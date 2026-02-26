@@ -226,7 +226,8 @@
     lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
     const skills = data.skills || {};
-    const count99s = Object.values(skills).filter((s) => {
+    const count99s = Object.entries(skills).filter(([key, s]) => {
+      if (key === 'overall') return false;
       if (!s || typeof s !== 'object') return false;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
       return !Number.isNaN(level) && level >= 99;
