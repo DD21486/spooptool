@@ -15,10 +15,20 @@
       font-family: ui-monospace, monospace;
       font-size: clamp(0.35rem, 1.5vw, 0.6rem);
       line-height: 1.2;
-      color: #94a3b8;
       white-space: pre;
       overflow-x: auto;
       text-align: center;
+      background: linear-gradient(90deg, #3b82f6, #06b6d4, #14b8a6, #10b981, #8b5cf6, #a855f7, #3b82f6);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: ascii-gradient 6s ease-in-out infinite;
+    }
+    @keyframes ascii-gradient {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
     }
     #ascii-title .ascii-char {
       opacity: 0;
@@ -264,7 +274,14 @@
     </div>
 
     <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="SpoopScore leaderboard">
-      <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">SpoopScore</h2>
+      <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-lg font-semibold text-slate-100">SpoopScore</h2>
+        <div class="flex items-center gap-1" role="tablist" aria-label="SpoopScore chart value">
+          <button type="button" id="spoop-chart-all" role="tab" aria-selected="true" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-600 text-white">All</button>
+          <button type="button" id="spoop-chart-boss" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Boss Score</button>
+          <button type="button" id="spoop-chart-skill" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Skill Score</button>
+        </div>
+      </div>
       <div class="px-4 py-4">
         <div class="min-h-[280px]">
           <canvas id="spoop-score-chart"></canvas>

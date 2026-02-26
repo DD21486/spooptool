@@ -82,11 +82,15 @@
   const tabWeek = document.getElementById('tab-week');
   const tabToday = document.getElementById('tab-today');
   const tabLast24 = document.getElementById('tab-last24');
+  const spoopChartAll = document.getElementById('spoop-chart-all');
+  const spoopChartBoss = document.getElementById('spoop-chart-boss');
+  const spoopChartSkill = document.getElementById('spoop-chart-skill');
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
 
   let homeViewMode = 'last24';
+  let spoopChartMode = 'all';
   let last24hDeltas = {};
   let todayDeltas = {};
   let weekDeltas = {};
@@ -464,6 +468,8 @@
       homeChartSpoopScore.destroy();
       homeChartSpoopScore = null;
     }
+    const valueKey = spoopChartMode === 'boss' ? 'bossScore' : spoopChartMode === 'skill' ? 'skillScore' : 'spoopScore';
+    const datasetLabel = spoopChartMode === 'boss' ? 'Boss Score' : spoopChartMode === 'skill' ? 'Skill Score' : 'SpoopScore';
     const rows = (characterList || []).map((username) => {
       const player = playerData[username];
       const bossScore = computeBossPointsForPeriod(null, player);
@@ -472,16 +478,16 @@
       const s = skillScore || 0;
       return { username, spoopScore: b + s, bossScore: b, skillScore: s };
     });
-    rows.sort((a, b) => b.spoopScore - a.spoopScore);
+    rows.sort((a, b) => b[valueKey] - a[valueKey]);
     const labels = rows.map((r) => r.username);
-    const data = rows.map((r) => r.spoopScore);
+    const data = rows.map((r) => r[valueKey]);
     if (labels.length === 0) return;
     homeChartSpoopScore = new Chart(canvas.getContext('2d'), {
       type: 'bar',
       data: {
         labels,
         datasets: [{
-          label: 'SpoopScore',
+          label: datasetLabel,
           data,
           backgroundColor: 'rgba(56, 189, 248, 0.6)',
           borderColor: 'rgb(56, 189, 248)',
@@ -1547,6 +1553,38 @@
   if (tabWeek) tabWeek.addEventListener('click', () => setHomeViewMode('week'));
   if (tabToday) tabToday.addEventListener('click', () => setHomeViewMode('today'));
   if (tabLast24) tabLast24.addEventListener('click', () => setHomeViewMode('last24'));
+
+  function setSpoopChartMode(mode) {
+    spoopChartMode = mode;
+    const isAll = mode === 'all';
+    const isBoss = mode === 'boss';
+    const isSkill = mode === 'skill';
+    if (spoopChartAll) {
+      spoopChartAll.classList.toggle('bg-sky-600', isAll);
+      spoopChartAll.classList.toggle('text-white', isAll);
+      spoopChartAll.classList.toggle('bg-slate-700', !isAll);
+      spoopChartAll.classList.toggle('text-slate-300', !isAll);
+      spoopChartAll.setAttribute('aria-selected', String(isAll));
+    }
+    if (spoopChartBoss) {
+      spoopChartBoss.classList.toggle('bg-sky-600', isBoss);
+      spoopChartBoss.classList.toggle('text-white', isBoss);
+      spoopChartBoss.classList.toggle('bg-slate-700', !isBoss);
+      spoopChartBoss.classList.toggle('text-slate-300', !isBoss);
+      spoopChartBoss.setAttribute('aria-selected', String(isBoss));
+    }
+    if (spoopChartSkill) {
+      spoopChartSkill.classList.toggle('bg-sky-600', isSkill);
+      spoopChartSkill.classList.toggle('text-white', isSkill);
+      spoopChartSkill.classList.toggle('bg-slate-700', !isSkill);
+      spoopChartSkill.classList.toggle('text-slate-300', !isSkill);
+      spoopChartSkill.setAttribute('aria-selected', String(isSkill));
+    }
+    paintSpoopScoreChart();
+  }
+  if (spoopChartAll) spoopChartAll.addEventListener('click', () => setSpoopChartMode('all'));
+  if (spoopChartBoss) spoopChartBoss.addEventListener('click', () => setSpoopChartMode('boss'));
+  if (spoopChartSkill) spoopChartSkill.addEventListener('click', () => setSpoopChartMode('skill'));
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);
