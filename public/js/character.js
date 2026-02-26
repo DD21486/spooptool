@@ -800,6 +800,89 @@
     }
   }
 
+  function buildBossScoreListHtml() {
+    const byPts = {};
+    Object.entries(BOSS_POINTS).forEach(([key, pts]) => {
+      if (!byPts[pts]) byPts[pts] = [];
+      byPts[pts].push(key);
+    });
+    const lines = [];
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 25].forEach((pts) => {
+      if (!byPts[pts]) return;
+      const seen = new Set();
+      const names = byPts[pts]
+        .map((k) => ({ raw: k, display: skillLabel(k), norm: skillLabel(k).toLowerCase().replace(/\s+/g, '') }))
+        .filter(({ norm }) => {
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        })
+        .map(({ display }) => display)
+        .sort((a, b) => a.localeCompare(b));
+      lines.push(pts + ' pt' + (pts !== 1 ? 's' : '') + ': ' + names.join(', '));
+    });
+    return lines.map((line) => '<div>' + escapeHtml(line) + '</div>').join('');
+  }
+
+  function openScoringModal(tab) {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    const listEl = document.getElementById('scoring-boss-list');
+    const bossScoreTooltip = document.getElementById('boss-score-tooltip');
+    if (bossScoreTooltip) { bossScoreTooltip.classList.add('hidden'); bossScoreTooltip.setAttribute('aria-hidden', 'true'); }
+    if (listEl) listEl.innerHTML = buildBossScoreListHtml();
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+    setScoringTab(tab || 'boss');
+  }
+
+  function closeScoringModal() {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function setScoringTab(tab) {
+    document.querySelectorAll('.scoring-tab').forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('border-sky-500', isActive);
+      btn.classList.toggle('border-transparent', !isActive);
+      btn.classList.toggle('bg-slate-800', true);
+      btn.classList.toggle('text-sky-400', isActive);
+      btn.classList.toggle('text-slate-400', !isActive);
+    });
+    document.querySelectorAll('.scoring-tab-panel').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.id !== 'scoring-tab-' + tab);
+    });
+  }
+
+  const scoringModalOpen = document.getElementById('scoring-modal-open');
+  if (scoringModalOpen) scoringModalOpen.addEventListener('click', () => openScoringModal('boss'));
+  const statBossScoreWrap = document.getElementById('stat-boss-score-wrap');
+  if (statBossScoreWrap) {
+    statBossScoreWrap.addEventListener('click', (e) => { e.preventDefault(); openScoringModal('boss'); });
+    statBossScoreWrap.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openScoringModal('boss'); } });
+  }
+  const statSkillScoreWrap = document.getElementById('stat-skill-score-wrap');
+  if (statSkillScoreWrap) {
+    statSkillScoreWrap.addEventListener('click', (e) => { e.preventDefault(); openScoringModal('skill'); });
+    statSkillScoreWrap.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openScoringModal('skill'); } });
+  }
+  const scoringModalClose = document.getElementById('scoring-modal-close');
+  if (scoringModalClose) scoringModalClose.addEventListener('click', closeScoringModal);
+  const scoringOverlay = document.getElementById('scoring-modal-overlay');
+  if (scoringOverlay) {
+    scoringOverlay.addEventListener('click', function (e) {
+      if (e.target === scoringOverlay) closeScoringModal();
+    });
+  }
+  document.querySelectorAll('.scoring-tab').forEach((btn) => {
+    btn.addEventListener('click', function () { setScoringTab(this.getAttribute('data-tab')); });
+  });
+
   document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
   document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });
   document.querySelectorAll('.chart-range-btn').forEach((btn) => {
