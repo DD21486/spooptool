@@ -183,6 +183,27 @@
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
   }
 
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +300 at 93, +2000 at 99. */
+  function skillPointsForLevel(level) {
+    const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
+    let pts = L * 15;
+    if (L >= 70) pts += 100;
+    if (L >= 80) pts += 200;
+    if (L >= 93) pts += 300;
+    if (L >= 99) pts += 2000;
+    return pts;
+  }
+
+  function totalSkillingScore(skills) {
+    if (!skills || typeof skills !== 'object') return 0;
+    return Object.entries(skills).reduce((sum, [key, s]) => {
+      if (key === 'overall') return sum;
+      if (!s || typeof s !== 'object') return sum;
+      const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      return sum + skillPointsForLevel(level);
+    }, 0);
+  }
+
   /** Boss name (normalized) -> points per kill. API may return "The Whisperer" or "Whisperer"; we map both forms where applicable. */
   const BOSS_POINTS = {
     wintertodt: 1, kraken: 1,
@@ -302,6 +323,10 @@
     const statBossScoreEl = document.getElementById('stat-boss-score');
     if (statBossScoreEl) statBossScoreEl.textContent = formatNum(totalBossPoints);
 
+    const totalSkillingPoints = totalSkillingScore(skills);
+    const statSkillingScoreEl = document.getElementById('stat-skilling-score');
+    if (statSkillingScoreEl) statSkillingScoreEl.textContent = formatNum(totalSkillingPoints);
+
     const bossScoreBreakdown = Object.entries(bosses)
       .filter(([, b]) => b && typeof b === 'object' && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
       .map(([bossKey, b]) => {
@@ -365,6 +390,7 @@
         ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
+      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum);
       const skillDelta = characterDeltas.skillDeltas[key];
       const skillDeltaMonth = characterDeltasMonth.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
@@ -379,6 +405,7 @@
         <td class="px-4 py-2 text-right font-mono align-top">
           <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
         </td>
+        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(skillScoreForRow)}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
         <td class="px-2 py-2 text-right">${chartIcon}</td>
       </tr>`;
@@ -389,6 +416,8 @@
       .sort((a, b) => (b[1].count ?? b[1].kc ?? 0) - (a[1].count ?? a[1].kc ?? 0));
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
+      const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+      const bossScore = (typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0) * pts;
       const rank = (b.rank != null) ? b.rank : '—';
       const bossDelta = characterDeltas.bossDeltas[bossKey];
       const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';
@@ -398,11 +427,12 @@
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${skillLabel(bossKey)}</span></div></td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
+        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(bossScore)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
         <td class="px-2 py-2 text-right">${chartIconBoss}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
 
     if (lootTotalDrops) lootTotalDrops.textContent = '—';
     if (lootTotalValue) lootTotalValue.textContent = '—';
