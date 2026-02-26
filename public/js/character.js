@@ -311,12 +311,13 @@
     const statBossKillsEl = document.getElementById('stat-boss-kills');
     if (statBossKillsEl) statBossKillsEl.textContent = formatNum(totalBossKills);
 
+    const FIRST_KILL_BONUS = 10;
     const totalBossPoints = Object.entries(bosses).reduce((sum, [bossKey, b]) => {
       if (!b || typeof b !== 'object') return sum;
       const kc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
       const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
       const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-      return sum + count * pts;
+      return sum + count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
     }, 0);
     const bossPointsEl = document.getElementById('boss-points-total');
     if (bossPointsEl) bossPointsEl.textContent = formatNum(totalBossPoints);
@@ -327,12 +328,17 @@
     const statSkillingScoreEl = document.getElementById('stat-skilling-score');
     if (statSkillingScoreEl) statSkillingScoreEl.textContent = formatNum(totalSkillingPoints);
 
+    const spoopScore = totalBossPoints + totalSkillingPoints;
+    const spoopScoreEl = document.getElementById('spoop-score');
+    if (spoopScoreEl) spoopScoreEl.textContent = formatNum(spoopScore);
+
     const bossScoreBreakdown = Object.entries(bosses)
       .filter(([, b]) => b && typeof b === 'object' && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
       .map(([bossKey, b]) => {
         const count = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
         const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-        return { name: skillLabel(bossKey), count, pts, total: count * pts };
+        const total = count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
+        return { name: skillLabel(bossKey), count, pts, total };
       })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total)
@@ -416,8 +422,9 @@
       .sort((a, b) => (b[1].count ?? b[1].kc ?? 0) - (a[1].count ?? a[1].kc ?? 0));
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
+      const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
       const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-      const bossScore = (typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0) * pts;
+      const bossScore = count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
       const rank = (b.rank != null) ? b.rank : '—';
       const bossDelta = characterDeltas.bossDeltas[bossKey];
       const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';

@@ -7,6 +7,20 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <style>
+    .spoop-score-gradient {
+      background: linear-gradient(90deg, #3b82f6, #06b6d4, #14b8a6, #10b981, #8b5cf6, #a855f7, #3b82f6);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      animation: spoop-gradient 6s ease-in-out infinite;
+    }
+    @keyframes spoop-gradient {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
   <div class="max-w-4xl mx-auto px-4 py-6">
@@ -20,8 +34,12 @@
 
     <div id="loading" class="py-12 text-slate-500 text-center">Loading…</div>
     <div id="content" class="hidden">
-      <div class="mb-1">
+      <div class="flex items-baseline justify-between gap-4 mb-1">
         <h1 id="char-name" class="text-2xl font-bold text-slate-100"></h1>
+        <div class="text-right shrink-0">
+          <p class="text-xs text-slate-500 uppercase tracking-wide">SpoopScore</p>
+          <p id="spoop-score" class="spoop-score-gradient text-xl font-semibold font-mono tabular-nums">—</p>
+        </div>
       </div>
       <p id="char-mode" class="text-slate-500 text-sm mb-4"></p>
 
@@ -188,7 +206,7 @@
       </div>
       <div class="overflow-y-auto flex-1 px-4 py-4">
         <div id="scoring-tab-boss" class="scoring-tab-panel text-sm text-slate-300 space-y-3">
-          <p>Your <strong class="text-slate-100">Boss Score</strong> is the sum of (kill count × points per kill) for each boss. Harder bosses are worth more points per kill.</p>
+          <p>Your <strong class="text-slate-100">Boss Score</strong> is the sum of (kill count × points per kill) for each boss. Harder bosses are worth more points per kill. You also get <strong class="text-slate-100">+10 points</strong> for the first kill of each boss (once per boss).</p>
           <p class="text-slate-400 text-xs">Points per kill by boss (grouped by value):</p>
           <div id="scoring-boss-list" class="text-slate-300 text-xs font-mono space-y-1 max-h-80 overflow-y-auto"></div>
         </div>

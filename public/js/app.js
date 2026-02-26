@@ -386,12 +386,13 @@
       return sum;
     }
     if (player && player.bosses && typeof player.bosses === 'object') {
+      const FIRST_KILL_BONUS = 10;
       let sum = 0;
       for (const [bossKey, b] of Object.entries(player.bosses)) {
         const count = b && (b.count != null ? b.count : b.kc);
         const n = typeof count === 'number' && !Number.isNaN(count) ? count : 0;
         const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-        sum += n * pts;
+        sum += n * pts + (n >= 1 ? FIRST_KILL_BONUS : 0);
       }
       return sum;
     }
