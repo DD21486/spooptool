@@ -85,6 +85,12 @@
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
+  const skillScoreTbody = document.getElementById('skill-score-tbody');
+  const bossScoreTbody = document.getElementById('boss-score-tbody');
+  const spoopScoreTbody = document.getElementById('spoop-score-tbody');
+  const skillScorePeriodLabel = document.getElementById('skill-score-period-label');
+  const bossScorePeriodLabel = document.getElementById('boss-score-period-label');
+  const spoopScorePeriodLabel = document.getElementById('spoop-score-period-label');
 
   let homeViewMode = 'last24';
   let last24hDeltas = {};
@@ -375,18 +381,18 @@
     doom_of_mokhaiotl: 14, doomofmokhaiotl: 14,
     fortis_colosseum: 25, tzkal_zuk: 25, tzkalzuk: 25,
   };
+  const FIRST_KILL_BONUS = 10;
   function computeBossPointsForPeriod(deltas, player) {
     if (deltas && deltas.bossDeltas && typeof deltas.bossDeltas === 'object') {
       let sum = 0;
       for (const [bossKey, delta] of Object.entries(deltas.bossDeltas)) {
         const count = typeof delta === 'number' && !Number.isNaN(delta) ? delta : 0;
         const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-        sum += count * pts;
+        sum += count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
       }
       return sum;
     }
     if (player && player.bosses && typeof player.bosses === 'object') {
-      const FIRST_KILL_BONUS = 10;
       let sum = 0;
       for (const [bossKey, b] of Object.entries(player.bosses)) {
         const count = b && (b.count != null ? b.count : b.kc);
@@ -397,6 +403,25 @@
       return sum;
     }
     return 0;
+  }
+
+  function skillPointsForLevel(level) {
+    const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
+    let pts = L * 15;
+    if (L >= 70) pts += 100;
+    if (L >= 80) pts += 200;
+    if (L >= 93) pts += 300;
+    if (L >= 99) pts += 2000;
+    return pts;
+  }
+  function totalSkillingScore(skills) {
+    if (!skills || typeof skills !== 'object') return 0;
+    return Object.entries(skills).reduce((sum, [key, s]) => {
+      if (key === 'overall') return sum;
+      if (!s || typeof s !== 'object') return sum;
+      const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      return sum + skillPointsForLevel(level);
+    }, 0);
   }
 
   function renderLoot() {
@@ -434,6 +459,77 @@
       const valueCell = `<span class="home-value-cell cursor-help inline-flex items-center justify-end gap-1.5" data-table="loot" data-username="${escapeHtml(r.username)}" title="">${coinImg}<span>${displayValue}</span></span>`;
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       lootTbody.appendChild(tr);
+    });
+  }
+
+  function periodLabel() {
+    if (homeViewMode === 'today') return 'Today';
+    if (homeViewMode === 'week') return 'This Week';
+    if (homeViewMode === 'month') return 'This Month';
+    if (homeViewMode === 'last24') return 'Last 24 Hr';
+    return 'Total';
+  }
+
+  function renderSkillScoreTable() {
+    if (!skillScoreTbody) return;
+    skillScoreTbody.innerHTML = '';
+    if (skillScorePeriodLabel) skillScorePeriodLabel.textContent = 'Total (current)';
+    const rows = characterList.map((username) => {
+      const player = playerData[username];
+      const score = totalSkillingScore(player && player.skills ? player.skills : {});
+      return { username, score };
+    });
+    rows.sort((a, b) => b.score - a.score);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(r.score)}</td>`;
+      skillScoreTbody.appendChild(tr);
+    });
+  }
+
+  function renderBossScoreTable() {
+    if (!bossScoreTbody) return;
+    bossScoreTbody.innerHTML = '';
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week' || homeViewMode === 'month';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : (homeViewMode === 'month' ? monthDeltas : last24hDeltas));
+    if (bossScorePeriodLabel) bossScorePeriodLabel.textContent = periodLabel();
+    const rows = characterList.map((username) => {
+      const d = deltaSource[username];
+      const player = playerData[username];
+      const score = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
+      return { username, score };
+    });
+    rows.sort((a, b) => b.score - a.score);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      const display = isDelta && r.score > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.score)}</span>` : formatNum(r.score);
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${display}</td>`;
+      bossScoreTbody.appendChild(tr);
+    });
+  }
+
+  function renderSpoopScoreTable() {
+    if (!spoopScoreTbody) return;
+    spoopScoreTbody.innerHTML = '';
+    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week' || homeViewMode === 'month';
+    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : (homeViewMode === 'month' ? monthDeltas : last24hDeltas));
+    if (spoopScorePeriodLabel) spoopScorePeriodLabel.textContent = periodLabel();
+    const rows = characterList.map((username) => {
+      const d = deltaSource[username];
+      const player = playerData[username];
+      const bossScore = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
+      const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
+      const spoopScore = bossScore + skillScore;
+      return { username, spoopScore, bossScore, skillScore };
+    });
+    rows.sort((a, b) => b.spoopScore - a.spoopScore);
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(r.spoopScore)}</td>`;
+      spoopScoreTbody.appendChild(tr);
     });
   }
 
@@ -784,6 +880,9 @@
       renderLeft();
       renderRight();
       renderLoot();
+      renderSkillScoreTable();
+      renderBossScoreTable();
+      renderSpoopScoreTable();
       renderActivity(data.activity || []);
       loadHomeCharts();
     } catch (e) {
@@ -866,6 +965,10 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
+      renderLoot();
+      renderSkillScoreTable();
+      renderBossScoreTable();
+      renderSpoopScoreTable();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -1350,6 +1453,9 @@
     renderLeft();
     renderRight();
     renderLoot();
+    renderSkillScoreTable();
+    renderBossScoreTable();
+    renderSpoopScoreTable();
     if (mode === 'today') {
       if (cachedHomeHistoryToday != null) {
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
