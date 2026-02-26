@@ -70,7 +70,10 @@
       </section>
 
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
-        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Boss kills</h2>
+        <div class="px-4 py-3 flex flex-wrap items-center justify-between gap-3 border-b border-slate-700">
+          <h2 class="text-lg font-semibold text-slate-100">Boss kills</h2>
+          <p class="text-sm text-slate-400">Total boss points: <span id="boss-points-total" class="font-semibold text-slate-100 font-mono tabular-nums">—</span></p>
+        </div>
         <div class="overflow-x-auto max-h-96">
           <table class="w-full text-sm">
             <thead>

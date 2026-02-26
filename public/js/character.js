@@ -178,6 +178,24 @@
     return div.innerHTML;
   }
 
+  /** Normalize boss key for points lookup (lowercase, spaces to _, strip apostrophes/colons/hyphens). */
+  function normalizeBossKeyForPoints(key) {
+    return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
+  }
+
+  /** Boss name (normalized) -> points per kill. API may return "The Whisperer" or "Whisperer"; we map both forms where applicable. */
+  const BOSS_POINTS = {
+    tempoross: 1, wintertodt: 1,
+    kraken: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
+    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, dagannoth_prime: 3, dagannothprime: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3,
+    dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, crystalline_hunllef: 4, the_hueycoatl: 4, hueycoatl: 4, moons_of_peril: 4, the_royal_titans: 4, royal_titans: 4, royaltitans: 4, skotizo: 4, sarachnis: 4,
+    abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, kalphite_queen: 5, kalphitequeen: 5, kreearra: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, theatre_of_blood: 5, theatreofblood: 5, tombs_of_amascut: 5, tombsofamascut: 5, tzhaar_ket_raks_challenges: 5, venenatis: 5, vorkath: 5, zalcano: 5,
+    chaos_elemental: 6, chaoselemental: 6, corporeal_beast: 6, corporealbeast: 6, corrupted_hunllef: 6, corruptedhunllef: 6, the_leviathan: 6, leviathan: 6, the_mimic: 6, mimic: 6, phosanis_nightmare: 6, phosanisnightmare: 6, phantom_muspah: 6, phantommuspah: 6, scorpia: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, the_whisperer: 6, whisperer: 6, zulrah: 6,
+    chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, doom_of_mokhaiotl: 7, doomofmokhaiotl: 7, fortis_colosseum: 7, vardorvis: 7, yama: 7, tombs_of_amascut_expert_mode: 7, tombsofamascutexpertmode: 7,
+    alchemical_hydra: 8, alchemicalhydra: 8, nex: 8, theatre_of_blood_hard_mode: 8,
+    tzkal_zuk: 12, tzkalzuk: 12,
+  };
+
   // OSRS cumulative XP table (same as wiki Module:Experience/data). Used for XP-to-next when API doesn't send it.
   const xpTable = (function () {
     const ret = [0];
@@ -243,6 +261,16 @@
     }, 0);
     const statBossKillsEl = document.getElementById('stat-boss-kills');
     if (statBossKillsEl) statBossKillsEl.textContent = formatNum(totalBossKills);
+
+    const totalBossPoints = Object.entries(bosses).reduce((sum, [bossKey, b]) => {
+      if (!b || typeof b !== 'object') return sum;
+      const kc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+      const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
+      const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+      return sum + count * pts;
+    }, 0);
+    const bossPointsEl = document.getElementById('boss-points-total');
+    if (bossPointsEl) bossPointsEl.textContent = formatNum(totalBossPoints);
 
     const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
     const luckNeedle = document.getElementById('luck-needle');
