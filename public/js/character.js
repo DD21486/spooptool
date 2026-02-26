@@ -182,10 +182,10 @@
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
   }
 
-  /** Points per 10k XP (no cap); level 99 ~13M XP adds ~130, 200M adds 2000. */
-  const POINTS_PER_10K_XP = 0.1;
+  /** Points per 10k XP (no cap); level 99 ~13M XP adds ~650, 200M adds 10000. */
+  const POINTS_PER_10K_XP = 0.5;
 
-  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.1 per 10k XP (no cap). */
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.5 per 10k XP (no cap). */
   function skillPointsForLevel(level, xp) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;

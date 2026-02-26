@@ -403,7 +403,7 @@
     return 0;
   }
 
-  const POINTS_PER_10K_XP = 0.1;
+  const POINTS_PER_10K_XP = 0.5;
   function skillPointsForLevel(level, xp) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
