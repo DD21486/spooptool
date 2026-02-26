@@ -238,6 +238,31 @@
     errorEl.classList.toggle('hidden', !msg);
   }
 
+  function setupBossScoreTooltipHover(tooltipEl) {
+    const wrap = document.getElementById('stat-boss-score-wrap');
+    if (!wrap || !tooltipEl || wrap.dataset.bossScoreTooltipBound === '1') return;
+    wrap.dataset.bossScoreTooltipBound = '1';
+    wrap.addEventListener('mouseenter', function () {
+      tooltipEl.classList.remove('hidden');
+      tooltipEl.setAttribute('aria-hidden', 'false');
+      const rect = wrap.getBoundingClientRect();
+      requestAnimationFrame(function () {
+        const ttRect = tooltipEl.getBoundingClientRect();
+        let left = rect.left + rect.width / 2 - ttRect.width / 2;
+        let top = rect.bottom + 6;
+        if (left < 8) left = 8;
+        if (left + ttRect.width > window.innerWidth - 8) left = window.innerWidth - ttRect.width - 8;
+        if (top + ttRect.height > window.innerHeight - 8) top = rect.top - ttRect.height - 6;
+        tooltipEl.style.left = left + 'px';
+        tooltipEl.style.top = top + 'px';
+      });
+    });
+    wrap.addEventListener('mouseleave', function () {
+      tooltipEl.classList.add('hidden');
+      tooltipEl.setAttribute('aria-hidden', 'true');
+    });
+  }
+
   function render(data) {
     if (!data) return;
     document.title = (data.name || name) + ' – SpoopTool';
@@ -276,6 +301,25 @@
     if (bossPointsEl) bossPointsEl.textContent = formatNum(totalBossPoints);
     const statBossScoreEl = document.getElementById('stat-boss-score');
     if (statBossScoreEl) statBossScoreEl.textContent = formatNum(totalBossPoints);
+
+    const bossScoreBreakdown = Object.entries(bosses)
+      .filter(([, b]) => b && typeof b === 'object' && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
+      .map(([bossKey, b]) => {
+        const count = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        return { name: skillLabel(bossKey), count, pts, total: count * pts };
+      })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    const bossScoreTooltipContent = document.getElementById('boss-score-tooltip-content');
+    const bossScoreTooltip = document.getElementById('boss-score-tooltip');
+    if (bossScoreTooltipContent) {
+      bossScoreTooltipContent.innerHTML = bossScoreBreakdown.length === 0
+        ? '<span class="text-slate-500">No boss kills</span>'
+        : bossScoreBreakdown.map((r) => '<div class="whitespace-nowrap">' + escapeHtml(r.name) + ': ' + formatNum(r.count) + ' × ' + r.pts + ' = ' + formatNum(r.total) + '</div>').join('');
+    }
+    setupBossScoreTooltipHover(bossScoreTooltip);
 
     const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
     const luckNeedle = document.getElementById('luck-needle');

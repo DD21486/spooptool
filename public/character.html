@@ -31,10 +31,13 @@
           <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of Boss Kills</p>
           <p id="stat-boss-kills" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
         </div>
-        <div class="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 min-w-[8rem]">
+        <div id="stat-boss-score-wrap" class="rounded-lg border border-slate-700 bg-slate-800/70 px-4 py-3 min-w-[8rem] cursor-help" aria-describedby="boss-score-tooltip">
           <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Boss Score</p>
           <p id="stat-boss-score" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
         </div>
+      </div>
+      <div id="boss-score-tooltip" class="hidden fixed z-50 rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-slate-400 text-xs shadow-xl" role="tooltip" aria-hidden="true">
+        <div id="boss-score-tooltip-content"></div>
       </div>
 
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
