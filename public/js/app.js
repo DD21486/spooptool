@@ -358,6 +358,46 @@
     return typeof n === 'number' ? n : 0;
   }
 
+  function normalizeBossKeyForPoints(key) {
+    return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
+  }
+  const BOSS_POINTS = {
+    wintertodt: 1, kraken: 1,
+    tempoross: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
+    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3, the_hueycoatl: 3, hueycoatl: 3, the_royal_titans: 3, royal_titans: 3, royaltitans: 3,
+    dagannoth_prime: 4, dagannothprime: 4, dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, moons_of_peril: 4, skotizo: 4, sarachnis: 4,
+    crystalline_hunllef: 5, abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, krilsutsaroth: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, tombs_of_amascut: 5, tombsofamascut: 5, venenatis: 5, vorkath: 5, zalcano: 5, zulrah: 5, chaos_elemental: 5, chaoselemental: 5, scorpia: 5,
+    kalphite_queen: 6, kalphitequeen: 6, kreearra: 6, corporeal_beast: 6, corporealbeast: 6, phantom_muspah: 6, phantommuspah: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, tombs_of_amascut_expert_mode: 6, tombsofamascutexpertmode: 6, alchemical_hydra: 6, alchemicalhydra: 6,
+    corrupted_hunllef: 7, corruptedhunllef: 7, the_leviathan: 7, leviathan: 7, the_whisperer: 7, whisperer: 7, the_mimic: 7, mimic: 7, chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, vardorvis: 7, yama: 7,
+    theatre_of_blood: 8, theatreofblood: 8, phosanis_nightmare: 8, phosanisnightmare: 8, nex: 8,
+    tzhaar_ket_raks_challenges: 9,
+    theatre_of_blood_hard_mode: 10,
+    doom_of_mokhaiotl: 14, doomofmokhaiotl: 14,
+    fortis_colosseum: 25, tzkal_zuk: 25, tzkalzuk: 25,
+  };
+  function computeBossPointsForPeriod(deltas, player) {
+    if (deltas && deltas.bossDeltas && typeof deltas.bossDeltas === 'object') {
+      let sum = 0;
+      for (const [bossKey, delta] of Object.entries(deltas.bossDeltas)) {
+        const count = typeof delta === 'number' && !Number.isNaN(delta) ? delta : 0;
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        sum += count * pts;
+      }
+      return sum;
+    }
+    if (player && player.bosses && typeof player.bosses === 'object') {
+      let sum = 0;
+      for (const [bossKey, b] of Object.entries(player.bosses)) {
+        const count = b && (b.count != null ? b.count : b.kc);
+        const n = typeof count === 'number' && !Number.isNaN(count) ? count : 0;
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        sum += n * pts;
+      }
+      return sum;
+    }
+    return 0;
+  }
+
   function renderLoot() {
     if (!lootTbody || !lootLoading) return;
     lootLoading.classList.add('hidden');
@@ -416,13 +456,16 @@
     }
     const rows = characterList.map(username => {
       const d = deltaSource[username];
+      const player = playerData[username];
       const kcDelta = isDelta && d
         ? (bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : d.bossKcDelta)
         : 0;
+      const bossPoints = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
       return {
         username,
-        kc: getRightBossKc(playerData[username], bossKey),
+        kc: getRightBossKc(player, bossKey),
         kcDelta: kcDelta != null ? kcDelta : 0,
+        bossPoints,
       };
     });
     if (isDelta) {
@@ -433,9 +476,11 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const displayValue = isDelta
+      const kcDisplay = isDelta
         ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
         : formatNum(r.kc);
+      const pointsSuffix = typeof r.bossPoints === 'number' ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)})</span>` : '';
+      const displayValue = kcDisplay + pointsSuffix;
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       rightTbody.appendChild(tr);
