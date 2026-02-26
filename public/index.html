@@ -28,6 +28,14 @@
       color: transparent;
       animation: ascii-gradient 6s ease-in-out infinite;
     }
+    /* Chrome doesn't paint background-clip:text when text is in child elements; use solid color so art is visible */
+    #ascii-title.ascii-chrome .ascii-gradient-inner {
+      background: none;
+      background-image: none;
+      -webkit-text-fill-color: #38bdf8;
+      color: #38bdf8;
+      animation: none;
+    }
     @keyframes ascii-gradient {
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
@@ -35,6 +43,8 @@
     #ascii-title .ascii-char {
       opacity: 0;
       animation: ascii-fade-in 0.08s ease-out forwards;
+      color: inherit;
+      -webkit-text-fill-color: inherit;
     }
     @keyframes ascii-fade-in {
       to { opacity: 1; }
@@ -126,6 +136,8 @@
           ' \\______/ |__/       \\______/  \\______/ |__/         |__/   \\______/  \\______/ |________/      '
         ];
         var el = document.getElementById('ascii-title');
+        if (!el) return;
+        if (/Chrome/.test(navigator.userAgent)) el.classList.add('ascii-chrome');
         var durationMs = 3000;
         var html = '';
         function esc(c) { return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c; }
