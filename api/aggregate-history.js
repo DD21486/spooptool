@@ -16,7 +16,8 @@ module.exports = async function handler(req, res) {
 
   const today = req.query.today === '1' || req.query.today === 'true';
   const week = req.query.week === '1' || req.query.week === 'true';
-  const hours = (today || week) ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
+  const month = req.query.month === '1' || req.query.month === 'true';
+  const hours = (today || week || month) ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
   const bucketMinutes = 15;
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
@@ -49,6 +50,17 @@ module.exports = async function handler(req, res) {
       `;
       const startRow = await sql`SELECT (date_trunc('week', NOW() + interval '1 day') - interval '1 day') AS t`;
       start = startRow.length && startRow[0].t ? new Date(startRow[0].t) : new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    } else if (month) {
+      const startRow = await sql`SELECT date_trunc('month', NOW()) AS t`;
+      start = startRow.length && startRow[0].t ? new Date(startRow[0].t) : new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
+      rows = await sql`
+        SELECT character_id, at,
+          (data->'skills'->'overall'->>'xp')::bigint AS xp,
+          (SELECT COALESCE(SUM((elem->'count')::int), 0) FROM jsonb_each(data->'bosses') AS t(k, elem)) AS boss_kc
+        FROM character_snapshots
+        WHERE at >= date_trunc('month', NOW())
+        ORDER BY at ASC
+      `;
     } else {
       const fetchHours = hours + 1;
       start = new Date(now.getTime() - hours * 60 * 60 * 1000);
@@ -86,7 +98,7 @@ module.exports = async function handler(req, res) {
       };
     });
 
-    const periodFilter = today || week ? null : (hours === 24 || hours === 168 ? hours : 24);
+    const periodFilter = today || week || month ? null : (hours === 24 || hours === 168 ? hours : 24);
     let lootHistory = [];
     try {
       const lootBuckets = today
@@ -105,13 +117,21 @@ module.exports = async function handler(req, res) {
               GROUP BY date_trunc('hour', at)
               ORDER BY bucket ASC
             `
-          : await sql`
-              SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
-              FROM loot_drops
-              WHERE at >= NOW() - make_interval(hours => ${periodFilter})
-              GROUP BY date_trunc('hour', at)
-              ORDER BY bucket ASC
-            `;
+          : month
+            ? await sql`
+                SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+                FROM loot_drops
+                WHERE at >= date_trunc('month', NOW())
+                GROUP BY date_trunc('hour', at)
+                ORDER BY bucket ASC
+              `
+            : await sql`
+                SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+                FROM loot_drops
+                WHERE at >= NOW() - make_interval(hours => ${periodFilter})
+                GROUP BY date_trunc('hour', at)
+                ORDER BY bucket ASC
+              `;
       let cum = 0;
       lootHistory = lootBuckets.map((r) => {
         cum += Number(r.value || 0);

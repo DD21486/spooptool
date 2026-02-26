@@ -50,3 +50,7 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 **Big drops → Discord:** To post only high-value drops to your Discord loot channel, add env var `DISCORD_LOOT_WEBHOOK_URL` with your channel’s [incoming webhook](https://support.discord.com/hc/en-us/articles/228383668-Intro-to-Webhooks) URL. SpoopTool logs every drop it receives; when a single drop event totals **≥ 400k gp**, it also sends that drop to Discord (one embed per event). Use Dink’s 50k threshold so SpoopTool only receives notable loot; Discord then gets only the 400k+ events.
 
 **Boss kill leader change → Discord:** After each snapshot cron run, SpoopTool checks who has the most total boss kills. If that leader changed (someone overtook the previous leader), it can post to Discord. Add env var `DISCORD_LEADERBOARD_WEBHOOK_URL` with an incoming webhook URL for the channel where you want these notifications. Run `sql/migration_leaderboard_state.sql` in Neon so the cron can store the previous leader and detect changes.
+
+## Notes
+
+**`url.parse()` deprecation warning:** You may see `[DEP0169] DeprecationWarning: url.parse()...` in Vercel function logs. This comes from a dependency or the Node runtime, not from SpoopTool’s code. It’s harmless. To hide it in production, add an environment variable in Vercel: **Key** `NODE_OPTIONS`, **Value** `--no-deprecation` (Project → Settings → Environment Variables, then redeploy).

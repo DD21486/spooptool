@@ -149,6 +149,7 @@ module.exports = async function handler(req, res) {
           const hoursParam = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
           const todayParam = req.query.today === '1' || req.query.today === 'true';
           const weekParam = req.query.week === '1' || req.query.week === 'true';
+          const monthParam = req.query.month === '1' || req.query.month === 'true';
           const periodFilter = hoursParam === 24 || hoursParam === 168 ? hoursParam : null;
           let rows;
           if (todayParam) {
@@ -164,6 +165,14 @@ module.exports = async function handler(req, res) {
               SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
               FROM loot_drops
               WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
+              GROUP BY LOWER(TRIM(username))
+              ORDER BY total_value_gp DESC
+            `;
+          } else if (monthParam) {
+            rows = await sql`
+              SELECT MAX(TRIM(username)) AS username, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+              FROM loot_drops
+              WHERE at >= date_trunc('month', NOW())
               GROUP BY LOWER(TRIM(username))
               ORDER BY total_value_gp DESC
             `;
@@ -192,11 +201,29 @@ module.exports = async function handler(req, res) {
 
       const limit = Math.min(parseInt(req.query.limit, 10) || 20, 100);
       const hours = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
-      const periodFilter = hours === 24 || hours === 168 ? hours : null;
+      const monthParam = req.query.month === '1' || req.query.month === 'true';
+      const periodFilter = !monthParam && (hours === 24 || hours === 168) ? hours : null;
       const sourceFilter = (req.query.source || req.query.from || '').trim() || null;
 
       let agg;
-      if (periodFilter != null) {
+      if (monthParam) {
+        if (sourceFilter) {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= date_trunc('month', NOW())
+              AND TRIM(source) = TRIM(${sourceFilter})
+          `;
+        } else {
+          agg = await sql`
+            SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND at >= date_trunc('month', NOW())
+          `;
+        }
+      } else if (periodFilter != null) {
         if (sourceFilter) {
           agg = await sql`
             SELECT COUNT(*)::int AS total_drops, COALESCE(SUM(total_value_gp), 0)::bigint AS total_value_gp
@@ -232,9 +259,30 @@ module.exports = async function handler(req, res) {
       const a = agg[0] || { total_drops: 0, total_value_gp: 0 };
 
       let lootHistory = [];
-      if (periodFilter != null) {
+      if (monthParam || periodFilter != null) {
         let buckets;
-        if (sourceFilter) {
+        if (monthParam) {
+          if (sourceFilter) {
+            buckets = await sql`
+              SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+              FROM loot_drops
+              WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                AND at >= date_trunc('month', NOW())
+                AND TRIM(source) = TRIM(${sourceFilter})
+              GROUP BY date_trunc('hour', at)
+              ORDER BY bucket ASC
+            `;
+          } else {
+            buckets = await sql`
+              SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
+              FROM loot_drops
+              WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                AND at >= date_trunc('month', NOW())
+              GROUP BY date_trunc('hour', at)
+              ORDER BY bucket ASC
+            `;
+          }
+        } else if (sourceFilter) {
           buckets = await sql`
             SELECT date_trunc('hour', at) AS bucket, SUM(total_value_gp)::bigint AS value
             FROM loot_drops
@@ -288,7 +336,7 @@ module.exports = async function handler(req, res) {
 
       let grouped;
       try {
-        grouped = periodFilter != null
+        grouped = monthParam
           ? (sourceFilter != null
             ? await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
@@ -296,7 +344,7 @@ module.exports = async function handler(req, res) {
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-                  AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  AND at >= date_trunc('month', NOW())
                   AND TRIM(source) = TRIM(${sourceFilter})
                 GROUP BY item_id, item_name
                 ORDER BY total_value_gp DESC
@@ -308,12 +356,37 @@ module.exports = async function handler(req, res) {
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-                  AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  AND at >= date_trunc('month', NOW())
                 GROUP BY item_id, item_name
                 ORDER BY total_value_gp DESC
                 LIMIT ${limit}
               `)
-          : (sourceFilter != null
+          : periodFilter != null
+            ? (sourceFilter != null
+              ? await sql`
+                  SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                    (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  GROUP BY item_id, item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                    (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
+                    (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  GROUP BY item_id, item_name
+                  ORDER BY total_value_gp DESC
+                  LIMIT ${limit}
+                `)
+            : (sourceFilter != null
             ? await sql`
                 SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                   (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
@@ -338,14 +411,14 @@ module.exports = async function handler(req, res) {
       } catch (groupErr) {
         const msg = (groupErr && groupErr.message) || String(groupErr);
         if (msg.includes('item_id') || msg.includes('does not exist') || msg.includes('column')) {
-          grouped = periodFilter != null
+          grouped = monthParam
             ? (sourceFilter != null
               ? await sql`
                   SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                     (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
                   FROM loot_drops
                   WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    AND at >= date_trunc('month', NOW())
                     AND TRIM(source) = TRIM(${sourceFilter})
                   GROUP BY item_name
                   ORDER BY total_value_gp DESC
@@ -356,12 +429,35 @@ module.exports = async function handler(req, res) {
                     (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
                   FROM loot_drops
                   WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    AND at >= date_trunc('month', NOW())
                   GROUP BY item_name
                   ORDER BY total_value_gp DESC
                   LIMIT ${limit}
                 `)
-            : (sourceFilter != null
+            : periodFilter != null
+              ? (sourceFilter != null
+                ? await sql`
+                    SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                      (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= NOW() - make_interval(hours => ${periodFilter})
+                      AND TRIM(source) = TRIM(${sourceFilter})
+                    GROUP BY item_name
+                    ORDER BY total_value_gp DESC
+                    LIMIT ${limit}
+                  `
+                : await sql`
+                    SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                      (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    GROUP BY item_name
+                    ORDER BY total_value_gp DESC
+                    LIMIT ${limit}
+                  `)
+              : (sourceFilter != null
               ? await sql`
                   SELECT item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                     (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source
@@ -434,14 +530,21 @@ module.exports = async function handler(req, res) {
       if (!rawBody || rawBody.length === 0) return res.status(400).json({ error: 'Empty body' });
       const payload = extractPayloadJson(rawBody, contentType);
       if (!payload || payload.type !== 'LOOT') {
+        console.warn('Loot POST: invalid or non-LOOT payload', payload ? { type: payload.type } : 'null');
         return res.status(400).json({ error: 'Invalid or non-LOOT payload' });
       }
 
       const username = (payload.playerName || '').trim().replace(/\s+/g, ' ').substring(0, 12);
-      if (!username) return res.status(400).json({ error: 'Missing playerName' });
+      if (!username) {
+        console.warn('Loot POST: missing playerName');
+        return res.status(400).json({ error: 'Missing playerName' });
+      }
 
       const extra = payload.extra || {};
       const items = Array.isArray(extra.items) ? extra.items : [];
+      if (items.length === 0) {
+        console.warn('Loot POST: no items in payload', { username, extraKeys: Object.keys(extra || {}) });
+      }
       const source = (extra.source || '').trim().substring(0, 128) || null;
       const killCount = extra.killCount != null ? parseInt(extra.killCount, 10) : null;
       const rarest = extra.rarestProbability != null ? String(extra.rarestProbability).substring(0, 64) : null;
@@ -555,6 +658,9 @@ module.exports = async function handler(req, res) {
       const lootDesc = items.map((i) => (i.name || 'Unknown') + (i.quantity > 1 ? ' x' + i.quantity : '')).join(', ') + ' (' + formatGpShort(payloadTotalValueGp) + ' gp)' + (source ? ' from ' + source : '');
       await insertActivity(sql, { username, type: 'loot', description: lootDesc });
 
+      if (inserted > 0) {
+        console.log('Loot POST: inserted', inserted, 'for', username, formatGpShort(payloadTotalValueGp) + ' gp');
+      }
       return res.status(201).json({ ok: true, inserted });
     }
   } catch (err) {
