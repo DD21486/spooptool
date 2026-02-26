@@ -468,7 +468,9 @@
       const player = playerData[username];
       const bossScore = computeBossPointsForPeriod(null, player);
       const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
-      return { username, spoopScore: (bossScore || 0) + (skillScore || 0) };
+      const b = bossScore || 0;
+      const s = skillScore || 0;
+      return { username, spoopScore: b + s, bossScore: b, skillScore: s };
     });
     rows.sort((a, b) => b.spoopScore - a.spoopScore);
     const labels = rows.map((r) => r.username);
@@ -490,11 +492,23 @@
         indexAxis: 'y',
         responsive: true,
         maintainAspectRatio: false,
+        elements: {
+          bar: {
+            borderRadius: { topRight: 4, bottomRight: 4, topLeft: 0, bottomLeft: 0 },
+          },
+        },
         plugins: {
           legend: { display: false },
           tooltip: {
             callbacks: {
-              label: (ctx) => ' ' + formatNum(ctx.raw),
+              label: (ctx) => {
+                const r = rows[ctx.dataIndex];
+                return [
+                  'Total: ' + formatNum(ctx.raw),
+                  'Boss: ' + formatNum(r.bossScore),
+                  'Skill: ' + formatNum(r.skillScore),
+                ];
+              },
             },
           },
         },
