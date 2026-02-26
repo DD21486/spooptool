@@ -6,9 +6,38 @@
   <title>Where is the bull? – SpoopTool</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
+  <style>
+    .bull-title {
+      background: linear-gradient(90deg, #fbbf24, #f59e0b, #fbbf24, #fcd34d, #fbbf24);
+      background-size: 200% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: bull-shine 3s ease-in-out infinite;
+    }
+    @keyframes bull-shine {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
+    .bull-sub {
+      animation: bull-fade 2.5s ease-in-out infinite;
+    }
+    @keyframes bull-fade {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    .bull-pre {
+      animation: bull-float 4s ease-in-out infinite;
+    }
+    @keyframes bull-float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+    }
+  </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased flex flex-col items-center justify-center py-8">
-  <pre class="text-slate-400 font-mono text-[0.35rem] sm:text-[0.4rem] leading-tight text-center whitespace-pre overflow-x-auto max-w-full mb-6" aria-hidden="true">                    @                                                                                        @
+  <pre class="bull-pre text-slate-400 font-mono text-[0.35rem] sm:text-[0.4rem] leading-tight text-center whitespace-pre overflow-x-auto max-w-full mb-6" aria-hidden="true">                    @                                                                                        @
                   @@                                                                                          @@
                 @@@                                                                                            @@@
               @@@@                                                                                              @@@@
@@ -66,6 +95,7 @@
                                                            @@@@@@@@@
                                                            @@@@@@@
                                                              @</pre>
-  <p class="text-xl text-slate-100">where is the bull?</p>
+  <h1 class="bull-title text-2xl sm:text-3xl font-bold mb-1">Right here.</h1>
+  <p class="bull-sub text-slate-400 text-sm">where is the bull?</p>
 </body>
 </html>
