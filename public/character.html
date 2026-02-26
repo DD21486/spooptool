@@ -33,6 +33,11 @@
       min-height: 100%;
       padding: 0.75rem 1rem;
     }
+    @media (max-width: 639px) {
+      .stat-box-gradient-inner {
+        padding: 0.5rem 0.5rem;
+      }
+    }
     @keyframes stat-box-border {
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
@@ -52,36 +57,36 @@
     <div id="loading" class="py-12 text-slate-500 text-center">Loading…</div>
     <div id="content" class="hidden">
       <div class="text-center mb-6">
-        <h1 id="char-name" class="text-[20px] font-bold text-slate-100 uppercase tracking-tight mb-1"></h1>
-        <p id="spoop-score" class="spoop-score-gradient text-[96px] font-bold font-mono tabular-nums leading-none mb-0.5">—</p>
-        <p class="text-xs text-slate-500 uppercase tracking-wide">SpoopScore</p>
+        <h1 id="char-name" class="text-base sm:text-lg md:text-[20px] font-bold text-slate-100 uppercase tracking-tight mb-1"></h1>
+        <p id="spoop-score" class="spoop-score-gradient text-4xl sm:text-6xl md:text-7xl lg:text-[96px] font-bold font-mono tabular-nums leading-none mb-0.5">—</p>
+        <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide">SpoopScore</p>
       </div>
 
-      <div class="flex gap-3 mb-6 w-full" aria-label="Character stats">
+      <div class="flex gap-2 sm:gap-3 mb-6 w-full" aria-label="Character stats">
         <div class="flex-1 min-w-0 stat-box-gradient">
           <div class="stat-box-gradient-inner">
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of 99's</p>
-            <p id="stat-99s" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+            <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of 99's</p>
+            <p id="stat-99s" class="text-sm sm:text-base md:text-xl font-semibold text-slate-100 font-mono tabular-nums truncate">—</p>
           </div>
         </div>
         <div class="flex-1 min-w-0 stat-box-gradient">
           <div class="stat-box-gradient-inner">
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of Boss Kills</p>
-            <p id="stat-boss-kills" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+            <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5"># of Boss Kills</p>
+            <p id="stat-boss-kills" class="text-sm sm:text-base md:text-xl font-semibold text-slate-100 font-mono tabular-nums truncate">—</p>
           </div>
         </div>
         <div id="stat-boss-score-wrap" class="flex-1 min-w-0 stat-box-gradient group cursor-pointer relative" role="button" tabindex="0" aria-label="Open Boss Score explanation" aria-describedby="boss-score-tooltip">
           <div class="stat-box-gradient-inner relative">
-            <span class="absolute top-2 right-2 text-slate-500 group-hover:text-sky-400 pointer-events-none" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Boss Score</p>
-            <p id="stat-boss-score" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+            <span class="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 text-slate-500 group-hover:text-sky-400 pointer-events-none" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+            <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5">Boss Score</p>
+            <p id="stat-boss-score" class="text-sm sm:text-base md:text-xl font-semibold text-slate-100 font-mono tabular-nums truncate">—</p>
           </div>
         </div>
         <div id="stat-skill-score-wrap" class="flex-1 min-w-0 stat-box-gradient group cursor-pointer relative" role="button" tabindex="0" aria-label="Open Skill Score explanation">
           <div class="stat-box-gradient-inner relative">
-            <span class="absolute top-2 right-2 text-slate-500 group-hover:text-sky-400 pointer-events-none" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
-            <p class="text-xs text-slate-500 uppercase tracking-wide mb-0.5">Skill Score</p>
-            <p id="stat-skilling-score" class="text-xl font-semibold text-slate-100 font-mono tabular-nums">—</p>
+            <span class="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 text-slate-500 group-hover:text-sky-400 pointer-events-none" aria-hidden="true"><svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span>
+            <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5">Skill Score</p>
+            <p id="stat-skilling-score" class="text-sm sm:text-base md:text-xl font-semibold text-slate-100 font-mono tabular-nums truncate">—</p>
           </div>
         </div>
       </div>

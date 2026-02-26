@@ -85,12 +85,6 @@
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
-  const skillScoreTbody = document.getElementById('skill-score-tbody');
-  const bossScoreTbody = document.getElementById('boss-score-tbody');
-  const spoopScoreTbody = document.getElementById('spoop-score-tbody');
-  const skillScorePeriodLabel = document.getElementById('skill-score-period-label');
-  const bossScorePeriodLabel = document.getElementById('boss-score-period-label');
-  const spoopScorePeriodLabel = document.getElementById('spoop-score-period-label');
 
   let homeViewMode = 'last24';
   let last24hDeltas = {};
@@ -462,74 +456,60 @@
     });
   }
 
-  function periodLabel() {
-    if (homeViewMode === 'today') return 'Today';
-    if (homeViewMode === 'week') return 'This Week';
-    if (homeViewMode === 'month') return 'This Month';
-    if (homeViewMode === 'last24') return 'Last 24 Hr';
-    return 'Total';
-  }
-
-  function renderSkillScoreTable() {
-    if (!skillScoreTbody) return;
-    skillScoreTbody.innerHTML = '';
-    if (skillScorePeriodLabel) skillScorePeriodLabel.textContent = 'Total (current)';
-    const rows = characterList.map((username) => {
+  /** SpoopScore = total boss points (with first-kill bonus) + total skill score from current snapshot. */
+  function paintSpoopScoreChart() {
+    const canvas = document.getElementById('spoop-score-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (homeChartSpoopScore) {
+      homeChartSpoopScore.destroy();
+      homeChartSpoopScore = null;
+    }
+    const rows = (characterList || []).map((username) => {
       const player = playerData[username];
-      const score = totalSkillingScore(player && player.skills ? player.skills : {});
-      return { username, score };
-    });
-    rows.sort((a, b) => b.score - a.score);
-    rows.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(r.score)}</td>`;
-      skillScoreTbody.appendChild(tr);
-    });
-  }
-
-  function renderBossScoreTable() {
-    if (!bossScoreTbody) return;
-    bossScoreTbody.innerHTML = '';
-    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week' || homeViewMode === 'month';
-    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : (homeViewMode === 'month' ? monthDeltas : last24hDeltas));
-    if (bossScorePeriodLabel) bossScorePeriodLabel.textContent = periodLabel();
-    const rows = characterList.map((username) => {
-      const d = deltaSource[username];
-      const player = playerData[username];
-      const score = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
-      return { username, score };
-    });
-    rows.sort((a, b) => b.score - a.score);
-    rows.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const display = isDelta && r.score > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.score)}</span>` : formatNum(r.score);
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${display}</td>`;
-      bossScoreTbody.appendChild(tr);
-    });
-  }
-
-  function renderSpoopScoreTable() {
-    if (!spoopScoreTbody) return;
-    spoopScoreTbody.innerHTML = '';
-    const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week' || homeViewMode === 'month';
-    const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : (homeViewMode === 'month' ? monthDeltas : last24hDeltas));
-    if (spoopScorePeriodLabel) spoopScorePeriodLabel.textContent = periodLabel();
-    const rows = characterList.map((username) => {
-      const d = deltaSource[username];
-      const player = playerData[username];
-      const bossScore = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
+      const bossScore = computeBossPointsForPeriod(null, player);
       const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
-      const spoopScore = bossScore + skillScore;
-      return { username, spoopScore, bossScore, skillScore };
+      return { username, spoopScore: (bossScore || 0) + (skillScore || 0) };
     });
     rows.sort((a, b) => b.spoopScore - a.spoopScore);
-    rows.forEach((r, i) => {
-      const tr = document.createElement('tr');
-      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(r.spoopScore)}</td>`;
-      spoopScoreTbody.appendChild(tr);
+    const labels = rows.map((r) => r.username);
+    const data = rows.map((r) => r.spoopScore);
+    if (labels.length === 0) return;
+    homeChartSpoopScore = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: 'SpoopScore',
+          data,
+          backgroundColor: 'rgba(56, 189, 248, 0.6)',
+          borderColor: 'rgb(56, 189, 248)',
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ' ' + formatNum(ctx.raw),
+            },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: { color: '#94a3b8', callback: (v) => formatNum(Number(v)), font: { size: 10 } },
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#94a3b8', font: { size: 11 }, autoSkip: false },
+          },
+        },
+      },
     });
   }
 
@@ -880,9 +860,7 @@
       renderLeft();
       renderRight();
       renderLoot();
-      renderSkillScoreTable();
-      renderBossScoreTable();
-      renderSpoopScoreTable();
+      paintSpoopScoreChart();
       renderActivity(data.activity || []);
       loadHomeCharts();
     } catch (e) {
@@ -966,9 +944,7 @@
       renderLeft();
       renderRight();
       renderLoot();
-      renderSkillScoreTable();
-      renderBossScoreTable();
-      renderSpoopScoreTable();
+      paintSpoopScoreChart();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -982,6 +958,7 @@
   let homeChartXp = null;
   let homeChartBoss = null;
   let homeChartLoot = null;
+  let homeChartSpoopScore = null;
   let cachedHomeHistory = null;
   let cachedLootHistory = null;
   let lootLeaderboardTotal = [];
@@ -1453,9 +1430,7 @@
     renderLeft();
     renderRight();
     renderLoot();
-    renderSkillScoreTable();
-    renderBossScoreTable();
-    renderSpoopScoreTable();
+    paintSpoopScoreChart();
     if (mode === 'today') {
       if (cachedHomeHistoryToday != null) {
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
