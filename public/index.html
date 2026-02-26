@@ -18,6 +18,8 @@
       white-space: pre;
       overflow-x: auto;
       text-align: center;
+    }
+    #ascii-title .ascii-gradient-inner {
       background: linear-gradient(90deg, #3b82f6, #06b6d4, #14b8a6, #10b981, #8b5cf6, #a855f7, #3b82f6);
       background-size: 300% 100%;
       -webkit-background-clip: text;
@@ -135,7 +137,7 @@
           }
           if (i < lines.length - 1) html += '\n';
         }
-        el.innerHTML = html;
+        el.innerHTML = '<span class="ascii-gradient-inner">' + html + '</span>';
 
         var allChars = el.querySelectorAll('.ascii-char');
         var visibleChars = [];

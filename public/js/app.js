@@ -526,7 +526,7 @@
           },
           y: {
             grid: { display: false },
-            ticks: { color: '#94a3b8', font: { size: 11 }, autoSkip: false },
+            ticks: { color: '#94a3b8', font: { size: 13, weight: 'bold' }, autoSkip: false },
           },
         },
       },
