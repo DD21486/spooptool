@@ -30,7 +30,6 @@
   const loadingEl = document.getElementById('loading');
   const contentEl = document.getElementById('content');
   const charName = document.getElementById('char-name');
-  const charMode = document.getElementById('char-mode');
   const lastUpdated = document.getElementById('last-updated');
   const skillsTbody = document.getElementById('skills-tbody');
   const bossesTbody = document.getElementById('bosses-tbody');
@@ -288,7 +287,6 @@
     if (!data) return;
     document.title = (data.name || name) + ' – SpoopTool';
     charName.textContent = data.name || name;
-    charMode.textContent = (data.mode || 'main').replace(/\b\w/g, c => c.toUpperCase());
     const lastCapture = getLastCronRunInNY();
     lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
