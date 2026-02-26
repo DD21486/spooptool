@@ -182,14 +182,14 @@
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
   }
 
-  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +300 at 93, +2000 at 99. */
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99. */
   function skillPointsForLevel(level) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
     if (L >= 70) pts += 100;
     if (L >= 80) pts += 200;
-    if (L >= 93) pts += 300;
-    if (L >= 99) pts += 2000;
+    if (L >= 93) pts += 500;
+    if (L >= 99) pts += 2500;
     return pts;
   }
 

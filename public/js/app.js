@@ -408,8 +408,8 @@
     let pts = L * 15;
     if (L >= 70) pts += 100;
     if (L >= 80) pts += 200;
-    if (L >= 93) pts += 300;
-    if (L >= 99) pts += 2000;
+    if (L >= 93) pts += 500;
+    if (L >= 99) pts += 2500;
     return pts;
   }
   function totalSkillingScore(skills) {
