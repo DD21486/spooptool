@@ -42,6 +42,7 @@
   const lootEmpty = document.getElementById('loot-empty');
 
   let characterDeltas = { skillDeltas: {}, bossDeltas: {} };
+  let characterDeltasMonth = { skillDeltas: {}, bossDeltas: {} };
   let lootPeriodHours = 24;
   let lootSourceFilter = '';
   let lootChartInstance = null;
@@ -270,12 +271,15 @@
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
       const skillDelta = characterDeltas.skillDeltas[key];
+      const skillDeltaMonth = characterDeltasMonth.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
+      const thisMonthSkill = skillDeltaMonth != null && skillDeltaMonth > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDeltaMonth)}</span>` : '—';
       const chartIcon = '<button type="button" class="row-chart-btn p-1 rounded text-slate-500 hover:text-sky-400 hover:bg-slate-700" data-skill="' + escapeHtml(key) + '" title="View chart" aria-label="View chart">' + chartIconSvg + '</button>';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2 font-medium"><span class="inline-flex items-center gap-2"><span class="w-4 h-4 flex items-center justify-center shrink-0">${skillIconHtml(key)}</span>${skillLabel(key)}</span></td>
         <td class="px-4 py-2 text-right">${level}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Skill}</td>
+        <td class="pl-2 pr-4 py-2 text-right">${thisMonthSkill}</td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(xp)}</td>
         <td class="px-4 py-2 text-right font-mono align-top">
           <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
@@ -494,9 +498,10 @@
     loadingEl.classList.remove('hidden');
     contentEl.classList.add('hidden');
     try {
-      const [res, deltasRes] = await Promise.all([
+      const [res, deltasRes, deltasMonthRes] = await Promise.all([
         fetch(API + '/character-snapshot?name=' + encodeURIComponent(name)),
         fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&hours=24'),
+        fetch(API + '/player-deltas?name=' + encodeURIComponent(name) + '&month=1'),
       ]);
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -508,6 +513,12 @@
         characterDeltas = { skillDeltas: d.skillDeltas || {}, bossDeltas: d.bossDeltas || {} };
       } else {
         characterDeltas = { skillDeltas: {}, bossDeltas: {} };
+      }
+      if (deltasMonthRes && deltasMonthRes.ok) {
+        const d = await deltasMonthRes.json().catch(() => ({}));
+        characterDeltasMonth = { skillDeltas: d.skillDeltas || {}, bossDeltas: d.bossDeltas || {} };
+      } else {
+        characterDeltasMonth = { skillDeltas: {}, bossDeltas: {} };
       }
       render(data);
       fetchLoot();
