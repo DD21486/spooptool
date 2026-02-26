@@ -404,7 +404,19 @@
   }
 
   const POINTS_PER_10K_XP = 0.5;
-  function skillPointsForLevel(level, xp) {
+  const SKILL_DIFFICULTY_RANK = {
+    runecraft: 1, slayer: 2, agility: 3, mining: 4, woodcutting: 5, fishing: 6, smithing: 7,
+    defence: 8, attack: 9, strength: 10, hitpoints: 11, ranged: 12, magic: 13, farming: 14,
+    herblore: 15, crafting: 16, thieving: 17, hunter: 18, construction: 19, prayer: 20,
+    firemaking: 21, cooking: 22, fletching: 23,
+  };
+  function getDifficultyBonusFor99(skillKey) {
+    if (!skillKey || skillKey === 'overall') return 0;
+    const rank = SKILL_DIFFICULTY_RANK[String(skillKey).toLowerCase()];
+    if (rank == null) return 0;
+    return Math.round(1000 - (700 * (rank - 1)) / 22);
+  }
+  function skillPointsForLevel(level, xp, skillKey) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
     if (L >= 70) pts += 100;
@@ -413,6 +425,7 @@
     if (L >= 99) pts += 2500;
     const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
     pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
+    if (L >= 99 && skillKey) pts += getDifficultyBonusFor99(skillKey);
     return pts;
   }
   function totalSkillingScore(skills) {
@@ -422,7 +435,7 @@
       if (!s || typeof s !== 'object') return sum;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
       const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
-      return sum + skillPointsForLevel(level, xp);
+      return sum + skillPointsForLevel(level, xp, key);
     }, 0);
   }
 

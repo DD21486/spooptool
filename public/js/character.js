@@ -185,8 +185,23 @@
   /** Points per 10k XP (no cap); level 99 ~13M XP adds ~650, 200M adds 10000. */
   const POINTS_PER_10K_XP = 0.5;
 
-  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.5 per 10k XP (no cap). */
-  function skillPointsForLevel(level, xp) {
+  /** Difficulty rank 1 (hardest) = Runecraft → 23 (easiest) = Fletching. Used for 99 bonus only. */
+  const SKILL_DIFFICULTY_RANK = {
+    runecraft: 1, slayer: 2, agility: 3, mining: 4, woodcutting: 5, fishing: 6, smithing: 7,
+    defence: 8, attack: 9, strength: 10, hitpoints: 11, ranged: 12, magic: 13, farming: 14,
+    herblore: 15, crafting: 16, thieving: 17, hunter: 18, construction: 19, prayer: 20,
+    firemaking: 21, cooking: 22, fletching: 23,
+  };
+  /** Bonus for 99 in a skill: hardest = 1000, easiest = 300, linear scale. Only applied when level >= 99. */
+  function getDifficultyBonusFor99(skillKey) {
+    if (!skillKey || skillKey === 'overall') return 0;
+    const rank = SKILL_DIFFICULTY_RANK[String(skillKey).toLowerCase()];
+    if (rank == null) return 0;
+    return Math.round(1000 - (700 * (rank - 1)) / 22);
+  }
+
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.5 per 10k XP (no cap). If level 99, add difficulty bonus (1000 hardest → 300 easiest). */
+  function skillPointsForLevel(level, xp, skillKey) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
     if (L >= 70) pts += 100;
@@ -195,6 +210,7 @@
     if (L >= 99) pts += 2500;
     const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
     pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
+    if (L >= 99 && skillKey) pts += getDifficultyBonusFor99(skillKey);
     return pts;
   }
 
@@ -205,7 +221,7 @@
       if (!s || typeof s !== 'object') return sum;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
       const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
-      return sum + skillPointsForLevel(level, xp);
+      return sum + skillPointsForLevel(level, xp, key);
     }, 0);
   }
 
@@ -400,7 +416,7 @@
         ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
-      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum, xp);
+      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum, xp, key);
       const skillDelta = characterDeltas.skillDeltas[key];
       const skillDeltaMonth = characterDeltasMonth.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
