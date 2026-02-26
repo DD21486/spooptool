@@ -403,13 +403,16 @@
     return 0;
   }
 
-  function skillPointsForLevel(level) {
+  const POINTS_PER_10K_XP = 0.1;
+  function skillPointsForLevel(level, xp) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
     if (L >= 70) pts += 100;
     if (L >= 80) pts += 200;
     if (L >= 93) pts += 500;
     if (L >= 99) pts += 2500;
+    const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
+    pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
     return pts;
   }
   function totalSkillingScore(skills) {
@@ -418,7 +421,8 @@
       if (key === 'overall') return sum;
       if (!s || typeof s !== 'object') return sum;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
-      return sum + skillPointsForLevel(level);
+      const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
+      return sum + skillPointsForLevel(level, xp);
     }, 0);
   }
 

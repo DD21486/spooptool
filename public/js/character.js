@@ -182,14 +182,19 @@
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
   }
 
-  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99. */
-  function skillPointsForLevel(level) {
+  /** Points per 10k XP (no cap); level 99 ~13M XP adds ~130, 200M adds 2000. */
+  const POINTS_PER_10K_XP = 0.1;
+
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.1 per 10k XP (no cap). */
+  function skillPointsForLevel(level, xp) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
     if (L >= 70) pts += 100;
     if (L >= 80) pts += 200;
     if (L >= 93) pts += 500;
     if (L >= 99) pts += 2500;
+    const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
+    pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
     return pts;
   }
 
@@ -199,7 +204,8 @@
       if (key === 'overall') return sum;
       if (!s || typeof s !== 'object') return sum;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
-      return sum + skillPointsForLevel(level);
+      const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
+      return sum + skillPointsForLevel(level, xp);
     }, 0);
   }
 
@@ -394,7 +400,7 @@
         ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
-      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum);
+      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum, xp);
       const skillDelta = characterDeltas.skillDeltas[key];
       const skillDeltaMonth = characterDeltasMonth.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
