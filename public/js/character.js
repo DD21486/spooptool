@@ -274,6 +274,8 @@
     }, 0);
     const bossPointsEl = document.getElementById('boss-points-total');
     if (bossPointsEl) bossPointsEl.textContent = formatNum(totalBossPoints);
+    const statBossScoreEl = document.getElementById('stat-boss-score');
+    if (statBossScoreEl) statBossScoreEl.textContent = formatNum(totalBossPoints);
 
     const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
     const luckNeedle = document.getElementById('luck-needle');
