@@ -34,8 +34,23 @@
       overflow: hidden;
       border: 1px solid rgba(71, 85, 105, 0.5);
       background: #1e293b;
+      position: relative;
     }
     #map { width: 100%; height: 100%; }
+    #map-coord-readout {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(71, 85, 105, 0.8);
+      font-family: ui-monospace, monospace;
+      font-size: 12px;
+      color: #94a3b8;
+      pointer-events: none;
+      z-index: 1000;
+    }
     .player-marker {
       background: #38bdf8;
       border: 2px solid #fff;
@@ -60,6 +75,7 @@
       <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">OSRS world</h2>
       <div id="osrs-map-wrap">
         <div id="map"></div>
+        <div id="map-coord-readout" aria-live="polite">—</div>
       </div>
       <p class="text-slate-500 text-xs mt-1">Pan and zoom freely; we never move the camera for you.</p>
       <a id="map-wiki-link" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs mt-1 inline-block">Open full wiki map in new tab</a>
@@ -133,12 +149,29 @@
           bg.addTo(map);
         });
         markersLayer = L.layerGroup().addTo(map);
+
+        var readoutEl = document.getElementById('map-coord-readout');
+        if (readoutEl) {
+          map.on('mousemove', function (e) {
+            var g = latLngToGame(e.latlng.lat, e.latlng.lng);
+            readoutEl.textContent = g.x + ', ' + g.y;
+          });
+          map.on('mouseout', function () {
+            readoutEl.textContent = '—';
+          });
+        }
       }
 
       function gameToLatLng(x, y) {
         var lat = (y - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
         var lng = (x - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
         return L.latLng(lat, lng);
+      }
+
+      function latLngToGame(lat, lng) {
+        var x = Math.round(GAME_MIN_X + (lng / IMG_WIDTH) * (GAME_MAX_X - GAME_MIN_X));
+        var y = Math.round(GAME_MIN_Y + (lat / IMG_HEIGHT) * (GAME_MAX_Y - GAME_MIN_Y));
+        return { x: x, y: y };
       }
 
       function updateMarkers(players) {
