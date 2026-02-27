@@ -200,14 +200,18 @@
     return Math.round(1000 - (700 * (rank - 1)) / 22);
   }
 
-  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.5 per 10k XP (no cap). If level 99, add difficulty bonus (1000 hardest → 300 easiest). */
+  /** Skilling score for one skill: 15 per level, +5@40, +10@50, +25@60, +100 at 70, +200 at 80, +300 at 90, +600 at 93, +3000 at 99, +0.5 per 10k XP (no cap). If level 99, add difficulty bonus (1000 hardest → 300 easiest). */
   function skillPointsForLevel(level, xp, skillKey) {
     const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
     let pts = L * 15;
+    if (L >= 40) pts += 5;
+    if (L >= 50) pts += 10;
+    if (L >= 60) pts += 25;
     if (L >= 70) pts += 100;
     if (L >= 80) pts += 200;
-    if (L >= 93) pts += 500;
-    if (L >= 99) pts += 2500;
+    if (L >= 90) pts += 300;
+    if (L >= 93) pts += 600;
+    if (L >= 99) pts += 3000;
     const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
     pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
     if (L >= 99 && skillKey) pts += getDifficultyBonusFor99(skillKey);
@@ -216,13 +220,18 @@
 
   function totalSkillingScore(skills) {
     if (!skills || typeof skills !== 'object') return 0;
-    return Object.entries(skills).reduce((sum, [key, s]) => {
-      if (key === 'overall') return sum;
-      if (!s || typeof s !== 'object') return sum;
+    let totalLevel = 0;
+    const sum = Object.entries(skills).reduce((acc, [key, s]) => {
+      if (key === 'overall') return acc;
+      if (!s || typeof s !== 'object') return acc;
       const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      if (!Number.isNaN(level) && level >= 0) totalLevel += level;
       const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
-      return sum + skillPointsForLevel(level, xp, key);
+      return acc + skillPointsForLevel(level, xp, key);
     }, 0);
+    const n = Math.floor(totalLevel / 100);
+    const totalLevelBonus = (n * (n + 1)) / 2;
+    return sum + totalLevelBonus;
   }
 
   /** Boss name (normalized) -> points per kill. API may return "The Whisperer" or "Whisperer"; we map both forms where applicable. */

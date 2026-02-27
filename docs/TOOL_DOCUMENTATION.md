@@ -241,7 +241,7 @@ All other endpoints are read-only (SELECT) from these tables (and optionally one
 ## 4. Scoring formulas (reference)
 
 - **Boss Score:** Sum over bosses of `(kill_count × points_per_boss)` plus **+10 per boss for first kill** (once per boss). Boss point values are defined in the front end (e.g. Wintertodt 1, …, Fortis/Zuk 25).
-- **Skill Score (per skill):** `level × 15` + 100 at 70 + 200 at 80 + 500 at 93 + 2500 at 99 + `floor(xp / 10_000) × 0.5` (no cap). **At 99 only:** difficulty bonus from **1000** (hardest, e.g. Runecraft) down to **300** (easiest, e.g. Fletching), linear by rank (see `docs/SKILL_DIFFICULTY_RANKING.md`).
+- **Skill Score (per skill):** `level × 15` + 5 at 40 + 10 at 50 + 25 at 60 + 100 at 70 + 200 at 80 + 300 at 90 + 600 at 93 + 3000 at 99 + `floor(xp / 10_000) × 0.5` (no cap). **At 99 only:** difficulty bonus from **1000** (hardest, e.g. Runecraft) down to **300** (easiest, e.g. Fletching), linear by rank (see `docs/SKILL_DIFFICULTY_RANKING.md`). **Total level bonus (stacked):** sum of 1+2+…+floor(total_level/100) added to Skill Score (e.g. 100 total = +1, 200 = +3, 500 = +15, 2100 = +231).
 - **SpoopScore:** Boss Score + Skill Score (sum over all non-overall skills), from latest snapshot. Used for the homepage bar chart and character page header.
 
 ---
