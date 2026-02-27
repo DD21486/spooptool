@@ -463,6 +463,28 @@
         favoriteBossBg.classList.add('hidden');
       }
     }
+    const favoriteSkillBg = document.getElementById('favorite-skill-bg');
+    const favoriteSkillBgImg = document.getElementById('favorite-skill-bg-img');
+    if (favoriteSkillBg && favoriteSkillBgImg) {
+      const skillEntriesByXp = Object.entries(skills)
+        .filter(([key]) => key !== 'overall')
+        .map(([key, s]) => {
+          const xp = s && (s.xp != null ? s.xp : s.experience) != null ? (s.xp != null ? s.xp : s.experience) : 0;
+          const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? xp : (parseInt(xp, 10) || 0);
+          return [key, xpNum];
+        })
+        .sort((a, b) => b[1] - a[1]);
+      if (skillEntriesByXp.length > 0 && skillEntriesByXp[0][1] > 0) {
+        const [favoriteSkillKey] = skillEntriesByXp[0];
+        favoriteSkillBgImg.src = skillIconSrc(favoriteSkillKey);
+        favoriteSkillBgImg.onerror = function () { favoriteSkillBg.classList.add('hidden'); };
+        favoriteSkillBg.classList.remove('hidden');
+      } else {
+        favoriteSkillBgImg.removeAttribute('src');
+        favoriteSkillBgImg.onerror = null;
+        favoriteSkillBg.classList.add('hidden');
+      }
+    }
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
       const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
@@ -477,8 +499,8 @@
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${skillLabel(bossKey)}</span></div></td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
-        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(bossScore)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
+        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(bossScore)}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
         <td class="px-2 py-2 text-right">${chartIconBoss}</td>
       </tr>`;
