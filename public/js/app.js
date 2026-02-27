@@ -82,11 +82,15 @@
   const tabWeek = document.getElementById('tab-week');
   const tabToday = document.getElementById('tab-today');
   const tabLast24 = document.getElementById('tab-last24');
+  const spoopChartAll = document.getElementById('spoop-chart-all');
+  const spoopChartBoss = document.getElementById('spoop-chart-boss');
+  const spoopChartSkill = document.getElementById('spoop-chart-skill');
   const leftValueTh = document.getElementById('left-value-th');
   const rightValueTh = document.getElementById('right-value-th');
   const lootValueTh = document.getElementById('loot-value-th');
 
   let homeViewMode = 'last24';
+  let spoopChartMode = 'all';
   let last24hDeltas = {};
   let todayDeltas = {};
   let weekDeltas = {};
@@ -358,6 +362,83 @@
     return typeof n === 'number' ? n : 0;
   }
 
+  function normalizeBossKeyForPoints(key) {
+    return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
+  }
+  const BOSS_POINTS = {
+    wintertodt: 1, kraken: 1,
+    tempoross: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
+    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3, the_hueycoatl: 3, hueycoatl: 3, the_royal_titans: 3, royal_titans: 3, royaltitans: 3,
+    dagannoth_prime: 4, dagannothprime: 4, dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, moons_of_peril: 4, skotizo: 4, sarachnis: 4,
+    crystalline_hunllef: 5, abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, krilsutsaroth: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, tombs_of_amascut: 5, tombsofamascut: 5, venenatis: 5, vorkath: 5, zalcano: 5, zulrah: 5, chaos_elemental: 5, chaoselemental: 5, scorpia: 5,
+    kalphite_queen: 6, kalphitequeen: 6, kreearra: 6, corporeal_beast: 6, corporealbeast: 6, phantom_muspah: 6, phantommuspah: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, tombs_of_amascut_expert_mode: 6, tombsofamascutexpertmode: 6, alchemical_hydra: 6, alchemicalhydra: 6,
+    corrupted_hunllef: 7, corruptedhunllef: 7, the_leviathan: 7, leviathan: 7, the_whisperer: 7, whisperer: 7, the_mimic: 7, mimic: 7, chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, vardorvis: 7, yama: 7,
+    theatre_of_blood: 8, theatreofblood: 8, phosanis_nightmare: 8, phosanisnightmare: 8, nex: 8,
+    tzhaar_ket_raks_challenges: 9,
+    theatre_of_blood_hard_mode: 10,
+    doom_of_mokhaiotl: 14, doomofmokhaiotl: 14,
+    fortis_colosseum: 25, tzkal_zuk: 25, tzkalzuk: 25,
+  };
+  const FIRST_KILL_BONUS = 10;
+  function computeBossPointsForPeriod(deltas, player) {
+    if (deltas && deltas.bossDeltas && typeof deltas.bossDeltas === 'object') {
+      let sum = 0;
+      for (const [bossKey, delta] of Object.entries(deltas.bossDeltas)) {
+        const count = typeof delta === 'number' && !Number.isNaN(delta) ? delta : 0;
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        sum += count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
+      }
+      return sum;
+    }
+    if (player && player.bosses && typeof player.bosses === 'object') {
+      let sum = 0;
+      for (const [bossKey, b] of Object.entries(player.bosses)) {
+        const count = b && (b.count != null ? b.count : b.kc);
+        const n = typeof count === 'number' && !Number.isNaN(count) ? count : 0;
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        sum += n * pts + (n >= 1 ? FIRST_KILL_BONUS : 0);
+      }
+      return sum;
+    }
+    return 0;
+  }
+
+  const POINTS_PER_10K_XP = 0.5;
+  const SKILL_DIFFICULTY_RANK = {
+    runecraft: 1, slayer: 2, agility: 3, mining: 4, woodcutting: 5, fishing: 6, smithing: 7,
+    defence: 8, attack: 9, strength: 10, hitpoints: 11, ranged: 12, magic: 13, farming: 14,
+    herblore: 15, crafting: 16, thieving: 17, hunter: 18, construction: 19, prayer: 20,
+    firemaking: 21, cooking: 22, fletching: 23,
+  };
+  function getDifficultyBonusFor99(skillKey) {
+    if (!skillKey || skillKey === 'overall') return 0;
+    const rank = SKILL_DIFFICULTY_RANK[String(skillKey).toLowerCase()];
+    if (rank == null) return 0;
+    return Math.round(1000 - (700 * (rank - 1)) / 22);
+  }
+  function skillPointsForLevel(level, xp, skillKey) {
+    const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
+    let pts = L * 15;
+    if (L >= 70) pts += 100;
+    if (L >= 80) pts += 200;
+    if (L >= 93) pts += 500;
+    if (L >= 99) pts += 2500;
+    const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
+    pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
+    if (L >= 99 && skillKey) pts += getDifficultyBonusFor99(skillKey);
+    return pts;
+  }
+  function totalSkillingScore(skills) {
+    if (!skills || typeof skills !== 'object') return 0;
+    return Object.entries(skills).reduce((sum, [key, s]) => {
+      if (key === 'overall') return sum;
+      if (!s || typeof s !== 'object') return sum;
+      const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
+      return sum + skillPointsForLevel(level, xp, key);
+    }, 0);
+  }
+
   function renderLoot() {
     if (!lootTbody || !lootLoading) return;
     lootLoading.classList.add('hidden');
@@ -396,6 +477,79 @@
     });
   }
 
+  /** SpoopScore = total boss points (with first-kill bonus) + total skill score from current snapshot. */
+  function paintSpoopScoreChart() {
+    const canvas = document.getElementById('spoop-score-chart');
+    if (!canvas || typeof Chart === 'undefined') return;
+    if (homeChartSpoopScore) {
+      homeChartSpoopScore.destroy();
+      homeChartSpoopScore = null;
+    }
+    const valueKey = spoopChartMode === 'boss' ? 'bossScore' : spoopChartMode === 'skill' ? 'skillScore' : 'spoopScore';
+    const datasetLabel = spoopChartMode === 'boss' ? 'Boss Score' : spoopChartMode === 'skill' ? 'Skill Score' : 'SpoopScore';
+    const rows = (characterList || []).map((username) => {
+      const player = playerData[username];
+      const bossScore = computeBossPointsForPeriod(null, player);
+      const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
+      const b = bossScore || 0;
+      const s = skillScore || 0;
+      return { username, spoopScore: b + s, bossScore: b, skillScore: s };
+    });
+    rows.sort((a, b) => b[valueKey] - a[valueKey]);
+    const labels = rows.map((r) => r.username);
+    const data = rows.map((r) => r[valueKey]);
+    if (labels.length === 0) return;
+    homeChartSpoopScore = new Chart(canvas.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels,
+        datasets: [{
+          label: datasetLabel,
+          data,
+          backgroundColor: 'rgba(56, 189, 248, 0.6)',
+          borderColor: 'rgb(56, 189, 248)',
+          borderWidth: 1,
+        }],
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        maintainAspectRatio: false,
+        elements: {
+          bar: {
+            borderRadius: { topRight: 4, bottomRight: 4, topLeft: 0, bottomLeft: 0 },
+          },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => {
+                const r = rows[ctx.dataIndex];
+                return [
+                  'Total: ' + formatNum(ctx.raw),
+                  'Boss: ' + formatNum(r.bossScore),
+                  'Skill: ' + formatNum(r.skillScore),
+                ];
+              },
+            },
+          },
+        },
+        scales: {
+          x: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: { color: '#94a3b8', callback: (v) => formatNum(Number(v)), font: { size: 10 } },
+          },
+          y: {
+            grid: { display: false },
+            ticks: { color: '#94a3b8', font: { size: 13, weight: 'bold' }, autoSkip: false },
+          },
+        },
+      },
+    });
+  }
+
   function renderRight() {
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
@@ -416,13 +570,16 @@
     }
     const rows = characterList.map(username => {
       const d = deltaSource[username];
+      const player = playerData[username];
       const kcDelta = isDelta && d
         ? (bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : d.bossKcDelta)
         : 0;
+      const bossPoints = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
       return {
         username,
-        kc: getRightBossKc(playerData[username], bossKey),
+        kc: getRightBossKc(player, bossKey),
         kcDelta: kcDelta != null ? kcDelta : 0,
+        bossPoints,
       };
     });
     if (isDelta) {
@@ -433,9 +590,11 @@
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
-      const displayValue = isDelta
+      const kcDisplay = isDelta
         ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
         : formatNum(r.kc);
+      const pointsSuffix = typeof r.bossPoints === 'number' ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)})</span>` : '';
+      const displayValue = kcDisplay + pointsSuffix;
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
       rightTbody.appendChild(tr);
@@ -738,6 +897,7 @@
       renderLeft();
       renderRight();
       renderLoot();
+      paintSpoopScoreChart();
       renderActivity(data.activity || []);
       loadHomeCharts();
     } catch (e) {
@@ -820,6 +980,8 @@
       populateFilterBoss();
       renderLeft();
       renderRight();
+      renderLoot();
+      paintSpoopScoreChart();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -833,6 +995,7 @@
   let homeChartXp = null;
   let homeChartBoss = null;
   let homeChartLoot = null;
+  let homeChartSpoopScore = null;
   let cachedHomeHistory = null;
   let cachedLootHistory = null;
   let lootLeaderboardTotal = [];
@@ -1304,6 +1467,7 @@
     renderLeft();
     renderRight();
     renderLoot();
+    paintSpoopScoreChart();
     if (mode === 'today') {
       if (cachedHomeHistoryToday != null) {
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
@@ -1406,6 +1570,38 @@
   if (tabWeek) tabWeek.addEventListener('click', () => setHomeViewMode('week'));
   if (tabToday) tabToday.addEventListener('click', () => setHomeViewMode('today'));
   if (tabLast24) tabLast24.addEventListener('click', () => setHomeViewMode('last24'));
+
+  function setSpoopChartMode(mode) {
+    spoopChartMode = mode;
+    const isAll = mode === 'all';
+    const isBoss = mode === 'boss';
+    const isSkill = mode === 'skill';
+    if (spoopChartAll) {
+      spoopChartAll.classList.toggle('bg-sky-600', isAll);
+      spoopChartAll.classList.toggle('text-white', isAll);
+      spoopChartAll.classList.toggle('bg-slate-700', !isAll);
+      spoopChartAll.classList.toggle('text-slate-300', !isAll);
+      spoopChartAll.setAttribute('aria-selected', String(isAll));
+    }
+    if (spoopChartBoss) {
+      spoopChartBoss.classList.toggle('bg-sky-600', isBoss);
+      spoopChartBoss.classList.toggle('text-white', isBoss);
+      spoopChartBoss.classList.toggle('bg-slate-700', !isBoss);
+      spoopChartBoss.classList.toggle('text-slate-300', !isBoss);
+      spoopChartBoss.setAttribute('aria-selected', String(isBoss));
+    }
+    if (spoopChartSkill) {
+      spoopChartSkill.classList.toggle('bg-sky-600', isSkill);
+      spoopChartSkill.classList.toggle('text-white', isSkill);
+      spoopChartSkill.classList.toggle('bg-slate-700', !isSkill);
+      spoopChartSkill.classList.toggle('text-slate-300', !isSkill);
+      spoopChartSkill.setAttribute('aria-selected', String(isSkill));
+    }
+    paintSpoopScoreChart();
+  }
+  if (spoopChartAll) spoopChartAll.addEventListener('click', () => setSpoopChartMode('all'));
+  if (spoopChartBoss) spoopChartBoss.addEventListener('click', () => setSpoopChartMode('boss'));
+  if (spoopChartSkill) spoopChartSkill.addEventListener('click', () => setSpoopChartMode('skill'));
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);

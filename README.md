@@ -1,8 +1,9 @@
 # SpoopTool
 
-Private Old School RuneScape tool for you and your friends. Uses OSRS Hiscores data to show character stats, rankings (total XP + filters by skill or boss), and detailed character pages.
+Private Old School RuneScape tool for you and your friends. Uses OSRS Hiscores data to show character stats, rankings (total XP + filters by skill or boss), SpoopScore (Boss + Skill with 99 difficulty bonuses), loot from Dink, and detailed character pages.
 
-**Start here:** See [PLAN.md](./PLAN.md) for full scope, API research, and phased implementation.
+- **Full documentation:** [docs/TOOL_DOCUMENTATION.md](./docs/TOOL_DOCUMENTATION.md) – all features, how data is obtained, and how it’s saved in the database.
+- **Scope/planning:** [PLAN.md](./PLAN.md) – original scope, API research, and phased implementation.
 
 - **Name:** SpoopTool
 - **Repo:** [github.com/DD21486/spooptool](https://github.com/DD21486/spooptool)

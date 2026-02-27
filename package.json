@@ -3,8 +3,10 @@
   "version": "0.1.0",
   "description": "OSRS progress tracker for you and your friends",
   "private": true,
+  "packageManager": "npm@10.9.0",
   "scripts": {
-    "dev": "vercel dev",
+    "dev": "echo.",
+    "serve": "npx vercel dev",
     "build": "echo 'Static + serverless'",
     "deploy": "vercel"
   },

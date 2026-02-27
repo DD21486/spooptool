@@ -30,7 +30,6 @@
   const loadingEl = document.getElementById('loading');
   const contentEl = document.getElementById('content');
   const charName = document.getElementById('char-name');
-  const charMode = document.getElementById('char-mode');
   const lastUpdated = document.getElementById('last-updated');
   const skillsTbody = document.getElementById('skills-tbody');
   const bossesTbody = document.getElementById('bosses-tbody');
@@ -183,17 +182,63 @@
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
   }
 
+  /** Points per 10k XP (no cap); level 99 ~13M XP adds ~650, 200M adds 10000. */
+  const POINTS_PER_10K_XP = 0.5;
+
+  /** Difficulty rank 1 (hardest) = Runecraft → 23 (easiest) = Fletching. Used for 99 bonus only. */
+  const SKILL_DIFFICULTY_RANK = {
+    runecraft: 1, slayer: 2, agility: 3, mining: 4, woodcutting: 5, fishing: 6, smithing: 7,
+    defence: 8, attack: 9, strength: 10, hitpoints: 11, ranged: 12, magic: 13, farming: 14,
+    herblore: 15, crafting: 16, thieving: 17, hunter: 18, construction: 19, prayer: 20,
+    firemaking: 21, cooking: 22, fletching: 23,
+  };
+  /** Bonus for 99 in a skill: hardest = 1000, easiest = 300, linear scale. Only applied when level >= 99. */
+  function getDifficultyBonusFor99(skillKey) {
+    if (!skillKey || skillKey === 'overall') return 0;
+    const rank = SKILL_DIFFICULTY_RANK[String(skillKey).toLowerCase()];
+    if (rank == null) return 0;
+    return Math.round(1000 - (700 * (rank - 1)) / 22);
+  }
+
+  /** Skilling score for one skill: 15 per level, +100 at 70, +200 at 80, +500 at 93, +2500 at 99, +0.5 per 10k XP (no cap). If level 99, add difficulty bonus (1000 hardest → 300 easiest). */
+  function skillPointsForLevel(level, xp, skillKey) {
+    const L = typeof level === 'number' && !Number.isNaN(level) ? Math.max(0, Math.min(99, Math.floor(level))) : 0;
+    let pts = L * 15;
+    if (L >= 70) pts += 100;
+    if (L >= 80) pts += 200;
+    if (L >= 93) pts += 500;
+    if (L >= 99) pts += 2500;
+    const xpNum = typeof xp === 'number' && !Number.isNaN(xp) ? Math.max(0, Math.floor(xp)) : (xp != null ? Math.max(0, Math.floor(Number(xp))) : 0);
+    pts += Math.floor(xpNum / 10000) * POINTS_PER_10K_XP;
+    if (L >= 99 && skillKey) pts += getDifficultyBonusFor99(skillKey);
+    return pts;
+  }
+
+  function totalSkillingScore(skills) {
+    if (!skills || typeof skills !== 'object') return 0;
+    return Object.entries(skills).reduce((sum, [key, s]) => {
+      if (key === 'overall') return sum;
+      if (!s || typeof s !== 'object') return sum;
+      const level = s.level != null ? parseInt(s.level, 10) : NaN;
+      const xp = s.xp != null ? s.xp : (s.experience != null ? s.experience : 0);
+      return sum + skillPointsForLevel(level, xp, key);
+    }, 0);
+  }
+
   /** Boss name (normalized) -> points per kill. API may return "The Whisperer" or "Whisperer"; we map both forms where applicable. */
   const BOSS_POINTS = {
-    tempoross: 1, wintertodt: 1,
-    kraken: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
-    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, dagannoth_prime: 3, dagannothprime: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3,
-    dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, crystalline_hunllef: 4, the_hueycoatl: 4, hueycoatl: 4, moons_of_peril: 4, the_royal_titans: 4, royal_titans: 4, royaltitans: 4, skotizo: 4, sarachnis: 4,
-    abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, kalphite_queen: 5, kalphitequeen: 5, kreearra: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, theatre_of_blood: 5, theatreofblood: 5, tombs_of_amascut: 5, tombsofamascut: 5, tzhaar_ket_raks_challenges: 5, venenatis: 5, vorkath: 5, zalcano: 5,
-    chaos_elemental: 6, chaoselemental: 6, corporeal_beast: 6, corporealbeast: 6, corrupted_hunllef: 6, corruptedhunllef: 6, the_leviathan: 6, leviathan: 6, the_mimic: 6, mimic: 6, phosanis_nightmare: 6, phosanisnightmare: 6, phantom_muspah: 6, phantommuspah: 6, scorpia: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, the_whisperer: 6, whisperer: 6, zulrah: 6,
-    chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, doom_of_mokhaiotl: 7, doomofmokhaiotl: 7, fortis_colosseum: 7, vardorvis: 7, yama: 7, tombs_of_amascut_expert_mode: 7, tombsofamascutexpertmode: 7,
-    alchemical_hydra: 8, alchemicalhydra: 8, nex: 8, theatre_of_blood_hard_mode: 8,
-    tzkal_zuk: 12, tzkalzuk: 12,
+    wintertodt: 1, kraken: 1,
+    tempoross: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
+    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3, the_hueycoatl: 3, hueycoatl: 3, the_royal_titans: 3, royal_titans: 3, royaltitans: 3,
+    dagannoth_prime: 4, dagannothprime: 4, dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, moons_of_peril: 4, skotizo: 4, sarachnis: 4,
+    crystalline_hunllef: 5, abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, krilsutsaroth: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, tombs_of_amascut: 5, tombsofamascut: 5, venenatis: 5, vorkath: 5, zalcano: 5, zulrah: 5, chaos_elemental: 5, chaoselemental: 5, scorpia: 5,
+    kalphite_queen: 6, kalphitequeen: 6, kreearra: 6, corporeal_beast: 6, corporealbeast: 6, phantom_muspah: 6, phantommuspah: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, tombs_of_amascut_expert_mode: 6, tombsofamascutexpertmode: 6, alchemical_hydra: 6, alchemicalhydra: 6,
+    corrupted_hunllef: 7, corruptedhunllef: 7, the_leviathan: 7, leviathan: 7, the_whisperer: 7, whisperer: 7, the_mimic: 7, mimic: 7, chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, vardorvis: 7, yama: 7,
+    theatre_of_blood: 8, theatreofblood: 8, phosanis_nightmare: 8, phosanisnightmare: 8, nex: 8,
+    tzhaar_ket_raks_challenges: 9,
+    theatre_of_blood_hard_mode: 10,
+    doom_of_mokhaiotl: 14, doomofmokhaiotl: 14,
+    fortis_colosseum: 25, tzkal_zuk: 25, tzkalzuk: 25,
   };
 
   // OSRS cumulative XP table (same as wiki Module:Experience/data). Used for XP-to-next when API doesn't send it.
@@ -235,11 +280,35 @@
     errorEl.classList.toggle('hidden', !msg);
   }
 
+  function setupBossScoreTooltipHover(tooltipEl) {
+    const wrap = document.getElementById('stat-boss-score-wrap');
+    if (!wrap || !tooltipEl || wrap.dataset.bossScoreTooltipBound === '1') return;
+    wrap.dataset.bossScoreTooltipBound = '1';
+    wrap.addEventListener('mouseenter', function () {
+      tooltipEl.classList.remove('hidden');
+      tooltipEl.setAttribute('aria-hidden', 'false');
+      const rect = wrap.getBoundingClientRect();
+      requestAnimationFrame(function () {
+        const ttRect = tooltipEl.getBoundingClientRect();
+        let left = rect.left + rect.width / 2 - ttRect.width / 2;
+        let top = rect.bottom + 6;
+        if (left < 8) left = 8;
+        if (left + ttRect.width > window.innerWidth - 8) left = window.innerWidth - ttRect.width - 8;
+        if (top + ttRect.height > window.innerHeight - 8) top = rect.top - ttRect.height - 6;
+        tooltipEl.style.left = left + 'px';
+        tooltipEl.style.top = top + 'px';
+      });
+    });
+    wrap.addEventListener('mouseleave', function () {
+      tooltipEl.classList.add('hidden');
+      tooltipEl.setAttribute('aria-hidden', 'true');
+    });
+  }
+
   function render(data) {
     if (!data) return;
     document.title = (data.name || name) + ' – SpoopTool';
     charName.textContent = data.name || name;
-    charMode.textContent = (data.mode || 'main').replace(/\b\w/g, c => c.toUpperCase());
     const lastCapture = getLastCronRunInNY();
     lastUpdated.textContent = 'Last capture: ' + lastCapture;
 
@@ -262,15 +331,46 @@
     const statBossKillsEl = document.getElementById('stat-boss-kills');
     if (statBossKillsEl) statBossKillsEl.textContent = formatNum(totalBossKills);
 
+    const FIRST_KILL_BONUS = 10;
     const totalBossPoints = Object.entries(bosses).reduce((sum, [bossKey, b]) => {
       if (!b || typeof b !== 'object') return sum;
       const kc = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
       const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
       const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
-      return sum + count * pts;
+      return sum + count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
     }, 0);
     const bossPointsEl = document.getElementById('boss-points-total');
     if (bossPointsEl) bossPointsEl.textContent = formatNum(totalBossPoints);
+    const statBossScoreEl = document.getElementById('stat-boss-score');
+    if (statBossScoreEl) statBossScoreEl.textContent = formatNum(totalBossPoints);
+
+    const totalSkillingPoints = totalSkillingScore(skills);
+    const statSkillingScoreEl = document.getElementById('stat-skilling-score');
+    if (statSkillingScoreEl) statSkillingScoreEl.textContent = formatNum(totalSkillingPoints);
+
+    const spoopScore = totalBossPoints + totalSkillingPoints;
+    const spoopScoreEl = document.getElementById('spoop-score');
+    if (spoopScoreEl) spoopScoreEl.textContent = formatNum(spoopScore);
+
+    const bossScoreBreakdown = Object.entries(bosses)
+      .filter(([, b]) => b && typeof b === 'object' && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
+      .map(([bossKey, b]) => {
+        const count = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
+        const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+        const total = count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
+        return { name: skillLabel(bossKey), count, pts, total };
+      })
+      .filter((r) => r.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 10);
+    const bossScoreTooltipContent = document.getElementById('boss-score-tooltip-content');
+    const bossScoreTooltip = document.getElementById('boss-score-tooltip');
+    if (bossScoreTooltipContent) {
+      bossScoreTooltipContent.innerHTML = bossScoreBreakdown.length === 0
+        ? '<span class="text-slate-500">No boss kills</span>'
+        : bossScoreBreakdown.map((r) => '<div class="whitespace-nowrap">' + escapeHtml(r.name) + ': ' + formatNum(r.count) + ' × ' + r.pts + ' = ' + formatNum(r.total) + '</div>').join('');
+    }
+    setupBossScoreTooltipHover(bossScoreTooltip);
 
     const luckScore = typeof data.luckScore === 'number' ? data.luckScore : 0;
     const luckNeedle = document.getElementById('luck-needle');
@@ -316,6 +416,7 @@
         ? `<div class="mt-1 h-1 w-32 rounded-full bg-slate-600 overflow-hidden"><div class="h-full rounded-full bg-sky-500" style="width:${Math.min(100, Math.max(0, pct))}%"></div></div>`
         : '';
       const rank = (s && s.rank != null) ? s.rank : '—';
+      const skillScoreForRow = key === 'overall' ? totalSkillingPoints : skillPointsForLevel(levelNum, xp, key);
       const skillDelta = characterDeltas.skillDeltas[key];
       const skillDeltaMonth = characterDeltasMonth.skillDeltas[key];
       const last24Skill = skillDelta != null && skillDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(skillDelta)}</span>` : '—';
@@ -330,6 +431,7 @@
         <td class="px-4 py-2 text-right font-mono align-top">
           <div class="flex flex-col items-end"><div>${xpToNextDisplay}</div>${progressBar ? progressBar : ''}</div>
         </td>
+        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(skillScoreForRow)}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
         <td class="px-2 py-2 text-right">${chartIcon}</td>
       </tr>`;
@@ -340,6 +442,9 @@
       .sort((a, b) => (b[1].count ?? b[1].kc ?? 0) - (a[1].count ?? a[1].kc ?? 0));
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
+      const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
+      const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
+      const bossScore = count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
       const rank = (b.rank != null) ? b.rank : '—';
       const bossDelta = characterDeltas.bossDeltas[bossKey];
       const last24Boss = bossDelta != null && bossDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(bossDelta)}</span>` : '—';
@@ -349,11 +454,12 @@
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
         <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${skillLabel(bossKey)}</span></div></td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
+        <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(bossScore)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right text-slate-500">${formatNum(rank)}</td>
         <td class="px-2 py-2 text-right">${chartIconBoss}</td>
       </tr>`;
-    }).join('') || '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
+    }).join('') || '<tr><td colspan="6" class="px-4 py-6 text-slate-500 text-center">No boss kills recorded</td></tr>';
 
     if (lootTotalDrops) lootTotalDrops.textContent = '—';
     if (lootTotalValue) lootTotalValue.textContent = '—';
@@ -720,6 +826,89 @@
       chartInstance = null;
     }
   }
+
+  function buildBossScoreListHtml() {
+    const byPts = {};
+    Object.entries(BOSS_POINTS).forEach(([key, pts]) => {
+      if (!byPts[pts]) byPts[pts] = [];
+      byPts[pts].push(key);
+    });
+    const lines = [];
+    [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 14, 25].forEach((pts) => {
+      if (!byPts[pts]) return;
+      const seen = new Set();
+      const names = byPts[pts]
+        .map((k) => ({ raw: k, display: skillLabel(k), norm: skillLabel(k).toLowerCase().replace(/\s+/g, '') }))
+        .filter(({ norm }) => {
+          if (seen.has(norm)) return false;
+          seen.add(norm);
+          return true;
+        })
+        .map(({ display }) => display)
+        .sort((a, b) => a.localeCompare(b));
+      lines.push(pts + ' pt' + (pts !== 1 ? 's' : '') + ': ' + names.join(', '));
+    });
+    return lines.map((line) => '<div>' + escapeHtml(line) + '</div>').join('');
+  }
+
+  function openScoringModal(tab) {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    const listEl = document.getElementById('scoring-boss-list');
+    const bossScoreTooltip = document.getElementById('boss-score-tooltip');
+    if (bossScoreTooltip) { bossScoreTooltip.classList.add('hidden'); bossScoreTooltip.setAttribute('aria-hidden', 'true'); }
+    if (listEl) listEl.innerHTML = buildBossScoreListHtml();
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+    setScoringTab(tab || 'boss');
+  }
+
+  function closeScoringModal() {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+  }
+
+  function setScoringTab(tab) {
+    document.querySelectorAll('.scoring-tab').forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('border-sky-500', isActive);
+      btn.classList.toggle('border-transparent', !isActive);
+      btn.classList.toggle('bg-slate-800', true);
+      btn.classList.toggle('text-sky-400', isActive);
+      btn.classList.toggle('text-slate-400', !isActive);
+    });
+    document.querySelectorAll('.scoring-tab-panel').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.id !== 'scoring-tab-' + tab);
+    });
+  }
+
+  const scoringModalOpen = document.getElementById('scoring-modal-open');
+  if (scoringModalOpen) scoringModalOpen.addEventListener('click', () => openScoringModal('boss'));
+  const statBossScoreWrap = document.getElementById('stat-boss-score-wrap');
+  if (statBossScoreWrap) {
+    statBossScoreWrap.addEventListener('click', (e) => { e.preventDefault(); openScoringModal('boss'); });
+    statBossScoreWrap.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openScoringModal('boss'); } });
+  }
+  const statSkillScoreWrap = document.getElementById('stat-skill-score-wrap');
+  if (statSkillScoreWrap) {
+    statSkillScoreWrap.addEventListener('click', (e) => { e.preventDefault(); openScoringModal('skill'); });
+    statSkillScoreWrap.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openScoringModal('skill'); } });
+  }
+  const scoringModalClose = document.getElementById('scoring-modal-close');
+  if (scoringModalClose) scoringModalClose.addEventListener('click', closeScoringModal);
+  const scoringOverlay = document.getElementById('scoring-modal-overlay');
+  if (scoringOverlay) {
+    scoringOverlay.addEventListener('click', function (e) {
+      if (e.target === scoringOverlay) closeScoringModal();
+    });
+  }
+  document.querySelectorAll('.scoring-tab').forEach((btn) => {
+    btn.addEventListener('click', function () { setScoringTab(this.getAttribute('data-tab')); });
+  });
 
   document.getElementById('chart-modal-close').addEventListener('click', closeChartModal);
   document.getElementById('chart-modal').addEventListener('click', (e) => { if (e.target.id === 'chart-modal') closeChartModal(); });

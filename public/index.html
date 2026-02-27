@@ -15,14 +15,36 @@
       font-family: ui-monospace, monospace;
       font-size: clamp(0.35rem, 1.5vw, 0.6rem);
       line-height: 1.2;
-      color: #94a3b8;
       white-space: pre;
       overflow-x: auto;
       text-align: center;
     }
+    #ascii-title .ascii-gradient-inner {
+      background: linear-gradient(90deg, #3b82f6, #06b6d4, #14b8a6, #10b981, #8b5cf6, #a855f7, #3b82f6);
+      background-size: 300% 100%;
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      color: transparent;
+      animation: ascii-gradient 6s ease-in-out infinite;
+    }
+    /* Chrome doesn't paint background-clip:text when text is in child elements; use solid color so art is visible */
+    #ascii-title.ascii-chrome .ascii-gradient-inner {
+      background: none;
+      background-image: none;
+      -webkit-text-fill-color: #38bdf8;
+      color: #38bdf8;
+      animation: none;
+    }
+    @keyframes ascii-gradient {
+      0%, 100% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+    }
     #ascii-title .ascii-char {
       opacity: 0;
       animation: ascii-fade-in 0.08s ease-out forwards;
+      color: inherit;
+      -webkit-text-fill-color: inherit;
     }
     @keyframes ascii-fade-in {
       to { opacity: 1; }
@@ -114,6 +136,8 @@
           ' \\______/ |__/       \\______/  \\______/ |__/         |__/   \\______/  \\______/ |________/      '
         ];
         var el = document.getElementById('ascii-title');
+        if (!el) return;
+        if (/Chrome/.test(navigator.userAgent)) el.classList.add('ascii-chrome');
         var durationMs = 3000;
         var html = '';
         function esc(c) { return c === '&' ? '&amp;' : c === '<' ? '&lt;' : c === '>' ? '&gt;' : c; }
@@ -125,7 +149,7 @@
           }
           if (i < lines.length - 1) html += '\n';
         }
-        el.innerHTML = html;
+        el.innerHTML = '<span class="ascii-gradient-inner">' + html + '</span>';
 
         var allChars = el.querySelectorAll('.ascii-char');
         var visibleChars = [];
@@ -262,6 +286,24 @@
       </section>
     </div>
     </div>
+
+    <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="SpoopScore leaderboard">
+      <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+        <h2 class="flex items-center">
+          <img src="/assets/spoopscore.png" alt="SpoopScore" class="h-7 object-contain" />
+        </h2>
+        <div class="flex items-center gap-1" role="tablist" aria-label="SpoopScore chart value">
+          <button type="button" id="spoop-chart-all" role="tab" aria-selected="true" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-600 text-white">All</button>
+          <button type="button" id="spoop-chart-boss" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Boss Score</button>
+          <button type="button" id="spoop-chart-skill" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Skill Score</button>
+        </div>
+      </div>
+      <div class="px-4 py-4">
+        <div class="min-h-[280px]">
+          <canvas id="spoop-score-chart"></canvas>
+        </div>
+      </div>
+    </section>
 
     <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="Recent activity">
       <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Recent activity</h2>
