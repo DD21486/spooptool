@@ -1,0 +1,69 @@
+/**
+ * GET /api/location
+ * Returns current player locations (Live Location Sharing plugin compatible).
+ * Auth: header Authorization must match LOCATION_SHARED_KEY.
+ * Only returns rows updated in the last 10 seconds.
+ */
+const { neon } = require('@neondatabase/serverless');
+
+const STALE_MS = 10 * 1000;
+
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+}
+
+function auth(req) {
+  const key = process.env.LOCATION_SHARED_KEY;
+  if (!key || key.trim() === '') return { ok: false, reason: 'LOCATION_SHARED_KEY not set' };
+  const header = req.headers.authorization || req.headers.Authorization;
+  if (!header || header !== key) return { ok: false, reason: 'Invalid or missing Authorization' };
+  return { ok: true };
+}
+
+function send500(res, detail) {
+  return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
+}
+
+module.exports = async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  const a = auth(req);
+  if (!a.ok) return res.status(401).json({ error: a.reason });
+
+  try {
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
+      return send500(res, 'DATABASE_URL is not set.');
+    }
+    const sql = neon(process.env.DATABASE_URL);
+    const since = new Date(Date.now() - STALE_MS);
+    const rows = await sql`
+      SELECT name, x, y, plane, world, type, title, updated_at
+      FROM location_updates
+      WHERE updated_at > ${since}
+      ORDER BY name
+    `;
+    const out = rows.map((r) => ({
+      name: r.name,
+      x: r.x,
+      y: r.y,
+      plane: r.plane,
+      type: r.type || '',
+      title: r.title || '',
+      world: r.world,
+      timestamp: new Date(r.updated_at).getTime(),
+    }));
+    res.setHeader('Cache-Control', 'no-store');
+    return res.status(200).json(out);
+  } catch (err) {
+    console.error('/api/location', err);
+    const msg = (err.message || String(err)).replace(/postgresql:\/\/[^@]+@/gi, '***@');
+    const detail = msg.toLowerCase().includes('does not exist') && msg.toLowerCase().includes('location_updates')
+      ? 'Run sql/migration_location_updates.sql in Neon SQL Editor to create the table.'
+      : msg;
+    return send500(res, detail);
+  }
+};
