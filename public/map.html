@@ -119,6 +119,8 @@
       var IMG_HEIGHT = 4912;
       var INIT_VIEW = [3162, 3451];
       var INIT_ZOOM = 2;
+      var CALIBRATION_OFFSET_X = -30;
+      var CALIBRATION_OFFSET_Y = 122;
 
       var map = null;
       var markersLayer = null;
@@ -163,8 +165,10 @@
       }
 
       function gameToLatLng(x, y) {
-        var lat = (y - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
-        var lng = (x - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
+        var xCal = x + CALIBRATION_OFFSET_X;
+        var yCal = y + CALIBRATION_OFFSET_Y;
+        var lat = (yCal - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
+        var lng = (xCal - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
         return L.latLng(lat, lng);
       }
 
