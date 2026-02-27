@@ -25,28 +25,43 @@
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
     }
+    #osrs-map-wrap {
+      aspect-ratio: 16/10;
+      min-height: 320px;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+    }
+    #osrs-map-iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
-  <div class="max-w-2xl mx-auto px-4 py-6">
+  <div class="max-w-4xl mx-auto px-4 py-6">
     <header class="flex items-center justify-between gap-4 mb-6">
       <a href="/" class="text-sky-400 hover:underline text-sm">← SpoopTool</a>
     </header>
 
     <h1 class="text-xl font-bold text-slate-100 mb-2">Clan map</h1>
-    <p class="text-slate-500 text-sm mb-6">Live locations from the RuneLite Live Location Sharing plugin. Add your API key below to see who's online.</p>
+    <p class="text-slate-500 text-sm mb-4">Live locations from the RuneLite Live Location Sharing plugin. The map centers on Spoopspooply when you're online.</p>
 
-    <div class="mb-6">
-      <label for="map-api-key" class="block text-slate-400 text-sm mb-1">Shared key (optional)</label>
-      <input type="password" id="map-api-key" placeholder="Paste your LOCATION_SHARED_KEY" autocomplete="off"
-        class="w-full rounded-lg border border-slate-600 bg-slate-800 text-slate-200 px-3 py-2 text-sm placeholder-slate-500 focus:border-sky-500 focus:ring-1 focus:ring-sky-500" />
-      <p class="text-slate-500 text-xs mt-1">Stored in this browser only. Same value you set in the plugin and in Vercel (LOCATION_SHARED_KEY).</p>
-    </div>
+    <!-- OSRS world map (wiki) - centers on your location -->
+    <section class="mb-6">
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">OSRS world map</h2>
+      <div id="osrs-map-wrap">
+        <iframe id="osrs-map-iframe" title="OSRS World Map" src="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2"></iframe>
+      </div>
+      <p id="map-center-label" class="text-slate-500 text-xs mt-1">Centered on Lumbridge (no location data yet)</p>
+      <a id="map-open-tab" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs mt-1 inline-block">Open map in new tab</a>
+    </section>
 
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
       <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Locations</h2>
       <div id="locations-list" class="p-4">
-        <p id="locations-placeholder" class="text-slate-500 text-sm">No data yet. Install the Live Location Sharing plugin, set API Base URL to <span class="font-mono text-slate-400 break-all" id="api-url-example">—</span> and add the shared key above to see live positions here.</p>
+        <p id="locations-placeholder" class="text-slate-500 text-sm">No data yet. Install the Live Location Sharing plugin and set API Base URL to <span class="font-mono text-slate-400 break-all" id="api-url-example">—</span></p>
         <div id="locations-entries" class="space-y-3 hidden"></div>
         <p id="locations-error" class="text-red-400 text-sm hidden"></p>
       </div>
@@ -54,67 +69,77 @@
 
     <div class="stat-box-gradient">
       <div class="stat-box-gradient-inner">
-        <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5">Demo – Spoopspooply</p>
+        <p class="text-[10px] sm:text-xs text-slate-500 uppercase tracking-wide mb-0.5">Spoopspooply</p>
         <p id="demo-name" class="text-lg font-semibold text-slate-100">Spoopspooply</p>
         <p id="demo-coords" class="text-sm text-slate-400 font-mono mt-1">World — · (—, —, —)</p>
-        <p id="demo-hint" class="text-slate-500 text-xs mt-2">When the plugin is running and sending data, your live coords will appear above in the list and here if your RSN is Spoopspooply.</p>
       </div>
     </div>
   </div>
 
   <script>
     (function () {
-      var apiKeyInput = document.getElementById('map-api-key');
+      // Hardcoded key – same value as LOCATION_SHARED_KEY in Vercel / .env
+      var MAP_SHARED_KEY = 'REPLACE_WITH_YOUR_LOCATION_SHARED_KEY';
+
       var locationsPlaceholder = document.getElementById('locations-placeholder');
       var locationsEntries = document.getElementById('locations-entries');
       var locationsError = document.getElementById('locations-error');
       var demoName = document.getElementById('demo-name');
       var demoCoords = document.getElementById('demo-coords');
       var apiUrlExample = document.getElementById('api-url-example');
+      var mapIframe = document.getElementById('osrs-map-iframe');
+      var mapCenterLabel = document.getElementById('map-center-label');
+      var mapOpenTab = document.getElementById('map-open-tab');
 
-      var STORAGE_KEY = 'spooptool_map_shared_key';
       var POLL_MS = 5000;
+      var WIKI_MAP_BASE = 'https://maps.runescape.wiki/osrs/';
+      var DEFAULT_X = 3165;
+      var DEFAULT_Y = 3494;
+      var DEFAULT_PLANE = 0;
+      var MAP_ZOOM = 2;
 
       function getBaseUrl() {
         return window.location.origin;
       }
 
-      function getApiKey() {
-        return (apiKeyInput && apiKeyInput.value ? apiKeyInput.value : '').trim();
-      }
-
-      function loadStoredKey() {
-        try {
-          var k = localStorage.getItem(STORAGE_KEY);
-          if (k && apiKeyInput) apiKeyInput.value = k;
-        } catch (_) {}
-      }
-
-      function saveKey() {
-        var k = getApiKey();
-        try {
-          if (k) localStorage.setItem(STORAGE_KEY, k);
-          else localStorage.removeItem(STORAGE_KEY);
-        } catch (_) {}
-      }
-
       apiUrlExample.textContent = getBaseUrl() + '/api/location';
 
-      loadStoredKey();
-      if (apiKeyInput) apiKeyInput.addEventListener('input', saveKey);
-      if (apiKeyInput) apiKeyInput.addEventListener('change', saveKey);
+      function buildMapSrc(x, y, plane) {
+        var m = 0;
+        if (plane === 1) m = 0;
+        if (plane === 2) m = 0;
+        return WIKI_MAP_BASE + '?m=' + m + '&p=' + (plane || 0) + '&x=' + (x || DEFAULT_X) + '&y=' + (y || DEFAULT_Y) + '&z=' + MAP_ZOOM;
+      }
+
+      function centerMapOnPlayer(player) {
+        if (!player) return;
+        var x = player.x, y = player.y, plane = player.plane != null ? player.plane : 0;
+        var src = buildMapSrc(x, y, plane);
+        if (mapIframe) mapIframe.src = src;
+        if (mapCenterLabel) mapCenterLabel.textContent = 'Centered on ' + (player.name || 'you') + ' · World ' + (player.world || '—') + ' · (' + x + ', ' + y + ', ' + plane + ')';
+        if (mapOpenTab) mapOpenTab.href = src;
+      }
+
+      function setDefaultMap() {
+        var src = buildMapSrc(DEFAULT_X, DEFAULT_Y, DEFAULT_PLANE);
+        if (mapIframe) mapIframe.src = src;
+        if (mapCenterLabel) mapCenterLabel.textContent = 'Centered on Lumbridge (no location data yet)';
+        if (mapOpenTab) mapOpenTab.href = src;
+      }
 
       function renderList(data) {
         locationsError.classList.add('hidden');
         if (!data || data.length === 0) {
           locationsPlaceholder.classList.remove('hidden');
           locationsEntries.classList.add('hidden');
+          locationsEntries.innerHTML = '';
           demoName.textContent = 'Spoopspooply';
           demoCoords.textContent = 'World — · (—, —, —)';
+          setDefaultMap();
           return;
         }
         locationsPlaceholder.classList.add('hidden');
-        locationsEntries.classList.remove('hidden');
+        locationsEntries.classList.add('hidden');
         locationsEntries.innerHTML = '';
         data.forEach(function (p) {
           var div = document.createElement('div');
@@ -125,13 +150,17 @@
             (p.title ? '<p class="text-slate-500 text-xs mt-0.5">' + escapeHtml(p.title) + '</p>' : '');
           locationsEntries.appendChild(div);
         });
+        locationsEntries.classList.remove('hidden');
+
         var spoop = data.find(function (p) { return p.name && p.name.toLowerCase() === 'spoopspooply'; });
         if (spoop) {
           demoName.textContent = spoop.name;
           demoCoords.textContent = 'World ' + spoop.world + ' · (' + spoop.x + ', ' + spoop.y + ', ' + spoop.plane + ')';
+          centerMapOnPlayer(spoop);
         } else {
           demoName.textContent = 'Spoopspooply';
           demoCoords.textContent = 'Not in list (different RSN or offline)';
+          centerMapOnPlayer(data[0]);
         }
       }
 
@@ -148,18 +177,18 @@
         locationsEntries.innerHTML = '';
         locationsError.textContent = msg || 'Failed to load locations';
         locationsError.classList.remove('hidden');
+        setDefaultMap();
       }
 
       function fetchLocations() {
-        var key = getApiKey();
-        if (!key) {
+        if (!MAP_SHARED_KEY || MAP_SHARED_KEY === 'REPLACE_WITH_YOUR_LOCATION_SHARED_KEY') {
           renderList([]);
           return;
         }
         var url = getBaseUrl() + '/api/location';
         fetch(url, {
           method: 'GET',
-          headers: { 'Authorization': key }
+          headers: { 'Authorization': MAP_SHARED_KEY }
         })
           .then(function (res) {
             if (!res.ok) {
