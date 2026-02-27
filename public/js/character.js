@@ -449,6 +449,20 @@
     const bossEntries = Object.entries(bosses)
       .filter(([, b]) => b && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))
       .sort((a, b) => (b[1].count ?? b[1].kc ?? 0) - (a[1].count ?? a[1].kc ?? 0));
+    const favoriteBossBg = document.getElementById('favorite-boss-bg');
+    const favoriteBossBgImg = document.getElementById('favorite-boss-bg-img');
+    if (favoriteBossBg && favoriteBossBgImg) {
+      if (bossEntries.length > 0) {
+        const [favoriteBossKey] = bossEntries[0];
+        favoriteBossBgImg.src = bossImageSrc(favoriteBossKey);
+        favoriteBossBgImg.onerror = function () { favoriteBossBg.classList.add('hidden'); };
+        favoriteBossBg.classList.remove('hidden');
+      } else {
+        favoriteBossBgImg.removeAttribute('src');
+        favoriteBossBgImg.onerror = null;
+        favoriteBossBg.classList.add('hidden');
+      }
+    }
     bossesTbody.innerHTML = bossEntries.map(([bossKey, b]) => {
       const kc = b.count != null ? b.count : b.kc;
       const count = typeof kc === 'number' && !Number.isNaN(kc) ? kc : 0;
