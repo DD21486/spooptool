@@ -119,8 +119,8 @@
       var IMG_HEIGHT = 6528;
       var INIT_VIEW = [3162, 3451];
       var INIT_ZOOM = 2;
-      var CALIBRATION_OFFSET_X = 0;
-      var CALIBRATION_OFFSET_Y = 0;
+      var CALIBRATION_OFFSET_X = -24;
+      var CALIBRATION_OFFSET_Y = 123;
 
       var map = null;
       var markersLayer = null;
@@ -136,7 +136,7 @@
         map = L.map('map', {
           crs: L.CRS.Simple,
           minZoom: -5,
-          maxZoom: 5,
+          maxZoom: 10,
           maxBounds: bounds,
           maxBoundsViscosity: 1
         });
