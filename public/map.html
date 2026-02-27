@@ -101,6 +101,9 @@
       var BOUNDS_MAX_Y = 4160;
       var INIT_VIEW = [3162, 3451];
       var INIT_ZOOM = 2;
+      // Tune these if the marker is offset from your in-game position (negative X = west, positive Y = north)
+      var MAP_OFFSET_X = -350;
+      var MAP_OFFSET_Y = 200;
 
       var map = null;
       var markersLayer = null;
@@ -135,7 +138,7 @@
       }
 
       function gameToLatLng(x, y) {
-        return L.latLng(y, x);
+        return L.latLng(y + MAP_OFFSET_Y, x + MAP_OFFSET_X);
       }
 
       function updateMarkers(players) {
