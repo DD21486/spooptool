@@ -402,6 +402,50 @@
     }
     return 0;
   }
+  function buildScoringBossListHtml() {
+    const byPts = {};
+    Object.entries(BOSS_POINTS).forEach(([key, pts]) => {
+      if (!byPts[pts]) byPts[pts] = [];
+      const name = key.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      byPts[pts].push(name);
+    });
+    const sortedPts = Object.keys(byPts).map(Number).sort((a, b) => b - a);
+    const lines = sortedPts.map((pts) => {
+      const names = [...new Set(byPts[pts])].sort((a, b) => a.localeCompare(b));
+      return pts + ' pt' + (pts !== 1 ? 's' : '') + ': ' + names.join(', ');
+    });
+    return lines.map((line) => '<div>' + escapeHtml(line) + '</div>').join('');
+  }
+  function openScoringModal(tab) {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    const listEl = document.getElementById('scoring-boss-list');
+    if (listEl) listEl.innerHTML = buildScoringBossListHtml();
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      overlay.setAttribute('aria-hidden', 'false');
+    }
+    setScoringTab(tab || 'boss');
+  }
+  function closeScoringModal() {
+    const overlay = document.getElementById('scoring-modal-overlay');
+    if (overlay) {
+      overlay.classList.add('hidden');
+      overlay.setAttribute('aria-hidden', 'true');
+    }
+  }
+  function setScoringTab(tab) {
+    document.querySelectorAll('.scoring-tab').forEach((btn) => {
+      const isActive = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('border-sky-500', isActive);
+      btn.classList.toggle('border-transparent', !isActive);
+      btn.classList.toggle('bg-slate-800', true);
+      btn.classList.toggle('text-sky-400', isActive);
+      btn.classList.toggle('text-slate-400', !isActive);
+    });
+    document.querySelectorAll('.scoring-tab-panel').forEach((panel) => {
+      panel.classList.toggle('hidden', panel.id !== 'scoring-tab-' + tab);
+    });
+  }
 
   const POINTS_PER_10K_XP = 0.5;
   const SKILL_DIFFICULTY_RANK = {
@@ -1602,6 +1646,18 @@
   if (spoopChartAll) spoopChartAll.addEventListener('click', () => setSpoopChartMode('all'));
   if (spoopChartBoss) spoopChartBoss.addEventListener('click', () => setSpoopChartMode('boss'));
   if (spoopChartSkill) spoopChartSkill.addEventListener('click', () => setSpoopChartMode('skill'));
+
+  const spoopWtfLink = document.getElementById('spoop-wtf-link');
+  if (spoopWtfLink) spoopWtfLink.addEventListener('click', () => openScoringModal('boss'));
+  const scoringModalClose = document.getElementById('scoring-modal-close');
+  if (scoringModalClose) scoringModalClose.addEventListener('click', closeScoringModal);
+  const scoringOverlay = document.getElementById('scoring-modal-overlay');
+  if (scoringOverlay) scoringOverlay.addEventListener('click', function (e) {
+    if (e.target === scoringOverlay) closeScoringModal();
+  });
+  document.querySelectorAll('.scoring-tab').forEach((btn) => {
+    btn.addEventListener('click', function () { setScoringTab(this.getAttribute('data-tab')); });
+  });
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
   modalUsername.addEventListener('input', updateModalAddState);

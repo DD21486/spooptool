@@ -290,10 +290,13 @@
 
     <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="SpoopScore leaderboard">
       <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
-        <h2 class="flex items-center">
+        <h2 class="flex items-center shrink-0">
           <img src="/assets/spoopscore.png" alt="SpoopScore" class="h-7 object-contain" />
         </h2>
-        <div class="flex items-center gap-1" role="tablist" aria-label="SpoopScore chart value">
+        <div class="flex-1 flex justify-center min-w-0">
+          <button type="button" id="spoop-wtf-link" class="text-slate-400 hover:text-sky-400 text-sm font-medium focus:outline-none focus:underline">wtf is spoopscore?</button>
+        </div>
+        <div class="flex items-center gap-1 shrink-0" role="tablist" aria-label="SpoopScore chart value">
           <button type="button" id="spoop-chart-all" role="tab" aria-selected="true" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-sky-600 text-white">All</button>
           <button type="button" id="spoop-chart-boss" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Boss Score</button>
           <button type="button" id="spoop-chart-skill" role="tab" aria-selected="false" class="spoop-chart-toggle px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600">Skill Score</button>
@@ -327,6 +330,41 @@
   </div>
 
   <div id="home-value-tooltip" class="hidden fixed z-[100] min-w-[22rem] max-w-[28rem] rounded-lg border border-slate-600 bg-slate-800 px-4 py-2.5 text-sm text-slate-200 shadow-xl pointer-events-none" role="tooltip" aria-hidden="true"></div>
+
+  <!-- Scoring methods modal (SpoopScore explanation) -->
+  <div id="scoring-modal-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" aria-modal="true" aria-labelledby="scoring-modal-title" role="dialog">
+    <div class="bg-slate-800 rounded-xl border border-slate-600 shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col" id="scoring-modal">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-600">
+        <h2 id="scoring-modal-title" class="text-lg font-semibold text-slate-100">Scoring methods</h2>
+        <button type="button" id="scoring-modal-close" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>
+      </div>
+      <div class="flex border-b border-slate-600">
+        <button type="button" class="scoring-tab px-4 py-3 text-sm font-medium border-b-2 border-sky-500 bg-slate-800 text-sky-400" data-tab="boss">Boss Score</button>
+        <button type="button" class="scoring-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-400 hover:text-slate-200" data-tab="skill">Skill Score</button>
+      </div>
+      <div class="overflow-y-auto flex-1 px-4 py-4">
+        <div id="scoring-tab-boss" class="scoring-tab-panel text-sm text-slate-300 space-y-3">
+          <p>Your <strong class="text-slate-100">Boss Score</strong> is the sum of (kill count × points per kill) for each boss. Harder bosses are worth more points per kill. You also get <strong class="text-slate-100">+10 points</strong> for the first kill of each boss (once per boss).</p>
+          <p class="text-slate-400 text-xs">Points per kill by boss (grouped by value):</p>
+          <div id="scoring-boss-list" class="text-slate-300 text-xs font-mono space-y-1 max-h-80 overflow-y-auto"></div>
+        </div>
+        <div id="scoring-tab-skill" class="scoring-tab-panel hidden text-sm text-slate-300 space-y-3">
+          <p>Your <strong class="text-slate-100">Skill Score</strong> is the sum of points from all 23 skills (excluding Overall).</p>
+          <p>For each skill:</p>
+          <ul class="list-disc list-inside space-y-1 text-slate-400">
+            <li><span class="text-slate-300">15 points per level</span></li>
+            <li><span class="text-slate-300">+100</span> at level 70</li>
+            <li><span class="text-slate-300">+200</span> at level 80</li>
+            <li><span class="text-slate-300">+500</span> at level 93</li>
+            <li><span class="text-slate-300">+2,500</span> at level 99</li>
+            <li><span class="text-slate-300">+0.5</span> points per 10k XP (no cap; 13M ≈ +650, 200M = +10,000)</li>
+            <li>At <strong class="text-slate-200">99</strong>: extra difficulty bonus (hardest skill +1,000 → easiest +300, scaled by training difficulty)</li>
+          </ul>
+          <p class="text-slate-400">Example: 99 Runecraft (hardest) with 13M XP = 5,435 + 1,000 (difficulty) = <strong class="text-slate-200">6,435</strong>. 99 Fletching (easiest) = 5,435 + 300 = <strong class="text-slate-200">5,735</strong>.</p>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Settings modal (webhook URL) -->
   <div id="settings-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
