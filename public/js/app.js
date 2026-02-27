@@ -173,6 +173,8 @@
   const settingsWebhookInput = document.getElementById('settings-webhook-url');
   const settingsCopyBtn = document.getElementById('settings-copy-btn');
   const settingsCopyFeedback = document.getElementById('settings-copy-feedback');
+  const settingsTestLeaderboardBtn = document.getElementById('settings-test-leaderboard-btn');
+  const settingsTestLeaderboardFeedback = document.getElementById('settings-test-leaderboard-feedback');
   const btnSettings = document.getElementById('btn-settings');
   if (btnSettings && settingsModal) {
     btnSettings.addEventListener('click', function () {
@@ -186,6 +188,10 @@
           .catch(() => {});
       }
       if (settingsCopyFeedback) settingsCopyFeedback.classList.add('hidden');
+      if (settingsTestLeaderboardFeedback) {
+        settingsTestLeaderboardFeedback.classList.add('hidden');
+        settingsTestLeaderboardFeedback.textContent = '';
+      }
     });
   }
   const settingsModalClose = document.getElementById('settings-modal-close');
@@ -213,6 +219,34 @@
           setTimeout(function () { settingsCopyFeedback.classList.add('hidden'); }, 2000);
         }
       } catch (_) {}
+    });
+  }
+  if (settingsTestLeaderboardBtn && settingsTestLeaderboardFeedback) {
+    settingsTestLeaderboardBtn.addEventListener('click', function () {
+      settingsTestLeaderboardFeedback.classList.add('hidden');
+      settingsTestLeaderboardFeedback.textContent = '';
+      settingsTestLeaderboardBtn.disabled = true;
+      fetch(API + '/test-leaderboard-webhook')
+        .then((r) => r.json())
+        .then((d) => {
+          settingsTestLeaderboardBtn.disabled = false;
+          settingsTestLeaderboardFeedback.classList.remove('hidden');
+          if (d && d.ok) {
+            settingsTestLeaderboardFeedback.textContent = 'Test message sent! Check your Discord channel.';
+            settingsTestLeaderboardFeedback.classList.remove('text-red-400', 'text-amber-400');
+            settingsTestLeaderboardFeedback.classList.add('text-sky-400');
+          } else {
+            settingsTestLeaderboardFeedback.textContent = d && d.error ? d.error : 'Failed to send test.';
+            settingsTestLeaderboardFeedback.classList.remove('text-sky-400');
+            settingsTestLeaderboardFeedback.classList.add('text-amber-400');
+          }
+        })
+        .catch(function () {
+          settingsTestLeaderboardBtn.disabled = false;
+          settingsTestLeaderboardFeedback.classList.remove('hidden', 'text-sky-400');
+          settingsTestLeaderboardFeedback.classList.add('text-red-400');
+          settingsTestLeaderboardFeedback.textContent = 'Request failed. Check the console.';
+        });
     });
   }
 
