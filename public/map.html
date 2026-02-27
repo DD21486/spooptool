@@ -99,7 +99,7 @@
       var BOUNDS_MAX_X = 3968;
       var BOUNDS_MIN_Y = 2496;
       var BOUNDS_MAX_Y = 4160;
-      var INIT_VIEW = [3328, 2500];
+      var INIT_VIEW = [3162, 3451];
       var INIT_ZOOM = 2;
 
       var map = null;
@@ -124,8 +124,13 @@
           maxBoundsViscosity: 1
         });
         map.setView(L.latLng(INIT_VIEW[1], INIT_VIEW[0]), INIT_ZOOM);
-        var bg = L.rectangle(bounds, { color: '#334155', fillColor: '#1e293b', fillOpacity: 1, weight: 0 });
-        bg.addTo(map);
+        var mapImageUrl = 'https://oldschool.runescape.wiki/images/Old_School_RuneScape_world_map.png';
+        var imageLayer = L.imageOverlay(mapImageUrl, bounds, { opacity: 0.95 });
+        imageLayer.addTo(map);
+        imageLayer.on('error', function () {
+          var bg = L.rectangle(bounds, { color: '#334155', fillColor: '#1e293b', fillOpacity: 1, weight: 0 });
+          bg.addTo(map);
+        });
         markersLayer = L.layerGroup().addTo(map);
       }
 
