@@ -121,6 +121,9 @@
       var INIT_ZOOM = 2;
       var CALIBRATION_OFFSET_X = -24;
       var CALIBRATION_OFFSET_Y = 123;
+      var CALIBRATION_SCALE_X = 1;
+      var CALIBRATION_SCALE_Y = 1;
+      // Scale < 1 pulls markers toward map center (fixes drift that grows with distance)
 
       var map = null;
       var markersLayer = null;
@@ -167,8 +170,12 @@
       function gameToLatLng(x, y) {
         var xCal = x + CALIBRATION_OFFSET_X;
         var yCal = y + CALIBRATION_OFFSET_Y;
-        var lat = (yCal - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
-        var lng = (xCal - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
+        var lngRaw = (xCal - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
+        var latRaw = (yCal - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
+        var centerLng = IMG_WIDTH / 2;
+        var centerLat = IMG_HEIGHT / 2;
+        var lng = centerLng + (lngRaw - centerLng) * CALIBRATION_SCALE_X;
+        var lat = centerLat + (latRaw - centerLat) * CALIBRATION_SCALE_Y;
         return L.latLng(lat, lng);
       }
 
