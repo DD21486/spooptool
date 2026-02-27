@@ -11,7 +11,7 @@
 
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
-const { insertActivity, pruneTo30 } = require('../../lib/activity-log');
+const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
 
 /** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
 const DELAY_MS_BETWEEN_BATCHES = 1500;
@@ -149,7 +149,7 @@ module.exports = async function handler(req, res) {
       const description = parts.join(', ');
       await insertActivity(sql, { username: row.username, type: 'xp_kc', description });
     }
-    await pruneTo30(sql);
+    await pruneTo50(sql);
   } catch (activityErr) {
     console.error('activity_log xp_kc', activityErr?.message || activityErr);
   }

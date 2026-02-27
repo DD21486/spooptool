@@ -45,7 +45,7 @@ module.exports = async function handler(req, res) {
         SELECT at, username, type, description
         FROM activity_log
         ORDER BY at DESC
-        LIMIT 30
+        LIMIT 50
       `;
       activity = activityRows.map((a) => ({
         at: a.at,
