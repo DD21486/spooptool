@@ -62,6 +62,38 @@ function send500(res, detail) {
   return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
 }
 
+/** GET /api/loot-icon?id=123 — proxy OSRS item sprite (merged into /api/loot?icon=1 for serverless count). */
+const LOOT_SPRITE_URLS = [
+  (id) => 'https://chisel.weirdgloop.org/static/img/osrs-sprite/' + id + '.png',
+  (id) => 'https://chisel.weirdgloop.org/rsc/config/config18.jag/sprites/' + id + '.png',
+];
+const TRANSPARENT_1X1_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+  'base64'
+);
+async function handleLootIcon(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  const id = req.query.id != null ? parseInt(req.query.id, 10) : NaN;
+  if (Number.isNaN(id) || id < 0) return res.status(400).end();
+  for (const urlFn of LOOT_SPRITE_URLS) {
+    try {
+      const url = urlFn(id);
+      const resp = await fetch(url, { headers: { Accept: 'image/png, image/*' } });
+      if (resp.ok) {
+        const buf = await resp.arrayBuffer();
+        res.setHeader('Content-Type', 'image/png');
+        res.setHeader('Cache-Control', 'public, max-age=86400');
+        return res.end(Buffer.from(buf));
+      }
+    } catch (_) {
+      continue;
+    }
+  }
+  res.setHeader('Content-Type', 'image/png');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  return res.status(200).end(TRANSPARENT_1X1_PNG);
+}
+
 const DISCORD_BIG_DROP_THRESHOLD_GP = 300_000;
 
 /**
@@ -119,6 +151,9 @@ async function sendBigDropToDiscord(webhookUrl, { username, items, source, killC
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if (req.method === 'GET' && (req.query.icon === '1' || req.query.icon === 'true')) {
+    return handleLootIcon(req, res);
+  }
   if (req.method !== 'GET' && req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

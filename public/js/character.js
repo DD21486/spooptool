@@ -611,7 +611,7 @@
     const lootTopHeading = document.getElementById('loot-top-heading');
     if (lootTopHeading) lootTopHeading.textContent = 'Top 20 most valuable (' + rangeLabel + ')';
 
-    const spriteUrl = (id) => API + '/loot-icon?id=' + Number(id);
+    const spriteUrl = (id) => API + '/loot?icon=1&id=' + Number(id);
     function coinTierForValue(gp) {
       const v = Number(gp) || 0;
       if (v <= 80000) return 'Coins_1';

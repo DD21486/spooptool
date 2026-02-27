@@ -2,5 +2,10 @@
   "installCommand": "npm install",
   "buildCommand": "echo 'Static + serverless'",
   "outputDirectory": "public",
-  "rewrites": [{ "source": "/api/loot-webhook-url", "destination": "/api/loot?webhook=1" }]
+  "rewrites": [
+    { "source": "/api/loot-webhook-url", "destination": "/api/loot?webhook=1" },
+    { "source": "/api/location/post", "destination": "/api/location" },
+    { "source": "/api/loot-icon", "destination": "/api/loot?icon=1" },
+    { "source": "/api/characters-deltas", "destination": "/api/characters?path=deltas" }
+  ]
 }

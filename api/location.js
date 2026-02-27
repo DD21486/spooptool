@@ -1,8 +1,7 @@
 /**
- * GET /api/location
- * Returns current player locations (Live Location Sharing plugin compatible).
+ * GET /api/location — returns current player locations (Live Location Sharing plugin).
+ * POST /api/location (and /api/location/post via rewrite) — receives one player's location.
  * Auth: header Authorization must match LOCATION_SHARED_KEY.
- * Only returns rows updated in the last 10 seconds.
  */
 const { neon } = require('@neondatabase/serverless');
 
@@ -26,10 +25,30 @@ function send500(res, detail) {
   return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
 }
 
+async function getLocations(sql) {
+  const since = new Date(Date.now() - STALE_MS);
+  const rows = await sql`
+    SELECT name, x, y, plane, world, type, title, updated_at
+    FROM location_updates
+    WHERE updated_at > ${since}
+    ORDER BY name
+  `;
+  return rows.map((r) => ({
+    name: r.name,
+    x: r.x,
+    y: r.y,
+    plane: r.plane,
+    type: r.type || '',
+    title: r.title || '',
+    world: r.world,
+    timestamp: new Date(r.updated_at).getTime(),
+  }));
+}
+
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
-  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  if (req.method !== 'GET' && req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const a = auth(req);
   if (!a.ok) return res.status(401).json({ error: a.reason });
@@ -39,23 +58,42 @@ module.exports = async function handler(req, res) {
       return send500(res, 'DATABASE_URL is not set.');
     }
     const sql = neon(process.env.DATABASE_URL);
-    const since = new Date(Date.now() - STALE_MS);
-    const rows = await sql`
-      SELECT name, x, y, plane, world, type, title, updated_at
-      FROM location_updates
-      WHERE updated_at > ${since}
-      ORDER BY name
-    `;
-    const out = rows.map((r) => ({
-      name: r.name,
-      x: r.x,
-      y: r.y,
-      plane: r.plane,
-      type: r.type || '',
-      title: r.title || '',
-      world: r.world,
-      timestamp: new Date(r.updated_at).getTime(),
-    }));
+
+    if (req.method === 'POST') {
+      let body;
+      try {
+        body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+      } catch {
+        return res.status(400).json({ error: 'Invalid JSON' });
+      }
+      const name = (body.name || '').trim();
+      const waypoint = body.waypoint || {};
+      const x = parseInt(waypoint.x, 10);
+      const y = parseInt(waypoint.y, 10);
+      const plane = parseInt(waypoint.plane, 10);
+      const world = parseInt(body.world, 10) || 0;
+      const type = (body.type || '').trim().slice(0, 32);
+      const title = (body.title || '').trim().slice(0, 64);
+
+      if (!name || name.length > 12 || isNaN(x) || isNaN(y) || isNaN(plane)) {
+        return res.status(400).json({ error: 'Missing or invalid name or waypoint (x, y, plane)' });
+      }
+
+      await sql`
+        INSERT INTO location_updates (name, x, y, plane, world, type, title, updated_at)
+        VALUES (${name}, ${x}, ${y}, ${plane}, ${world}, ${type}, ${title}, NOW())
+        ON CONFLICT (name) DO UPDATE SET
+          x = EXCLUDED.x,
+          y = EXCLUDED.y,
+          plane = EXCLUDED.plane,
+          world = EXCLUDED.world,
+          type = EXCLUDED.type,
+          title = EXCLUDED.title,
+          updated_at = NOW()
+      `;
+    }
+
+    const out = await getLocations(sql);
     res.setHeader('Cache-Control', 'no-store');
     return res.status(200).json(out);
   } catch (err) {
