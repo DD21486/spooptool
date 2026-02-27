@@ -7,6 +7,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     .stat-box-gradient {
       padding: 2px;
@@ -31,12 +33,18 @@
       border-radius: 0.5rem;
       overflow: hidden;
       border: 1px solid rgba(71, 85, 105, 0.5);
+      background: #1e293b;
     }
-    #osrs-map-iframe {
-      width: 100%;
-      height: 100%;
-      border: none;
+    #map { width: 100%; height: 100%; }
+    .player-marker {
+      background: #38bdf8;
+      border: 2px solid #fff;
+      border-radius: 50%;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.5);
     }
+    .player-marker.spoopspooply { background: #f472b6; }
+    .leaflet-popup-content-wrapper { border-radius: 0.5rem; background: #1e293b; color: #e2e8f0; border: 1px solid #475569; }
+    .leaflet-popup-tip { background: #1e293b; }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
@@ -46,16 +54,15 @@
     </header>
 
     <h1 class="text-xl font-bold text-slate-100 mb-2">Clan map</h1>
-    <p class="text-slate-500 text-sm mb-4">Live locations from the RuneLite Live Location Sharing plugin. The map centers on Spoopspooply when you're online.</p>
+    <p class="text-slate-500 text-sm mb-4">You control the camera—pan and zoom the map. Player markers update every 5s so you can watch people move.</p>
 
-    <!-- OSRS world map (wiki) - centers on your location -->
     <section class="mb-6">
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">OSRS world map</h2>
+      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">OSRS world</h2>
       <div id="osrs-map-wrap">
-        <iframe id="osrs-map-iframe" title="OSRS World Map" src="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2"></iframe>
+        <div id="map"></div>
       </div>
-      <p id="map-center-label" class="text-slate-500 text-xs mt-1">Centered on Lumbridge (no location data yet)</p>
-      <a id="map-open-tab" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs mt-1 inline-block">Open map in new tab</a>
+      <p class="text-slate-500 text-xs mt-1">Pan and zoom freely; we never move the camera for you.</p>
+      <a id="map-wiki-link" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs mt-1 inline-block">Open full wiki map in new tab</a>
     </section>
 
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
@@ -78,7 +85,6 @@
 
   <script>
     (function () {
-      // Hardcoded key – same value as LOCATION_SHARED_KEY in Vercel / .env
       var MAP_SHARED_KEY = 'spoop135ly753';
 
       var locationsPlaceholder = document.getElementById('locations-placeholder');
@@ -87,16 +93,17 @@
       var demoName = document.getElementById('demo-name');
       var demoCoords = document.getElementById('demo-coords');
       var apiUrlExample = document.getElementById('api-url-example');
-      var mapIframe = document.getElementById('osrs-map-iframe');
-      var mapCenterLabel = document.getElementById('map-center-label');
-      var mapOpenTab = document.getElementById('map-open-tab');
 
       var POLL_MS = 5000;
-      var WIKI_MAP_BASE = 'https://maps.runescape.wiki/osrs/';
-      var DEFAULT_X = 3165;
-      var DEFAULT_Y = 3494;
-      var DEFAULT_PLANE = 0;
-      var MAP_ZOOM = 2;
+      var BOUNDS_MIN_X = 1024;
+      var BOUNDS_MAX_X = 3968;
+      var BOUNDS_MIN_Y = 2496;
+      var BOUNDS_MAX_Y = 4160;
+      var INIT_VIEW = [3328, 2500];
+      var INIT_ZOOM = 2;
+
+      var map = null;
+      var markersLayer = null;
 
       function getBaseUrl() {
         return window.location.origin;
@@ -104,27 +111,52 @@
 
       apiUrlExample.textContent = getBaseUrl() + '/api/location';
 
-      function buildMapSrc(x, y, plane) {
-        var m = 0;
-        if (plane === 1) m = 0;
-        if (plane === 2) m = 0;
-        return WIKI_MAP_BASE + '?m=' + m + '&p=' + (plane || 0) + '&x=' + (x || DEFAULT_X) + '&y=' + (y || DEFAULT_Y) + '&z=' + MAP_ZOOM;
+      function initMap() {
+        var bounds = L.latLngBounds(
+          L.latLng(BOUNDS_MIN_Y, BOUNDS_MIN_X),
+          L.latLng(BOUNDS_MAX_Y, BOUNDS_MAX_X)
+        );
+        map = L.map('map', {
+          crs: L.CRS.Simple,
+          minZoom: -2,
+          maxZoom: 5,
+          maxBounds: bounds,
+          maxBoundsViscosity: 1
+        });
+        map.setView(L.latLng(INIT_VIEW[1], INIT_VIEW[0]), INIT_ZOOM);
+        var bg = L.rectangle(bounds, { color: '#334155', fillColor: '#1e293b', fillOpacity: 1, weight: 0 });
+        bg.addTo(map);
+        markersLayer = L.layerGroup().addTo(map);
       }
 
-      function centerMapOnPlayer(player) {
-        if (!player) return;
-        var x = player.x, y = player.y, plane = player.plane != null ? player.plane : 0;
-        var src = buildMapSrc(x, y, plane);
-        if (mapIframe) mapIframe.src = src;
-        if (mapCenterLabel) mapCenterLabel.textContent = 'Centered on ' + (player.name || 'you') + ' · World ' + (player.world || '—') + ' · (' + x + ', ' + y + ', ' + plane + ')';
-        if (mapOpenTab) mapOpenTab.href = src;
+      function gameToLatLng(x, y) {
+        return L.latLng(y, x);
       }
 
-      function setDefaultMap() {
-        var src = buildMapSrc(DEFAULT_X, DEFAULT_Y, DEFAULT_PLANE);
-        if (mapIframe) mapIframe.src = src;
-        if (mapCenterLabel) mapCenterLabel.textContent = 'Centered on Lumbridge (no location data yet)';
-        if (mapOpenTab) mapOpenTab.href = src;
+      function updateMarkers(players) {
+        if (!map || !markersLayer) return;
+        markersLayer.clearLayers();
+        if (!players || players.length === 0) return;
+        players.forEach(function (p) {
+          var isSpoop = p.name && p.name.toLowerCase() === 'spoopspooply';
+          var ll = gameToLatLng(p.x, p.y);
+          var circle = L.circleMarker(ll, {
+            radius: 8,
+            className: 'player-marker' + (isSpoop ? ' spoopspooply' : ''),
+            fillOpacity: 1,
+            weight: 2
+          });
+          var popup = '<strong>' + escapeHtml(p.name) + '</strong><br>World ' + p.world + ' · (' + p.x + ', ' + p.y + ', ' + p.plane + ')';
+          circle.bindPopup(popup);
+          circle.addTo(markersLayer);
+        });
+      }
+
+      function escapeHtml(s) {
+        if (s == null) return '';
+        var div = document.createElement('div');
+        div.textContent = s;
+        return div.innerHTML;
       }
 
       function renderList(data) {
@@ -133,9 +165,9 @@
           locationsPlaceholder.classList.remove('hidden');
           locationsEntries.classList.add('hidden');
           locationsEntries.innerHTML = '';
-          demoName.textContent = 'Spoopspooply';
-          demoCoords.textContent = 'World — · (—, —, —)';
-          setDefaultMap();
+          if (demoName) demoName.textContent = 'Spoopspooply';
+          if (demoCoords) demoCoords.textContent = 'World — · (—, —, —)';
+          updateMarkers([]);
           return;
         }
         locationsPlaceholder.classList.add('hidden');
@@ -156,19 +188,11 @@
         if (spoop) {
           demoName.textContent = spoop.name;
           demoCoords.textContent = 'World ' + spoop.world + ' · (' + spoop.x + ', ' + spoop.y + ', ' + spoop.plane + ')';
-          centerMapOnPlayer(spoop);
         } else {
           demoName.textContent = 'Spoopspooply';
           demoCoords.textContent = 'Not in list (different RSN or offline)';
-          centerMapOnPlayer(data[0]);
         }
-      }
-
-      function escapeHtml(s) {
-        if (s == null) return '';
-        var div = document.createElement('div');
-        div.textContent = s;
-        return div.innerHTML;
+        updateMarkers(data);
       }
 
       function showError(msg) {
@@ -177,7 +201,7 @@
         locationsEntries.innerHTML = '';
         locationsError.textContent = msg || 'Failed to load locations';
         locationsError.classList.remove('hidden');
-        setDefaultMap();
+        updateMarkers([]);
       }
 
       function fetchLocations() {
@@ -203,6 +227,7 @@
           });
       }
 
+      initMap();
       fetchLocations();
       setInterval(fetchLocations, POLL_MS);
     })();
