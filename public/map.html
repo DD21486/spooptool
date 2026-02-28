@@ -36,6 +36,15 @@
       background: #1e293b;
       position: relative;
     }
+    #explv-map-wrap {
+      aspect-ratio: 16/10;
+      min-height: 320px;
+      border-radius: 0.5rem;
+      overflow: hidden;
+      border: 1px solid rgba(71, 85, 105, 0.5);
+      background: #1e293b;
+    }
+    .map-pane.hidden { display: none !important; }
     #map { width: 100%; height: 100%; }
     #map-coord-readout {
       position: absolute;
@@ -72,13 +81,25 @@
     <p class="text-slate-500 text-sm mb-4">You control the camera—pan and zoom the map. Player markers update every 5s so you can watch people move.</p>
 
     <section class="mb-6">
-      <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">OSRS world</h2>
-      <div id="osrs-map-wrap">
+      <div class="flex items-center justify-between gap-2 mb-2">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide">OSRS world</h2>
+        <div class="flex rounded-lg border border-slate-600 overflow-hidden" role="tablist">
+          <button type="button" id="map-tab-spooptool" role="tab" aria-selected="true" class="map-tab px-3 py-1.5 text-sm font-medium bg-slate-700 text-slate-200">SpoopTool map</button>
+          <button type="button" id="map-tab-explv" role="tab" aria-selected="false" class="map-tab px-3 py-1.5 text-sm font-medium text-slate-400 hover:text-slate-200">Explv&apos;s map</button>
+        </div>
+      </div>
+      <div id="osrs-map-wrap" class="map-pane">
         <div id="map"></div>
         <div id="map-coord-readout" aria-live="polite">—</div>
       </div>
+      <div id="explv-map-wrap" class="map-pane hidden">
+        <iframe id="explv-iframe" title="Explv's OSRS map" class="w-full h-full min-h-[320px] border-0 rounded-lg" allow="fullscreen"></iframe>
+      </div>
       <p class="text-slate-500 text-xs mt-1">Pan and zoom freely; we never move the camera for you.</p>
-      <a id="map-wiki-link" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs mt-1 inline-block">Open full wiki map in new tab</a>
+      <div class="flex flex-wrap gap-x-4 gap-y-1 mt-1">
+        <a id="link-explv" href="https://explv.github.io/?centreX=3162&centreY=3451&centreZ=0&zoom=4" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs">Open in Explv&apos;s map (new tab)</a>
+        <a id="map-wiki-link" href="https://maps.runescape.wiki/osrs/?m=0&amp;p=0&amp;x=3165&amp;y=3494&amp;z=2" target="_blank" rel="noopener noreferrer" class="text-sky-400 hover:underline text-xs">OSRS Wiki map</a>
+      </div>
     </section>
 
     <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
@@ -123,6 +144,60 @@
 
       var map = null;
       var markersLayer = null;
+      var lastLocationData = null;
+
+      function buildExplvUrl(x, y, plane, zoom) {
+        zoom = zoom != null ? zoom : 4;
+        plane = plane != null ? plane : 0;
+        return 'https://explv.github.io/?centreX=' + encodeURIComponent(x) + '&centreY=' + encodeURIComponent(y) + '&centreZ=' + encodeURIComponent(plane) + '&zoom=' + encodeURIComponent(zoom);
+      }
+
+      function updateExplvFromLocations(players) {
+        lastLocationData = players;
+        var x = INIT_VIEW[0], y = INIT_VIEW[1], plane = 0;
+        if (players && players.length > 0) {
+          var p = players.find(function (q) { return q.name && q.name.toLowerCase() === 'spoopspooply'; }) || players[0];
+          x = p.x; y = p.y; plane = p.plane != null ? p.plane : 0;
+        }
+        var url = buildExplvUrl(x, y, plane);
+        var link = document.getElementById('link-explv');
+        if (link) link.href = url;
+      }
+
+      function switchMapTab(toExplv) {
+        var spoopWrap = document.getElementById('osrs-map-wrap');
+        var explvWrap = document.getElementById('explv-map-wrap');
+        var tabSpoop = document.getElementById('map-tab-spooptool');
+        var tabExplv = document.getElementById('map-tab-explv');
+        if (toExplv) {
+          spoopWrap.classList.add('hidden');
+          explvWrap.classList.remove('hidden');
+          tabSpoop.classList.remove('bg-slate-700', 'text-slate-200');
+          tabSpoop.classList.add('text-slate-400');
+          tabExplv.classList.add('bg-slate-700', 'text-slate-200');
+          tabExplv.classList.remove('text-slate-400');
+          tabExplv.setAttribute('aria-selected', 'true');
+          tabSpoop.setAttribute('aria-selected', 'false');
+          var iframe = document.getElementById('explv-iframe');
+          if (iframe && !iframe.src) {
+            var x = INIT_VIEW[0], y = INIT_VIEW[1], plane = 0;
+            if (lastLocationData && lastLocationData.length > 0) {
+              var p = lastLocationData.find(function (q) { return q.name && q.name.toLowerCase() === 'spoopspooply'; }) || lastLocationData[0];
+              x = p.x; y = p.y; plane = p.plane != null ? p.plane : 0;
+            }
+            iframe.src = buildExplvUrl(x, y, plane);
+          }
+        } else {
+          explvWrap.classList.add('hidden');
+          spoopWrap.classList.remove('hidden');
+          tabExplv.classList.remove('bg-slate-700', 'text-slate-200');
+          tabExplv.classList.add('text-slate-400');
+          tabSpoop.classList.add('bg-slate-700', 'text-slate-200');
+          tabSpoop.classList.remove('text-slate-400');
+          tabSpoop.setAttribute('aria-selected', 'true');
+          tabExplv.setAttribute('aria-selected', 'false');
+        }
+      }
 
       function getBaseUrl() {
         return window.location.origin;
@@ -210,6 +285,7 @@
           if (demoName) demoName.textContent = 'Spoopspooply';
           if (demoCoords) demoCoords.textContent = 'World — · (—, —, —)';
           updateMarkers([]);
+          updateExplvFromLocations([]);
           return;
         }
         locationsPlaceholder.classList.add('hidden');
@@ -235,6 +311,7 @@
           demoCoords.textContent = 'Not in list (different RSN or offline)';
         }
         updateMarkers(data);
+        updateExplvFromLocations(data);
       }
 
       function showError(msg) {
@@ -272,6 +349,9 @@
       initMap();
       fetchLocations();
       setInterval(fetchLocations, POLL_MS);
+
+      document.getElementById('map-tab-explv').addEventListener('click', function () { switchMapTab(true); });
+      document.getElementById('map-tab-spooptool').addEventListener('click', function () { switchMapTab(false); });
     })();
   </script>
 </body>
