@@ -110,17 +110,20 @@
       var demoCoords = document.getElementById('demo-coords');
       var apiUrlExample = document.getElementById('api-url-example');
 
-      // Game coordinate bounds for Gielinor Surface (from maps.runescape.wiki basemaps.json).
-      // If the map image matches these bounds and has the same aspect ratio, no calibration is needed.
-      var GAME_MIN_X = 896;
-      var GAME_MAX_X = 4096;
-      var GAME_MIN_Y = 1984;
-      var GAME_MAX_Y = 4288;
+      // Bounds matching RuneLite/game surface. PNG doesn't match 1:1 so we apply calibration.
+      var GAME_MIN_X = 1024;
+      var GAME_MAX_X = 3968;
+      var GAME_MIN_Y = 2496;
+      var GAME_MAX_Y = 4160;
       var IMG_WIDTH = 9216;
       var IMG_HEIGHT = 6528;
       var INIT_VIEW = [3162, 3451];
       var INIT_ZOOM = 2;
       var POLL_MS = 5000;
+      // Calibration: wiki PNG has offset/scale vs game coords. Tuned from bridge (3214,3397) and graveyard (3213,3370).
+      var CALIBRATION_OFFSET_X = 30;
+      var CALIBRATION_OFFSET_Y = -1303;
+      var CALIBRATION_SCALE_Y = 4 / 3;
 
       var map = null;
       var markersLayer = null;
@@ -165,8 +168,10 @@
       }
 
       function gameToLatLng(x, y) {
-        var lng = (x - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
-        var lat = (y - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
+        var xCal = x + CALIBRATION_OFFSET_X;
+        var yCal = y * CALIBRATION_SCALE_Y + CALIBRATION_OFFSET_Y;
+        var lng = (xCal - GAME_MIN_X) * (IMG_WIDTH / (GAME_MAX_X - GAME_MIN_X));
+        var lat = (yCal - GAME_MIN_Y) * (IMG_HEIGHT / (GAME_MAX_Y - GAME_MIN_Y));
         return L.latLng(lat, lng);
       }
 
