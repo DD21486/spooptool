@@ -584,6 +584,29 @@ module.exports = async function handler(req, res) {
       const killCount = extra.killCount != null ? parseInt(extra.killCount, 10) : null;
       const rarest = extra.rarestProbability != null ? String(extra.rarestProbability).substring(0, 64) : null;
 
+      const eventTotalGp = items.reduce((s, i) => s + (Math.max(1, parseInt(i.quantity, 10) || 1) * (parseInt(i.priceEach, 10) || 0)), 0);
+
+      // Deduplicate: Dink sometimes sends the same raid loot twice (e.g. kill 19 and kill 20). Skip if we already have this exact drop in the last 2 minutes.
+      if (items.length > 0 && source) {
+        const dupCheck = await sql`
+          SELECT 1 FROM (
+            SELECT at, SUM(total_value_gp) AS event_total, COUNT(*) AS item_count
+            FROM loot_drops
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${username}))
+              AND TRIM(source) = TRIM(${source})
+              AND at > NOW() - interval '2 minutes'
+            GROUP BY at
+            HAVING SUM(total_value_gp) = ${eventTotalGp}
+              AND COUNT(*) = ${items.length}
+            LIMIT 1
+          ) AS sub
+        `;
+        if (dupCheck.length > 0) {
+          console.log('Loot POST: duplicate raid/source drop ignored for', username, source);
+          return res.status(201).json({ ok: true, inserted: 0, duplicate: true });
+        }
+      }
+
       const charRow = await sql`
         SELECT id FROM characters WHERE LOWER(TRIM(username)) = LOWER(TRIM(${username})) LIMIT 1
       `;
