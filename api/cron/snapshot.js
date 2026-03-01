@@ -14,9 +14,9 @@ const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
 
 /** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
-const DELAY_MS_BETWEEN_BATCHES = 1500;
-/** How many characters to fetch in parallel per batch. */
-const BATCH_CONCURRENCY = 2;
+const DELAY_MS_BETWEEN_BATCHES = 800;
+/** How many characters to fetch in parallel per batch. Tuned so 10 characters finish in ~10–15s (under cron-job.org 30s timeout including cold start). */
+const BATCH_CONCURRENCY = 5;
 
 function delay(ms) {
   return new Promise((r) => setTimeout(r, ms));
