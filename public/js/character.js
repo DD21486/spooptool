@@ -461,7 +461,7 @@
         const src = petImageSrc(petName);
         const title = petName + '\n+4,000 spoop points';
         const imgHtml = src
-          ? '<img src="' + escapeHtml(src) + '" alt="" width="40" height="40" loading="lazy" onerror="this.style.display=\'none\'">'
+          ? '<img src="' + escapeHtml(src) + '" alt="" width="54" height="54" loading="lazy" onerror="this.style.display=\'none\'">'
           : '<span class="text-slate-500 text-xs">' + escapeHtml(petName) + '</span>';
         return '<div class="pet-card-gradient group relative" title="' + escapeHtml(title) + '" role="img" aria-label="' + escapeHtml(petName) + '">' +
           '<div class="pet-card-gradient-inner">' + imgHtml + '</div>' +
