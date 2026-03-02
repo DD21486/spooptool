@@ -490,7 +490,7 @@
     });
   }
 
-  const POINTS_PER_10K_XP = 0.5;
+  const POINTS_PER_10K_XP = 0.1;
   const SKILL_DIFFICULTY_RANK = {
     runecraft: 1, slayer: 2, agility: 3, mining: 4, woodcutting: 5, fishing: 6, smithing: 7,
     defence: 8, attack: 9, strength: 10, hitpoints: 11, ranged: 12, magic: 13, farming: 14,
