@@ -797,6 +797,81 @@
     fetchLoot();
   }
 
+  let spoopHistoryChartInstance = null;
+  function paintSpoopScoreHistoryChart(history) {
+    const wrap = document.getElementById('spoop-history-chart-wrap');
+    const emptyEl = document.getElementById('spoop-history-empty');
+    const canvas = document.getElementById('spoop-history-chart');
+    if (!wrap || !emptyEl || !canvas) return;
+    if (spoopHistoryChartInstance) {
+      spoopHistoryChartInstance.destroy();
+      spoopHistoryChartInstance = null;
+    }
+    if (!history || history.length === 0) {
+      wrap.classList.add('hidden');
+      emptyEl.classList.remove('hidden');
+      return;
+    }
+    emptyEl.classList.add('hidden');
+    wrap.classList.remove('hidden');
+    const labels = history.map((h) => {
+      const d = new Date(h.at);
+      return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+    });
+    const values = history.map((h) => Number(h.spoopScore) || 0);
+    const dataMin = values.length ? Math.min(...values) : 0;
+    const dataMax = values.length ? Math.max(...values) : 1;
+    const range = dataMax - dataMin;
+    const pad = range > 0 ? range * 0.05 : Math.max(1, dataMax * 0.05);
+    const yMin = Math.max(0, dataMin - pad);
+    const yMax = dataMax + pad;
+    if (typeof Chart !== 'undefined') {
+      spoopHistoryChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'SpoopScore',
+            data: values,
+            borderColor: 'rgb(56, 189, 248)',
+            backgroundColor: 'rgba(56, 189, 248, 0.1)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 10, font: { size: 10 } },
+            },
+            y: {
+              min: yMin,
+              max: yMax,
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', callback: (v) => formatNum(Number(v)), font: { size: 10 } },
+            },
+          },
+        },
+      });
+    }
+  }
+  function loadSpoopScoreHistory() {
+    if (!name) return;
+    fetch(API + '/spoopscore-history?name=' + encodeURIComponent(name))
+      .then((res) => res.json())
+      .then((data) => {
+        paintSpoopScoreHistoryChart(data.history || []);
+      })
+      .catch(() => paintSpoopScoreHistoryChart([]));
+  }
+
   async function load() {
     if (!name) {
       showError('No character name in URL. Use ?name=Username');

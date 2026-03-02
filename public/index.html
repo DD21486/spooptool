@@ -315,6 +315,41 @@
       </div>
     </section>
 
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="99 count leaderboard">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">99 count leaderboard</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">99s</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-99-tbody"></tbody>
+          </table>
+        </div>
+        <p id="leaderboard-99-empty" class="px-4 py-6 text-slate-500 text-center text-sm hidden">No data yet.</p>
+      </section>
+      <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="Boss diversity leaderboard">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Boss diversity %</h2>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-slate-700 bg-slate-800/80">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">#</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Character</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Diversity %</th>
+              </tr>
+            </thead>
+            <tbody id="leaderboard-diversity-tbody"></tbody>
+          </table>
+        </div>
+        <p id="leaderboard-diversity-empty" class="px-4 py-6 text-slate-500 text-center text-sm hidden">No data yet.</p>
+      </section>
+    </div>
+
     <section class="mt-8 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="Recent activity">
       <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Recent activity</h2>
       <div class="overflow-x-auto">

@@ -668,6 +668,65 @@
     });
   }
 
+  function count99s(skills) {
+    if (!skills || typeof skills !== 'object') return 0;
+    return Object.entries(skills).filter(([key]) => key !== 'overall').filter(([, s]) => s && Number(s.level) === 99).length;
+  }
+
+  function render99CountLeaderboard() {
+    const tbody = document.getElementById('leaderboard-99-tbody');
+    const emptyEl = document.getElementById('leaderboard-99-empty');
+    if (!tbody) return;
+    const list = getDisplayCharacterList();
+    const rows = list.map((username) => {
+      const player = playerData[username];
+      const count = count99s(player && player.skills ? player.skills : {});
+      return { username, count };
+    });
+    rows.sort((a, b) => b.count - a.count);
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      tr.innerHTML = '<td class="px-4 py-2 text-slate-400">' + (i + 1) + '</td><td class="px-4 py-2"><a href="/character.html?name=' + encodeURIComponent(r.username) + '" class="text-sky-400 hover:underline">' + escapeHtml(r.username) + '</a></td><td class="px-4 py-2 text-right font-mono">' + formatNum(r.count) + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
+  function renderBossDiversityLeaderboard() {
+    const tbody = document.getElementById('leaderboard-diversity-tbody');
+    const emptyEl = document.getElementById('leaderboard-diversity-empty');
+    if (!tbody) return;
+    const totalBosses = (bossKeys && bossKeys.length) ? bossKeys.length : 0;
+    const list = getDisplayCharacterList();
+    const rows = list.map((username) => {
+      const player = playerData[username];
+      const bosses = player && player.bosses ? player.bosses : {};
+      const withKc = totalBosses ? bossKeys.filter((b) => (bosses[b] && Number(bosses[b].count) > 0)).length : 0;
+      const pct = totalBosses > 0 ? (withKc / totalBosses * 100) : 0;
+      return { username, pct, withKc, totalBosses };
+    });
+    rows.sort((a, b) => b.pct - a.pct);
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+      if (emptyEl) emptyEl.classList.remove('hidden');
+      return;
+    }
+    if (emptyEl) emptyEl.classList.add('hidden');
+    rows.forEach((r, i) => {
+      const tr = document.createElement('tr');
+      tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      const pctText = totalBosses > 0 ? (Math.round(r.pct * 10) / 10).toFixed(1) + '%' : '—';
+      tr.innerHTML = '<td class="px-4 py-2 text-slate-400">' + (i + 1) + '</td><td class="px-4 py-2"><a href="/character.html?name=' + encodeURIComponent(r.username) + '" class="text-sky-400 hover:underline">' + escapeHtml(r.username) + '</a></td><td class="px-4 py-2 text-right font-mono">' + pctText + '</td>';
+      tbody.appendChild(tr);
+    });
+  }
+
   function renderRight() {
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
@@ -1017,6 +1076,8 @@
       renderLoot();
       paintSpoopScoreChart();
       renderActivity(data.activity || []);
+      render99CountLeaderboard();
+      renderBossDiversityLeaderboard();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -1100,6 +1161,8 @@
       renderRight();
       renderLoot();
       paintSpoopScoreChart();
+      render99CountLeaderboard();
+      renderBossDiversityLeaderboard();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -1693,6 +1756,8 @@
       renderRight();
       renderLoot();
       paintSpoopScoreChart();
+      render99CountLeaderboard();
+      renderBossDiversityLeaderboard();
       if (homeViewMode === 'today' && cachedHomeHistoryToday != null) {
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
       } else if (homeViewMode === 'week' && cachedHomeHistoryWeek != null) {

@@ -164,6 +164,14 @@
         <p id="pets-empty" class="hidden text-slate-500 text-sm mt-1">No pets yet.</p>
       </section>
 
+      <section class="mb-6 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden hidden" aria-label="SpoopScore over time" id="spoop-history-section">
+        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">SpoopScore over time</h2>
+        <p id="spoop-history-empty" class="hidden px-4 py-6 text-slate-500 text-sm text-center">No history yet. SpoopScore is recorded at noon and 8pm (your timezone).</p>
+        <div id="spoop-history-chart-wrap" class="px-4 py-4 hidden" style="height: 220px;">
+          <canvas id="spoop-history-chart"></canvas>
+        </div>
+      </section>
+
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Skills</h2>
         <div class="overflow-x-auto">

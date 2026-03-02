@@ -105,7 +105,7 @@ SpoopTool is a private Old School RuneScape (OSRS) progress tracker. It shows ch
   8. **Leaderboard notification:** Computes current boss-kill leader(s); if different from `leaderboard_state.boss_kill_leader`, POSTs to Discord (if `DISCORD_LEADERBOARD_WEBHOOK_URL` is set) and updates `leaderboard_state`.
 
 - **Scheduling**  
-  Typically via external cron (e.g. cron-job.org) every 30–60 minutes; Vercel Cron can run it once per day on Hobby.
+  Vercel doesn’t support cron; use an **external cron** (e.g. [cron-job.org](https://cron-job.org)) to call the snapshot URL every 30–60 minutes.
 
 ### 2.3 Loot (Dink webhook)
 

@@ -32,11 +32,9 @@ Private Old School RuneScape tool for you and your friends. Uses OSRS Hiscores d
 To store periodic Hiscores snapshots for progress-over-time and insights:
 
 1. **Neon:** Run the migration in the SQL Editor: copy and run `sql/migration_character_snapshots.sql` (creates `character_snapshots` table).
-2. **Vercel:** Add env var `CRON_SECRET` (e.g. `openssl rand -hex 32`). Vercel Cron will send this as `Authorization: Bearer <CRON_SECRET>` when it invokes the snapshot job.
-3. **Schedule:**
-   - **Hobby plan:** Vercel Cron is limited to **once per day**. The app is configured to run the snapshot at 12:00 UTC daily. That gives one snapshot per character per day — good for "yesterday vs today" and weekly trends.
-   - **More frequent (e.g. every 30 min) on Hobby:** Use an external cron (e.g. [cron-job.org](https://cron-job.org), free) to call `GET https://your-app.vercel.app/api/cron/snapshot` with header `Authorization: Bearer YOUR_CRON_SECRET` every 30 minutes. Keeps data recent without upgrading Vercel. **Set the cron service’s request timeout to at least 60 seconds** so the job can finish when the serverless function has a cold start; a 30s timeout often causes every-other run to fail.
-   - **10 min:** Same idea with external cron every 10 min.
+2. **Vercel:** Add env var `CRON_SECRET` (e.g. `openssl rand -hex 32`). The snapshot endpoint checks this when invoked.
+3. **Schedule (external cron):**
+   - **External cron (recommended):** Use a free service like [cron-job.org](https://cron-job.org) to call `GET https://your-app.vercel.app/api/cron/snapshot` with header `Authorization: Bearer YOUR_CRON_SECRET` every 30-60 minutes. Set the request timeout to at least 60 seconds so the job can finish after a cold start.
 
 **Snapshot retention (automatic):** After each snapshot run, the cron prunes old data to stay under Neon’s 0.5 GB limit. It keeps **all snapshots from the last 30 days**, and for data older than 30 days it keeps **one snapshot per character per calendar month** (the latest in that month) for yearly summaries. So you get full resolution for the last 30 days and ~1 snapshot per user per month for as long as you’ve been running (e.g. ~60 MB total for 8 users).
 
