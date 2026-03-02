@@ -536,10 +536,11 @@
   }
 
   /** SpoopScore bonus per pet (must match character.js). */
-  const PET_POINTS = 5000;
+  const PET_POINTS = 4000;
   /** Username (lowercase) -> array of pet display names. Keep in sync with character.js CHARACTER_PETS. */
   const CHARACTER_PETS = {
     spoopspooply: ['Vorki'],
+    legolad52: ['Vorki'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];

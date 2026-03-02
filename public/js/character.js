@@ -177,8 +177,8 @@
     return div.innerHTML;
   }
 
-  /** SpoopScore bonus per pet. 1 pet = +5000. */
-  const PET_POINTS = 5000;
+  /** SpoopScore bonus per pet. 1 pet = +4000. */
+  const PET_POINTS = 4000;
   /** Display name -> image filename in /assets/pets/ (from OSRS Wiki pet list). */
   const PET_IMAGE_BY_NAME = {
     'Abyssal orphan': 'Abyssal_orphan.png',
@@ -236,6 +236,7 @@
   /** Username (lowercase) -> array of pet display names. Update manually when users get pets. */
   const CHARACTER_PETS = {
     spoopspooply: ['Vorki'],
+    legolad52: ['Vorki'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
@@ -439,14 +440,14 @@
     if (petsRow) {
       petsRow.innerHTML = characterPets.map((petName) => {
         const src = petImageSrc(petName);
-        const title = petName + '\n+5,000 spoop points';
+        const title = petName + '\n+4,000 spoop points';
         const imgHtml = src
           ? '<img src="' + escapeHtml(src) + '" alt="" width="40" height="40" loading="lazy" onerror="this.style.display=\'none\'">'
           : '<span class="text-slate-500 text-xs">' + escapeHtml(petName) + '</span>';
         return '<div class="pet-card-gradient group relative" title="' + escapeHtml(title) + '" role="img" aria-label="' + escapeHtml(petName) + '">' +
           '<div class="pet-card-gradient-inner">' + imgHtml + '</div>' +
           '<div class="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200 text-xs whitespace-nowrap z-10 pointer-events-none">' +
-          escapeHtml(petName) + '<br><span class="text-green-400">+5,000 spoop points</span></div>' +
+          escapeHtml(petName) + '<br><span class="text-green-400">+4,000 spoop points</span></div>' +
           '</div>';
       }).join('');
     }
