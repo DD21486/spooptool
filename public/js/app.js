@@ -541,6 +541,9 @@
   const CHARACTER_PETS = {
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki'],
+    'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
+    newlinechar: ['Heron'],
+    player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
@@ -644,7 +647,7 @@
                   'Boss: ' + formatNum(r.bossScore),
                   'Skill: ' + formatNum(r.skillScore),
                 ];
-                if (r.petPoints > 0) lines.push('Pets: +' + formatNum(r.petPoints));
+                if (spoopChartMode === 'all' && r.petPoints > 0) lines.push('Pets: +' + formatNum(r.petPoints));
                 return lines;
               },
             },

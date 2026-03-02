@@ -191,6 +191,7 @@
     'Dom': 'Dom.png',
     'Gull': 'Gull_(pet).png',
     'Hellpuppy': 'Hellpuppy.png',
+    'Heron': 'Heron.png',
     'Huberte': 'Huberte.png',
     'Ikkle hydra': 'Ikkle_hydra_(serpentine).png',
     'Jal-nib-rek': 'Jal-nib-rek.png',
@@ -237,6 +238,9 @@
   const CHARACTER_PETS = {
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki'],
+    'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
+    newlinechar: ['Heron'],
+    player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
