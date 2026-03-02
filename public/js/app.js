@@ -535,6 +535,19 @@
     return sum + totalLevelBonus;
   }
 
+  /** SpoopScore bonus per pet (must match character.js). */
+  const PET_POINTS = 5000;
+  /** Username (lowercase) -> array of pet display names. Keep in sync with character.js CHARACTER_PETS. */
+  const CHARACTER_PETS = {
+    spoopspooply: ['Vorki'],
+  };
+  function getPetsForCharacter(username) {
+    if (!username) return [];
+    const key = String(username).toLowerCase().trim();
+    const list = CHARACTER_PETS[key];
+    return Array.isArray(list) ? list : [];
+  }
+
   function renderLoot() {
     if (!lootTbody || !lootLoading) return;
     lootLoading.classList.add('hidden');
@@ -591,7 +604,8 @@
       const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
       const b = bossScore || 0;
       const s = skillScore || 0;
-      return { username, spoopScore: b + s, bossScore: b, skillScore: s };
+      const petPoints = getPetsForCharacter(username).length * PET_POINTS;
+      return { username, spoopScore: b + s + petPoints, bossScore: b, skillScore: s, petPoints };
     });
     rows.sort((a, b) => b[valueKey] - a[valueKey]);
     const labels = rows.map((r) => r.username);
@@ -624,11 +638,13 @@
             callbacks: {
               label: (ctx) => {
                 const r = rows[ctx.dataIndex];
-                return [
+                const lines = [
                   'Total: ' + formatNum(ctx.raw),
                   'Boss: ' + formatNum(r.bossScore),
                   'Skill: ' + formatNum(r.skillScore),
                 ];
+                if (r.petPoints > 0) lines.push('Pets: +' + formatNum(r.petPoints));
+                return lines;
               },
             },
           },

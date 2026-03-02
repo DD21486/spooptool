@@ -177,6 +177,77 @@
     return div.innerHTML;
   }
 
+  /** SpoopScore bonus per pet. 1 pet = +5000. */
+  const PET_POINTS = 5000;
+  /** Display name -> image filename in /assets/pets/ (from OSRS Wiki pet list). */
+  const PET_IMAGE_BY_NAME = {
+    'Abyssal orphan': 'Abyssal_orphan.png',
+    'Baby mole': 'Baby_mole.png',
+    'Baron': 'Baron.png',
+    'Beef': 'Beef.png',
+    'Bran': 'Bran.png',
+    'Butch': 'Butch.png',
+    'Callisto cub': 'Callisto_cub.png',
+    'Dom': 'Dom.png',
+    'Gull': 'Gull_(pet).png',
+    'Hellpuppy': 'Hellpuppy.png',
+    'Huberte': 'Huberte.png',
+    'Ikkle hydra': 'Ikkle_hydra_(serpentine).png',
+    'Jal-nib-rek': 'Jal-nib-rek.png',
+    'Kalphite princess': 'Kalphite_princess.png',
+    "Lil' zik": "Lil'_zik.png",
+    "Lil'viathan": "Lil'viathan.png",
+    'Little nightmare': 'Little_nightmare.png',
+    'Moxi': 'Moxi.png',
+    'Muphin': 'Muphin_(ranged).png',
+    'Nexling': 'Nexling.png',
+    'Nid': 'Nid.png',
+    'Noon': 'Noon.png',
+    'Olmlet': 'Olmlet.png',
+    'Pet chaos elemental': 'Pet_chaos_elemental.png',
+    'Pet dagannoth prime': 'Pet_dagannoth_prime.png',
+    'Pet dagannoth rex': 'Pet_dagannoth_rex.png',
+    'Pet dagannoth supreme': 'Pet_dagannoth_supreme.png',
+    'Pet dark core': 'Pet_dark_core.png',
+    'Pet general graardor': 'Pet_general_graardor.png',
+    "Pet k'ril tsutsaroth": "Pet_k'ril_tsutsaroth.png",
+    'Pet kraken': 'Pet_kraken.png',
+    "Pet kree'arra": "Pet_kree'arra.png",
+    'Pet smoke devil': 'Pet_smoke_devil.png',
+    'Pet snakeling': 'Pet_snakeling.png',
+    'Pet zilyana': 'Pet_zilyana.png',
+    'Phoenix': 'Phoenix.png',
+    'Prince black dragon': 'Prince_black_dragon.png',
+    'Scurry': 'Scurry.png',
+    'Skotos': 'Skotos.png',
+    'Smolcano': 'Smolcano.png',
+    'Smol heredit': 'Smol_heredit.png',
+    'Sraracha': 'Sraracha.png',
+    'Tiny tempor': 'Tiny_tempor.png',
+    "Tumeken's guardian": "Tumeken's_guardian.png",
+    'Tzrek-jad': 'Tzrek-jad.png',
+    'Venenatis spiderling': 'Venenatis_spiderling.png',
+    "Vet'ion jr.": "Vet'ion_jr..png",
+    'Vorki': 'Vorki.png',
+    'Wisp': 'Wisp.png',
+    'Yami': 'Yami.png',
+    'Youngllef': 'Youngllef.png',
+  };
+  /** Username (lowercase) -> array of pet display names. Update manually when users get pets. */
+  const CHARACTER_PETS = {
+    spoopspooply: ['Vorki'],
+  };
+  function getPetsForCharacter(username) {
+    if (!username) return [];
+    const key = String(username).toLowerCase().trim();
+    const list = CHARACTER_PETS[key];
+    return Array.isArray(list) ? list.slice().sort((a, b) => a.localeCompare(b)) : [];
+  }
+  function petImageSrc(displayName) {
+    const filename = PET_IMAGE_BY_NAME[displayName];
+    return filename ? '/assets/pets/' + filename : '';
+  }
+
   /** Normalize boss key for points lookup (lowercase, spaces to _, strip apostrophes/colons/hyphens). */
   function normalizeBossKeyForPoints(key) {
     return String(key || '').toLowerCase().replace(/\s+/g, '_').replace(/'/g, '').replace(/:/g, '').replace(/-/g, '_').trim();
@@ -357,9 +428,31 @@
     const statSkillingScoreEl = document.getElementById('stat-skilling-score');
     if (statSkillingScoreEl) statSkillingScoreEl.textContent = formatNum(totalSkillingPoints);
 
-    const spoopScore = totalBossPoints + totalSkillingPoints;
+    const characterPets = getPetsForCharacter(data.name || name);
+    const petPoints = characterPets.length * PET_POINTS;
+    const spoopScore = totalBossPoints + totalSkillingPoints + petPoints;
     const spoopScoreEl = document.getElementById('spoop-score');
     if (spoopScoreEl) spoopScoreEl.textContent = formatNum(spoopScore);
+
+    const petsRow = document.getElementById('pets-row');
+    const petsEmpty = document.getElementById('pets-empty');
+    if (petsRow) {
+      petsRow.innerHTML = characterPets.map((petName) => {
+        const src = petImageSrc(petName);
+        const title = petName + '\n+5,000 spoop points';
+        const imgHtml = src
+          ? '<img src="' + escapeHtml(src) + '" alt="" width="40" height="40" loading="lazy" onerror="this.style.display=\'none\'">'
+          : '<span class="text-slate-500 text-xs">' + escapeHtml(petName) + '</span>';
+        return '<div class="pet-card-gradient group relative" title="' + escapeHtml(title) + '" role="img" aria-label="' + escapeHtml(petName) + '">' +
+          '<div class="pet-card-gradient-inner">' + imgHtml + '</div>' +
+          '<div class="hidden group-hover:block absolute left-1/2 -translate-x-1/2 bottom-full mb-1 px-2 py-1 rounded bg-slate-800 border border-slate-600 text-slate-200 text-xs whitespace-nowrap z-10 pointer-events-none">' +
+          escapeHtml(petName) + '<br><span class="text-green-400">+5,000 spoop points</span></div>' +
+          '</div>';
+      }).join('');
+    }
+    if (petsEmpty) {
+      petsEmpty.classList.toggle('hidden', characterPets.length > 0);
+    }
 
     const bossScoreBreakdown = Object.entries(bosses)
       .filter(([, b]) => b && typeof b === 'object' && ((b.count != null && b.count > 0) || (b.kc != null && b.kc > 0)))

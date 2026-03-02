@@ -42,6 +42,30 @@
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
     }
+    .pet-card-gradient {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      padding: 2px;
+      border-radius: 0.375rem;
+      background: linear-gradient(135deg, #3b82f6, #06b6d4, #14b8a6, #8b5cf6, #a855f7, #3b82f6);
+      background-size: 200% 200%;
+      animation: stat-box-border 8s ease infinite;
+    }
+    .pet-card-gradient-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: calc(0.375rem - 2px);
+      background: linear-gradient(145deg, rgba(30, 41, 59, 0.92), rgba(15, 23, 42, 0.97) 50%, rgba(30, 27, 75, 0.92));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pet-card-gradient-inner img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+    }
     .favorite-boss-bg {
       position: fixed;
       top: 0;
@@ -131,6 +155,14 @@
       <div id="boss-score-tooltip" class="hidden fixed z-50 rounded-lg border border-slate-600 bg-slate-800 px-2.5 py-2 text-slate-400 text-xs shadow-xl" role="tooltip" aria-hidden="true">
         <div id="boss-score-tooltip-content"></div>
       </div>
+
+      <section class="mb-6" aria-label="Pets">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Pets</h2>
+        <div id="pets-row" class="flex flex-wrap gap-2">
+          <!-- Pet cards rendered by character.js -->
+        </div>
+        <p id="pets-empty" class="hidden text-slate-500 text-sm mt-1">No pets yet.</p>
+      </section>
 
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden mb-6">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Skills</h2>
