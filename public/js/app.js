@@ -63,6 +63,14 @@
   let bossKeys = [];
   let skillKeys = ['overall'];
 
+  /** When "No Chuds" is on, exclude VDBL from leaderboards and SpoopScore. Default off = everyone included. */
+  const NO_CHUDS_USERNAME = 'vdbl';
+  let noChudsEnabled = false;
+  function getDisplayCharacterList() {
+    if (!noChudsEnabled) return characterList;
+    return characterList.filter((u) => (u || '').toLowerCase() !== NO_CHUDS_USERNAME);
+  }
+
   const leftTbody = document.getElementById('left-tbody');
   const rightTbody = document.getElementById('right-tbody');
   const lootTbody = document.getElementById('loot-tbody');
@@ -361,7 +369,8 @@
     }
 
     const skillKey = filter.type === 'skill' ? filter.key : 'overall';
-    const rows = characterList.map(username => {
+    const displayList = getDisplayCharacterList();
+    const rows = displayList.map(username => {
       const d = deltaSource[username];
       const delta = isDelta && d
         ? (d.skillDeltas && skillKey in d.skillDeltas ? d.skillDeltas[skillKey] : d.xpDelta)
@@ -550,7 +559,8 @@
       return 'Coins_5';
     }
     const assetsBase = (typeof window !== 'undefined' && window.location && window.location.origin ? window.location.origin : '') + '/assets/';
-    const rows = characterList.map((username) => ({ username, value: getValue(username) }));
+    const displayList = getDisplayCharacterList();
+    const rows = displayList.map((username) => ({ username, value: getValue(username) }));
     rows.sort((a, b) => b.value - a.value);
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
@@ -574,7 +584,8 @@
     }
     const valueKey = spoopChartMode === 'boss' ? 'bossScore' : spoopChartMode === 'skill' ? 'skillScore' : 'spoopScore';
     const datasetLabel = spoopChartMode === 'boss' ? 'Boss Score' : spoopChartMode === 'skill' ? 'Skill Score' : 'SpoopScore';
-    const rows = (characterList || []).map((username) => {
+    const displayList = getDisplayCharacterList();
+    const rows = (displayList || []).map((username) => {
       const player = playerData[username];
       const bossScore = computeBossPointsForPeriod(null, player);
       const skillScore = totalSkillingScore(player && player.skills ? player.skills : {});
@@ -655,7 +666,7 @@
               ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
               : (bossKey ? formatBossKey(bossKey) : 'Total KC'));
     }
-    const rows = characterList.map(username => {
+    const rows = getDisplayCharacterList().map(username => {
       const d = deltaSource[username];
       const player = playerData[username];
       const kcDelta = isDelta && d
@@ -1216,35 +1227,35 @@
     }
 
     if (isToday) {
-      const sumXp = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.values(todayDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
-      const sumLoot = lootLeaderboardToday.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      const sumXp = Object.entries(todayDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.entries(todayDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboardToday.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (today)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (today)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (today)';
     } else if (isWeek) {
-      const sumXp = Object.values(weekDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.values(weekDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
-      const sumLoot = lootLeaderboardWeek.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      const sumXp = Object.entries(weekDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.entries(weekDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboardWeek.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (this week)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (this week)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (this week)';
     } else if (isMonth) {
-      const sumXp = Object.values(monthDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.values(monthDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
-      const sumLoot = lootLeaderboardMonth.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      const sumXp = Object.entries(monthDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.entries(monthDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboardMonth.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (this month)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (this month)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (this month)';
     } else if (isLast24) {
-      const sumXp = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.values(last24hDeltas).reduce((s, d) => s + (Number(d.bossKcDelta) || 0), 0);
-      const sumLoot = lootLeaderboard24.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      const sumXp = Object.entries(last24hDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
+      const sumBoss = Object.entries(last24hDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumLoot = lootLeaderboard24.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (24h)';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (24h)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (24h)';
     } else {
-      const sumLoot = lootLeaderboardTotal.reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
+      const sumLoot = lootLeaderboardTotal.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(Number(lastXp)).toLocaleString() + ' XP';
       if (bossTotalEl) bossTotalEl.textContent = Math.round(Number(lastBoss)).toLocaleString() + ' kills';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp';
@@ -1652,6 +1663,27 @@
   });
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
+
+  const noChudsToggle = document.getElementById('no-chuds-toggle');
+  if (noChudsToggle) {
+    noChudsToggle.addEventListener('change', function () {
+      noChudsEnabled = noChudsToggle.checked;
+      noChudsToggle.setAttribute('aria-checked', String(noChudsEnabled));
+      renderLeft();
+      renderRight();
+      renderLoot();
+      paintSpoopScoreChart();
+      if (homeViewMode === 'today' && cachedHomeHistoryToday != null) {
+        paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
+      } else if (homeViewMode === 'week' && cachedHomeHistoryWeek != null) {
+        paintHomeCharts(cachedHomeHistoryWeek, 'week', cachedLootHistoryWeek);
+      } else if (homeViewMode === 'month' && cachedHomeHistoryMonth != null) {
+        paintHomeCharts(cachedHomeHistoryMonth, 'month', cachedLootHistoryMonth);
+      } else if (cachedHomeHistory) {
+        paintHomeCharts(cachedHomeHistory, homeViewMode, cachedLootHistory);
+      }
+    });
+  }
 
   if (tabMonth) tabMonth.addEventListener('click', () => setHomeViewMode('month'));
   if (tabWeek) tabWeek.addEventListener('click', () => setHomeViewMode('week'));
