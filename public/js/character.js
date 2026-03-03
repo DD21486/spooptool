@@ -258,6 +258,7 @@
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
     newlinechar: ['Heron'],
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
+    norgentgorge: ['Phoenix'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
