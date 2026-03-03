@@ -875,6 +875,29 @@
       .catch(() => paintSpoopScoreHistoryChart([]));
   }
 
+  function renderAwards(winners) {
+    const norm = (s) => (s || '').toString().trim().toLowerCase();
+    const current = norm(name);
+    const xpCount = winners.xp && norm(winners.xp) === current ? 1 : 0;
+    const bossCount = winners.boss && norm(winners.boss) === current ? 1 : 0;
+    const lootCount = winners.loot && norm(winners.loot) === current ? 1 : 0;
+    const medalHtml = '<img src="/assets/SpoopMedal.png" class="award-medal" alt="" width="28" height="28" />';
+    const awardsXp = document.getElementById('awards-xp');
+    const awardsBoss = document.getElementById('awards-boss');
+    const awardsLoot = document.getElementById('awards-loot');
+    if (awardsXp) awardsXp.innerHTML = Array(xpCount).fill(medalHtml).join('');
+    if (awardsBoss) awardsBoss.innerHTML = Array(bossCount).fill(medalHtml).join('');
+    if (awardsLoot) awardsLoot.innerHTML = Array(lootCount).fill(medalHtml).join('');
+  }
+
+  function loadAwards() {
+    if (!name) return;
+    fetch(API + '/weekly-winners')
+      .then((res) => res.ok ? res.json() : {})
+      .then((data) => renderAwards(data || {}))
+      .catch(() => renderAwards({}));
+  }
+
   async function load() {
     if (!name) {
       showError('No character name in URL. Use ?name=Username');
@@ -909,6 +932,7 @@
       }
       render(data);
       fetchLoot();
+      loadAwards();
     } catch (e) {
       loadingEl.textContent = 'Failed to load';
       showError(e.message || 'Failed to load character');

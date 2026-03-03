@@ -42,6 +42,16 @@
       0%, 100% { background-position: 0% 50%; }
       50% { background-position: 100% 50%; }
     }
+    .award-medal {
+      width: 28px;
+      height: 28px;
+      object-fit: contain;
+      flex-shrink: 0;
+      margin-left: -10px;
+    }
+    .award-medal:first-child {
+      margin-left: 0;
+    }
     .pet-card-gradient {
       width: 60px;
       height: 60px;
@@ -162,6 +172,30 @@
           <!-- Pet cards rendered by character.js -->
         </div>
         <p id="pets-empty" class="hidden text-slate-500 text-sm mt-1">No pets yet.</p>
+      </section>
+
+      <section class="mb-6" aria-label="Awards">
+        <h2 class="text-sm font-semibold text-slate-400 uppercase tracking-wide mb-2">Awards</h2>
+        <div class="grid grid-cols-3 gap-4">
+          <div class="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">XP</p>
+            <div id="awards-xp" class="awards-medals flex items-end min-h-[2.5rem]">
+              <!-- Medals rendered by character.js -->
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Boss KC</p>
+            <div id="awards-boss" class="awards-medals flex items-end min-h-[2.5rem]">
+              <!-- Medals rendered by character.js -->
+            </div>
+          </div>
+          <div class="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+            <p class="text-xs font-medium text-slate-400 uppercase tracking-wide mb-2">Loot</p>
+            <div id="awards-loot" class="awards-medals flex items-end min-h-[2.5rem]">
+              <!-- Medals rendered by character.js -->
+            </div>
+          </div>
+        </div>
       </section>
 
       <section class="mb-6 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden hidden" aria-label="SpoopScore over time" id="spoop-history-section">
