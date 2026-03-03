@@ -251,6 +251,7 @@
   };
   /** Username (lowercase) -> array of pet display names. Update manually when users get pets. */
   const CHARACTER_PETS = {
+    bthunder: ['Giant squirrel'],
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],

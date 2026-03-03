@@ -333,7 +333,10 @@
         <p id="leaderboard-99-empty" class="px-4 py-6 text-slate-500 text-center text-sm hidden">No data yet.</p>
       </section>
       <section class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="Boss diversity leaderboard">
-        <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">Boss diversity %</h2>
+        <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+          <h2 class="text-lg font-semibold text-slate-100">Boss diversity %</h2>
+          <button type="button" id="boss-diversity-wtf-link" class="text-slate-400 hover:text-sky-400 text-sm font-medium focus:outline-none focus:underline">what is boss diversity%?</button>
+        </div>
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead>
@@ -408,6 +411,21 @@
           </ul>
           <p class="text-slate-400">Example: 99 Runecraft (hardest) with 13M XP = 6,375 + 1,000 (difficulty) = <strong class="text-slate-200">7,375</strong>. 99 Fletching (easiest) = 6,375 + 300 = <strong class="text-slate-200">6,675</strong>.</p>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Boss diversity explainer modal -->
+  <div id="boss-diversity-modal-overlay" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" aria-modal="true" aria-labelledby="boss-diversity-modal-title" aria-hidden="true" role="dialog">
+    <div class="bg-slate-800 rounded-xl border border-slate-600 shadow-xl w-full max-w-md" id="boss-diversity-modal">
+      <div class="flex items-center justify-between px-4 py-3 border-b border-slate-600">
+        <h2 id="boss-diversity-modal-title" class="text-lg font-semibold text-slate-100">What is Boss diversity %?</h2>
+        <button type="button" id="boss-diversity-modal-close" class="rounded-lg p-1.5 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>
+      </div>
+      <div class="px-4 py-4 text-sm text-slate-300 space-y-3">
+        <p><strong class="text-slate-100">Boss diversity %</strong> is the share of <em>tracked</em> bosses that a character has at least one kill on.</p>
+        <p>We take all bosses that appear in anyone’s snapshot (e.g. Vorkath, Zulrah, CoX, etc.) and count how many of those bosses you have KC &gt; 0 on. Your percentage is that count divided by the total number of tracked bosses.</p>
+        <p class="text-slate-400">So 100% means you’ve killed every boss we track at least once; a lower % means you’ve focused on fewer bosses (or haven’t been tracked on as many yet).</p>
       </div>
     </div>
   </div>

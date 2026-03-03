@@ -539,6 +539,7 @@
   const PET_POINTS = 4000;
   /** Username (lowercase) -> array of pet display names. Keep in sync with character.js CHARACTER_PETS. */
   const CHARACTER_PETS = {
+    bthunder: ['Giant squirrel'],
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
@@ -1817,6 +1818,28 @@
   });
   document.querySelectorAll('.scoring-tab').forEach((btn) => {
     btn.addEventListener('click', function () { setScoringTab(this.getAttribute('data-tab')); });
+  });
+
+  const bossDiversityWtfLink = document.getElementById('boss-diversity-wtf-link');
+  const bossDiversityModalOverlay = document.getElementById('boss-diversity-modal-overlay');
+  const bossDiversityModalClose = document.getElementById('boss-diversity-modal-close');
+  if (bossDiversityWtfLink && bossDiversityModalOverlay) {
+    bossDiversityWtfLink.addEventListener('click', function () {
+      bossDiversityModalOverlay.classList.remove('hidden');
+      bossDiversityModalOverlay.setAttribute('aria-hidden', 'false');
+    });
+  }
+  if (bossDiversityModalClose) bossDiversityModalClose.addEventListener('click', function () {
+    if (bossDiversityModalOverlay) {
+      bossDiversityModalOverlay.classList.add('hidden');
+      bossDiversityModalOverlay.setAttribute('aria-hidden', 'true');
+    }
+  });
+  if (bossDiversityModalOverlay) bossDiversityModalOverlay.addEventListener('click', function (e) {
+    if (e.target === bossDiversityModalOverlay) {
+      bossDiversityModalOverlay.classList.add('hidden');
+      bossDiversityModalOverlay.setAttribute('aria-hidden', 'true');
+    }
   });
 
   document.getElementById('btn-add').addEventListener('click', openAddModal);
