@@ -539,7 +539,7 @@
   const PET_POINTS = 4000;
   /** Username (lowercase) -> array of pet display names. Keep in sync with character.js CHARACTER_PETS. */
   const CHARACTER_PETS = {
-    bthunder: ['Giant squirrel'],
+    b7hund3r: ['Giant squirrel'],
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
