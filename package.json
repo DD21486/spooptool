@@ -12,6 +12,6 @@
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.0",
-    "osrs-json-hiscores": "^2.24.1"
+    "osrs-json-hiscores": "^2.25.0"
   }
 }
