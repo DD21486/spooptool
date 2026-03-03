@@ -103,6 +103,8 @@
   let todayDeltas = {};
   let weekDeltas = {};
   let monthDeltas = {};
+  let lastWeekDeltas = {};
+  let lastWeekLootLeaderboard = [];
   let lootTopDropsCache = {};
   let homeTooltipHideTimer = null;
 
@@ -728,6 +730,24 @@
     });
   }
 
+  function renderWeeklyWinners() {
+    const xpEl = document.getElementById('weekly-winner-xp-name');
+    const bossEl = document.getElementById('weekly-winner-boss-name');
+    const lootEl = document.getElementById('weekly-winner-loot-name');
+    const xpWinner = characterList
+      .map((u) => ({ username: u, xpDelta: (lastWeekDeltas[u] && lastWeekDeltas[u].xpDelta) || 0 }))
+      .filter((r) => r.xpDelta > 0)
+      .sort((a, b) => b.xpDelta - a.xpDelta)[0];
+    const bossWinner = characterList
+      .map((u) => ({ username: u, bossKcDelta: (lastWeekDeltas[u] && lastWeekDeltas[u].bossKcDelta) || 0 }))
+      .filter((r) => r.bossKcDelta > 0)
+      .sort((a, b) => b.bossKcDelta - a.bossKcDelta)[0];
+    const lootWinner = lastWeekLootLeaderboard[0];
+    if (xpEl) xpEl.textContent = xpWinner ? xpWinner.username : '—';
+    if (bossEl) bossEl.textContent = bossWinner ? bossWinner.username : '—';
+    if (lootEl) lootEl.textContent = lootWinner && lootWinner.username ? lootWinner.username : '—';
+  }
+
   function renderRight() {
     rightLoading.classList.add('hidden');
     rightTbody.innerHTML = '';
@@ -993,17 +1013,19 @@
     rightTbody.innerHTML = '';
     if (lootTbody) lootTbody.innerHTML = '';
     try {
-      const [dataRes, deltasRes, deltasTodayRes, deltasWeekRes, deltasMonthRes, lootTotalRes, loot24Res, lootTodayRes, lootWeekRes, lootMonthRes] = await Promise.all([
+      const [dataRes, deltasRes, deltasTodayRes, deltasWeekRes, deltasMonthRes, deltasLastWeekRes, lootTotalRes, loot24Res, lootTodayRes, lootWeekRes, lootMonthRes, lootLastWeekRes] = await Promise.all([
         fetch(API + '/characters-with-snapshots'),
         fetch(API + '/characters-deltas?hours=24'),
         fetch(API + '/characters-deltas?today=1'),
         fetch(API + '/characters-deltas?week=1'),
         fetch(API + '/characters-deltas?month=1'),
+        fetch(API + '/characters-deltas?lastWeek=1'),
         fetch(API + '/loot?leaderboard=1'),
         fetch(API + '/loot?leaderboard=1&hours=24'),
         fetch(API + '/loot?leaderboard=1&today=1'),
         fetch(API + '/loot?leaderboard=1&week=1'),
         fetch(API + '/loot?leaderboard=1&month=1'),
+        fetch(API + '/loot?leaderboard=1&lastWeek=1'),
       ]);
       if (!dataRes.ok) throw new Error('Failed to load data');
       const data = await dataRes.json();
@@ -1011,6 +1033,7 @@
       const deltasTodayData = await deltasTodayRes.json().catch(() => ({}));
       const deltasWeekData = await deltasWeekRes.json().catch(() => ({}));
       const deltasMonthData = await deltasMonthRes.json().catch(() => ({}));
+      const deltasLastWeekData = await deltasLastWeekRes.json().catch(() => ({}));
       last24hDeltas = {};
       (deltasData.deltas || []).forEach((d) => {
         last24hDeltas[d.username] = {
@@ -1047,6 +1070,17 @@
           bossDeltas: d.bossDeltas || {},
         };
       });
+      lastWeekDeltas = {};
+      (deltasLastWeekData.deltas || []).forEach((d) => {
+        lastWeekDeltas[d.username] = {
+          xpDelta: d.xpDelta,
+          bossKcDelta: d.bossKcDelta,
+          skillDeltas: d.skillDeltas || {},
+          bossDeltas: d.bossDeltas || {},
+        };
+      });
+      const lootLastWeekData = await lootLastWeekRes.json().catch(() => ({}));
+      lastWeekLootLeaderboard = Array.isArray(lootLastWeekData.players) ? lootLastWeekData.players : [];
       const list = data.characters || [];
       characterList = list.map(c => (typeof c === 'string' ? c : c.username));
       playerData = {};
@@ -1079,6 +1113,7 @@
       renderActivity(data.activity || []);
       render99CountLeaderboard();
       renderBossDiversityLeaderboard();
+      renderWeeklyWinners();
       loadHomeCharts();
     } catch (e) {
       console.error(e);
@@ -1759,6 +1794,7 @@
       paintSpoopScoreChart();
       render99CountLeaderboard();
       renderBossDiversityLeaderboard();
+      renderWeeklyWinners();
       if (homeViewMode === 'today' && cachedHomeHistoryToday != null) {
         paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
       } else if (homeViewMode === 'week' && cachedHomeHistoryWeek != null) {

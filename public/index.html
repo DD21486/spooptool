@@ -64,6 +64,32 @@
       0%, 100% { color: #94a3b8; }
       50% { color: var(--flash-color, #fff); }
     }
+    /* Weekly Winner card: gold gradient outline + subtle background, pulsing border */
+    .weekly-winner-card {
+      position: relative;
+      border-radius: 0.5rem;
+      padding: 0.5rem 0.75rem;
+      background: linear-gradient(135deg, rgba(30, 27, 18, 0.9) 0%, rgba(45, 38, 22, 0.85) 50%, rgba(30, 27, 18, 0.9) 100%);
+      box-shadow: inset 0 1px 0 rgba(251, 191, 36, 0.15);
+    }
+    .weekly-winner-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 0.5rem;
+      padding: 1px;
+      background: linear-gradient(135deg, #fbbf24, #f59e0b, #d97706, #b45309, #f59e0b, #fbbf24);
+      background-size: 200% 200%;
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      animation: weekly-winner-border-pulse 2.5s ease-in-out infinite;
+    }
+    @keyframes weekly-winner-border-pulse {
+      0%, 100% { opacity: 1; background-position: 0% 50%; }
+      50% { opacity: 0.85; background-position: 100% 50%; }
+    }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
@@ -208,6 +234,12 @@
             <canvas id="home-chart-xp"></canvas>
           </div>
         </div>
+        <div class="px-4 py-2 border-b border-slate-700">
+          <div id="weekly-winner-xp" class="weekly-winner-card">
+            <p class="text-xs text-amber-400/90 uppercase tracking-wide">Last Week's XP Leader</p>
+            <p id="weekly-winner-xp-name" class="text-base font-semibold text-white truncate">—</p>
+          </div>
+        </div>
         <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
           <h2 id="left-title" class="text-lg font-semibold text-slate-100">Total XP</h2>
           <div class="flex items-center gap-2 flex-shrink-0">
@@ -244,6 +276,12 @@
             <canvas id="home-chart-boss"></canvas>
           </div>
         </div>
+        <div class="px-4 py-2 border-b border-slate-700">
+          <div id="weekly-winner-boss" class="weekly-winner-card">
+            <p class="text-xs text-amber-400/90 uppercase tracking-wide">Last Week's Boss KC Leader</p>
+            <p id="weekly-winner-boss-name" class="text-base font-semibold text-white truncate">—</p>
+          </div>
+        </div>
         <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
           <h2 id="right-title" class="text-lg font-semibold text-slate-100">Boss KC</h2>
           <select id="filter-right-boss" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500 flex-shrink-0 ml-auto" aria-label="Filter by boss">
@@ -272,6 +310,12 @@
           </div>
           <div class="h-36">
             <canvas id="home-chart-loot"></canvas>
+          </div>
+        </div>
+        <div class="px-4 py-2 border-b border-slate-700">
+          <div id="weekly-winner-loot" class="weekly-winner-card">
+            <p class="text-xs text-amber-400/90 uppercase tracking-wide">Last Week's Loot Leader</p>
+            <p id="weekly-winner-loot-name" class="text-base font-semibold text-white truncate">—</p>
           </div>
         </div>
         <div class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">

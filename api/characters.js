@@ -38,8 +38,9 @@ async function handleCharactersDeltas(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
   const today = req.query.today === '1' || req.query.today === 'true';
   const week = req.query.week === '1' || req.query.week === 'true';
+  const lastWeek = req.query.lastWeek === '1' || req.query.lastWeek === 'true';
   const month = req.query.month === '1' || req.query.month === 'true';
-  const hours = (today || week || month) ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
+  const hours = (today || week || lastWeek || month) ? null : Math.min(168, Math.max(1, parseInt(req.query.hours, 10) || 24));
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
   }
@@ -50,16 +51,20 @@ async function handleCharactersDeltas(req, res) {
       ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('day', NOW()) ORDER BY character_id, at ASC`
       : week
         ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') ORDER BY character_id, at ASC`
-        : month
-          ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('month', NOW()) ORDER BY character_id, at ASC`
-          : await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= NOW() - make_interval(hours => ${hours}) ORDER BY character_id, at ASC`;
+        : lastWeek
+          ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - interval '7 days' AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day') ORDER BY character_id, at ASC`
+          : month
+            ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('month', NOW()) ORDER BY character_id, at ASC`
+            : await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= NOW() - make_interval(hours => ${hours}) ORDER BY character_id, at ASC`;
     const lastRows = today
       ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('day', NOW()) ORDER BY character_id, at DESC`
       : week
         ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') ORDER BY character_id, at DESC`
-        : month
-          ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('month', NOW()) ORDER BY character_id, at DESC`
-          : await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= NOW() - make_interval(hours => ${hours}) ORDER BY character_id, at DESC`;
+        : lastWeek
+          ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - interval '7 days' AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day') ORDER BY character_id, at DESC`
+          : month
+            ? await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= date_trunc('month', NOW()) ORDER BY character_id, at DESC`
+            : await sql`SELECT DISTINCT ON (character_id) character_id, at, data FROM character_snapshots WHERE at >= NOW() - make_interval(hours => ${hours}) ORDER BY character_id, at DESC`;
     const firstByChar = {};
     for (const r of firstRows) firstByChar[r.character_id] = r;
     const lastByChar = {};
