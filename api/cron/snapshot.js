@@ -12,6 +12,7 @@
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
+const { computeSpoopScore } = require('../../lib/spoopscore');
 
 /** Delay between batches of parallel requests (to avoid Hiscores rate limit). */
 const DELAY_MS_BETWEEN_BATCHES = 800;
@@ -187,6 +188,40 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  /** SpoopScore snapshots: one row per character per 6-hour UTC slot (0, 6, 12, 18). Upsert so we get ~4 points per day for the 7-day chart. */
+  let spoopScoreWritten = 0;
+  try {
+    const slotDate = new Date();
+    slotDate.setUTCMinutes(0, 0, 0);
+    slotDate.setUTCHours(Math.floor(slotDate.getUTCHours() / 6) * 6, 0, 0, 0);
+    const atSlot = slotDate.toISOString();
+    const latestRows = await sql`
+      SELECT DISTINCT ON (cs.character_id) cs.character_id, cs.data, c.username
+      FROM character_snapshots cs
+      JOIN characters c ON c.id = cs.character_id
+      ORDER BY cs.character_id, cs.at DESC
+    `;
+    for (const row of latestRows || []) {
+      const data = row.data || {};
+      const skills = data.skills || {};
+      const bosses = data.bosses || {};
+      const username = row.username != null ? String(row.username).trim() : null;
+      const { spoopScore, bossScore, skillScore, petPoints } = computeSpoopScore(skills, bosses, username);
+      await sql`
+        INSERT INTO spoopscore_snapshots (character_id, at_slot, spoop_score, boss_score, skill_score, pet_points)
+        VALUES (${row.character_id}, ${atSlot}::timestamptz, ${spoopScore}, ${bossScore}, ${skillScore}, ${petPoints})
+        ON CONFLICT (character_id, at_slot) DO UPDATE SET
+          spoop_score = EXCLUDED.spoop_score,
+          boss_score = EXCLUDED.boss_score,
+          skill_score = EXCLUDED.skill_score,
+          pet_points = EXCLUDED.pet_points
+      `;
+      spoopScoreWritten += 1;
+    }
+  } catch (spoopErr) {
+    console.error('spoopscore_snapshots write', spoopErr?.message || spoopErr);
+  }
+
   try {
     await sql`
       INSERT INTO cron_heartbeat (job_name, last_run_at) VALUES ('snapshot', NOW())
@@ -295,6 +330,7 @@ module.exports = async function handler(req, res) {
     characters: characters.length,
     offset,
     limit,
+    spoopScoreSnapshots: spoopScoreWritten || undefined,
     pruneDeleted: pruneDeleted || undefined,
     setLuckBaseline: setLuckBaseline || undefined,
     baselineRows: setLuckBaseline ? baselineUpdated : undefined,

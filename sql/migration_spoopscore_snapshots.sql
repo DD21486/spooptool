@@ -14,4 +14,4 @@ CREATE TABLE IF NOT EXISTS spoopscore_snapshots (
 CREATE INDEX IF NOT EXISTS idx_spoopscore_snapshots_character_at
   ON spoopscore_snapshots (character_id, at_slot DESC);
 
-COMMENT ON TABLE spoopscore_snapshots IS 'SpoopScore recorded twice daily (noon and 8pm) per character for over-time chart';
+COMMENT ON TABLE spoopscore_snapshots IS 'SpoopScore per character per 6-hour UTC slot (0, 6, 12, 18). Filled by /api/cron/snapshot for 7-day chart.';
