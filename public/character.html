@@ -198,6 +198,16 @@
         </div>
       </section>
 
+      <section class="mb-4 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden" aria-label="SpoopScore last 7 days">
+        <div class="px-4 py-2 flex items-center justify-between gap-2 border-b border-slate-700">
+          <h2 class="text-sm font-semibold text-slate-100">SpoopScore (7 days)</h2>
+          <p id="spoop-7d-pct" class="text-xs font-medium text-slate-400 tabular-nums">—</p>
+        </div>
+        <div class="px-4 py-2" style="height: 120px;">
+          <canvas id="spoop-7d-chart"></canvas>
+        </div>
+      </section>
+
       <section class="mb-6 rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden hidden" aria-label="SpoopScore over time" id="spoop-history-section">
         <h2 class="px-4 py-3 text-lg font-semibold text-slate-100 border-b border-slate-700">SpoopScore over time</h2>
         <p id="spoop-history-empty" class="hidden px-4 py-6 text-slate-500 text-sm text-center">No history yet. SpoopScore is recorded at noon and 8pm (your timezone).</p>

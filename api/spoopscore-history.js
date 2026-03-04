@@ -13,8 +13,6 @@ module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-  // Feature disabled for now — SpoopScore over time chart not in use
-  return res.status(404).json({ error: 'Not found' });
 
   const name = (req.query.name || req.query.username || '').trim().replace(/\s+/g, ' ');
   if (!name) return res.status(400).json({ error: 'Name required' });
@@ -34,6 +32,7 @@ module.exports = async function handler(req, res) {
       SELECT at_slot, spoop_score, boss_score, skill_score, pet_points
       FROM spoopscore_snapshots
       WHERE character_id = ${characterId}
+        AND at_slot >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '8 days'
       ORDER BY at_slot ASC
     `;
     const history = (rows || []).map((r) => ({

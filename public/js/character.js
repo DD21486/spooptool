@@ -458,6 +458,8 @@
     const spoopScoreEl = document.getElementById('spoop-score');
     if (spoopScoreEl) spoopScoreEl.textContent = formatNum(spoopScore);
 
+    loadSpoopScore7DayChart(spoopScore);
+
     const petsRow = document.getElementById('pets-row');
     const petsEmpty = document.getElementById('pets-empty');
     if (petsRow) {
@@ -874,6 +876,104 @@
         paintSpoopScoreHistoryChart(data.history || []);
       })
       .catch(() => paintSpoopScoreHistoryChart([]));
+  }
+
+  let spoop7DayChartInstance = null;
+  /** Build 7 daily points: last 7 days ending today. Today uses currentSpoopScore; earlier days use latest snapshot per day. */
+  function build7DaySeries(history, currentSpoopScore) {
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const labels = [];
+    const values = [];
+    let lastKnown = currentSpoopScore;
+    for (let i = 0; i < 7; i++) {
+      const dayStart = new Date(todayStart);
+      dayStart.setUTCDate(dayStart.getUTCDate() - (6 - i));
+      const dayEnd = new Date(dayStart);
+      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
+      const isToday = i === 6;
+      if (isToday) {
+        labels.push('Today');
+        values.push(currentSpoopScore);
+        lastKnown = currentSpoopScore;
+        continue;
+      }
+      const onDay = (history || []).filter((h) => {
+        const t = new Date(h.at).getTime();
+        return t >= dayStart.getTime() && t < dayEnd.getTime();
+      });
+      const latest = onDay.length ? onDay.reduce((a, b) => (new Date(b.at).getTime() > new Date(a.at).getTime() ? b : a)) : null;
+      const v = latest != null ? (Number(latest.spoopScore) || 0) : null;
+      if (v != null) lastKnown = v;
+      values.push(v != null ? v : lastKnown);
+      labels.push(dayStart.toLocaleString(undefined, { month: 'short', day: 'numeric' }));
+    }
+    return { labels, values };
+  }
+
+  function paintSpoopScore7DayChart(history, currentSpoopScore) {
+    const canvas = document.getElementById('spoop-7d-chart');
+    const pctEl = document.getElementById('spoop-7d-pct');
+    if (!canvas || !pctEl) return;
+    if (spoop7DayChartInstance) {
+      spoop7DayChartInstance.destroy();
+      spoop7DayChartInstance = null;
+    }
+    const { labels, values } = build7DaySeries(history, currentSpoopScore);
+    const sevenDaysAgo = values[0];
+    const yMin = sevenDaysAgo != null && sevenDaysAgo > 0 ? sevenDaysAgo : Math.max(0, currentSpoopScore - Math.max(1, currentSpoopScore * 0.1));
+    const yMax = currentSpoopScore * 1.05;
+    if (sevenDaysAgo != null && sevenDaysAgo > 0) {
+      const pct = ((currentSpoopScore - sevenDaysAgo) / sevenDaysAgo) * 100;
+      const sign = pct >= 0 ? '+' : '';
+      pctEl.textContent = sign + pct.toFixed(1) + '% of previous 7 day period';
+    } else {
+      pctEl.textContent = '—';
+    }
+    if (typeof Chart !== 'undefined') {
+      spoop7DayChartInstance = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'SpoopScore',
+            data: values,
+            borderColor: 'rgb(56, 189, 248)',
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 3,
+            pointHoverRadius: 5,
+          }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: 'index' },
+          plugins: { legend: { display: false } },
+          scales: {
+            x: {
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 7, font: { size: 10 } },
+            },
+            y: {
+              min: yMin,
+              max: yMax,
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', callback: (v) => formatNum(Number(v)), font: { size: 10 } },
+            },
+          },
+        },
+      });
+    }
+  }
+
+  function loadSpoopScore7DayChart(currentSpoopScore) {
+    if (!name) return;
+    fetch(API + '/spoopscore-history?name=' + encodeURIComponent(name))
+      .then((res) => res.ok ? res.json() : { history: [] })
+      .then((data) => paintSpoopScore7DayChart(data.history || [], currentSpoopScore))
+      .catch(() => paintSpoopScore7DayChart([], currentSpoopScore));
   }
 
   function renderAwards(winners) {
