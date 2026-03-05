@@ -879,34 +879,35 @@
   }
 
   let spoop7DayChartInstance = null;
-  /** Build 7 daily points: last 7 days ending today. Today uses currentSpoopScore; earlier days use latest snapshot per day. */
+  /** Build 28 points: every 6 hours for the last 7 days (UTC slots 0, 6, 12, 18). Uses history from API; current score for latest slot. */
   function build7DaySeries(history, currentSpoopScore) {
     const now = new Date();
-    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const historyBySlot = new Map();
+    (history || []).forEach((h) => {
+      const d = new Date(h.at);
+      const slotTs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Math.floor(d.getUTCHours() / 6) * 6, 0, 0, 0);
+      historyBySlot.set(slotTs, Number(h.spoopScore) || 0);
+    });
+
     const labels = [];
     const values = [];
-    let lastKnown = currentSpoopScore;
-    for (let i = 0; i < 7; i++) {
-      const dayStart = new Date(todayStart);
-      dayStart.setUTCDate(dayStart.getUTCDate() - (6 - i));
-      const dayEnd = new Date(dayStart);
-      dayEnd.setUTCDate(dayEnd.getUTCDate() + 1);
-      const isToday = i === 6;
-      if (isToday) {
-        labels.push('Today');
-        values.push(currentSpoopScore);
-        lastKnown = currentSpoopScore;
-        continue;
-      }
-      const onDay = (history || []).filter((h) => {
-        const t = new Date(h.at).getTime();
-        return t >= dayStart.getTime() && t < dayEnd.getTime();
-      });
-      const latest = onDay.length ? onDay.reduce((a, b) => (new Date(b.at).getTime() > new Date(a.at).getTime() ? b : a)) : null;
-      const v = latest != null ? (Number(latest.spoopScore) || 0) : null;
-      if (v != null) lastKnown = v;
-      values.push(v != null ? v : lastKnown);
-      labels.push(dayStart.toLocaleString(undefined, { month: 'short', day: 'numeric' }));
+    const slotMs = 6 * 60 * 60 * 1000;
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
+    sevenDaysAgo.setUTCMinutes(0, 0, 0);
+    sevenDaysAgo.setUTCHours(Math.floor(sevenDaysAgo.getUTCHours() / 6) * 6, 0, 0, 0);
+    const startTs = sevenDaysAgo.getTime();
+    const numSlots = 28;
+
+    for (let i = 0; i < numSlots; i++) {
+      const slotTs = startTs + i * slotMs;
+      const slotDate = new Date(slotTs);
+      const isLatestSlot = slotTs + slotMs > now.getTime();
+      let value = historyBySlot.get(slotTs) ?? null;
+      if (value == null && isLatestSlot) value = currentSpoopScore;
+      values.push(value);
+      const label = slotDate.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', hour12: false });
+      labels.push(label);
     }
     return { labels, values };
   }
@@ -920,30 +921,30 @@
       spoop7DayChartInstance = null;
     }
     const { labels, values } = build7DaySeries(history, currentSpoopScore);
-    const sevenDaysAgo = values[0];
-    const yMin = sevenDaysAgo != null && sevenDaysAgo > 0 ? sevenDaysAgo : Math.max(0, currentSpoopScore - Math.max(1, currentSpoopScore * 0.1));
-    const yMax = currentSpoopScore * 1.05;
+    const knownValues = values.filter((v) => v != null && !Number.isNaN(v));
+    const firstKnown = knownValues[0];
+    const lastKnown = knownValues.length ? knownValues[knownValues.length - 1] : currentSpoopScore;
+    const sevenDaysAgo = firstKnown;
+    const yMin = sevenDaysAgo != null && sevenDaysAgo > 0 ? Math.min(sevenDaysAgo, currentSpoopScore) * 0.99 : Math.max(0, currentSpoopScore - Math.max(1, currentSpoopScore * 0.1));
+    const yMax = (knownValues.length ? Math.max(...knownValues, currentSpoopScore) : currentSpoopScore) * 1.05;
     if (sevenDaysAgo != null && sevenDaysAgo > 0) {
       const pct = ((currentSpoopScore - sevenDaysAgo) / sevenDaysAgo) * 100;
       const sign = pct >= 0 ? '+' : '';
-      pctEl.textContent = sign + pct.toFixed(1) + '% of previous 7 day period';
+      pctEl.textContent = sign + pct.toFixed(1) + '% vs 7 days ago';
     } else {
       pctEl.textContent = '—';
     }
     if (typeof Chart !== 'undefined') {
       spoop7DayChartInstance = new Chart(canvas.getContext('2d'), {
-        type: 'line',
+        type: 'bar',
         data: {
           labels,
           datasets: [{
             label: 'SpoopScore',
             data: values,
+            backgroundColor: 'rgba(56, 189, 248, 0.6)',
             borderColor: 'rgb(56, 189, 248)',
-            backgroundColor: 'rgba(56, 189, 248, 0.15)',
-            fill: true,
-            tension: 0.2,
-            pointRadius: 3,
-            pointHoverRadius: 5,
+            borderWidth: 1,
           }],
         },
         options: {
@@ -954,7 +955,7 @@
           scales: {
             x: {
               grid: { color: 'rgba(148, 163, 184, 0.2)' },
-              ticks: { color: '#94a3b8', maxTicksLimit: 7, font: { size: 10 } },
+              ticks: { color: '#94a3b8', maxTicksLimit: 14, font: { size: 9 } },
             },
             y: {
               min: yMin,
