@@ -939,15 +939,18 @@
     }
     if (typeof Chart !== 'undefined') {
       spoop7DayChartInstance = new Chart(canvas.getContext('2d'), {
-        type: 'bar',
+        type: 'line',
         data: {
           labels,
           datasets: [{
             label: 'SpoopScore',
             data: values,
-            backgroundColor: 'rgba(56, 189, 248, 0.6)',
             borderColor: 'rgb(56, 189, 248)',
-            borderWidth: 1,
+            backgroundColor: 'rgba(56, 189, 248, 0.15)',
+            fill: true,
+            tension: 0.2,
+            pointRadius: 3,
+            pointHoverRadius: 5,
           }],
         },
         options: {
