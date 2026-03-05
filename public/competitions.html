@@ -64,6 +64,47 @@
       </a>
     </div>
 
+    <!-- Active / upcoming competitions list (mock data — will be API-driven once DB is wired up) -->
+    <div class="mb-8">
+      <h2 class="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Active &amp; Upcoming</h2>
+      <div class="space-y-3">
+
+        <!-- Mock: Summer Woodcutting Race -->
+        <a href="competition-detail.html?id=1"
+          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
+          <img src="assets/Woodcutting_icon.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Summer Woodcutting Race</p>
+            <p class="text-xs text-slate-500 mt-0.5">Team &middot; Woodcutting XP &middot; Ends in 5 days</p>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full border border-green-400/30 bg-green-400/10 text-green-400 shrink-0">Active</span>
+        </a>
+
+        <!-- Mock: Vorkath Grind -->
+        <a href="competition-detail.html?id=2"
+          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
+          <img src="assets/bosses/Vorkath.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Vorkath Grind</p>
+            <p class="text-xs text-slate-500 mt-0.5">Solo &middot; Kill Count &middot; Ends in 6 days</p>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full border border-green-400/30 bg-green-400/10 text-green-400 shrink-0">Active</span>
+        </a>
+
+        <!-- Mock: Total XP Blitz -->
+        <a href="competition-detail.html?id=3"
+          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
+          <img src="assets/Skills_icon.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
+          <div class="flex-1 min-w-0">
+            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Total XP Blitz</p>
+            <p class="text-xs text-slate-500 mt-0.5">Solo &middot; Total XP &middot; Starts in 2 days</p>
+          </div>
+          <span class="text-xs px-2 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-400 shrink-0">Upcoming</span>
+        </a>
+
+      </div>
+    </div>
+
     <!-- Under construction card -->
     <div class="max-w-md mx-auto rounded-xl border border-slate-700 bg-slate-800/50 px-10 py-12 flex flex-col items-center gap-5 text-center">
       <img src="assets/Construction_icon.png" alt="Under construction" class="w-16 h-16 object-contain bob" width="64" height="64" />

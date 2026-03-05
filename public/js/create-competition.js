@@ -293,6 +293,8 @@ function fetchPlayers() {
       state.allPlayers = (Array.isArray(data) ? data : []).map(function (p) {
         return p.username || p.name || p.display_name || String(p);
       }).filter(Boolean);
+      // Default all players to selected on first load
+      state.selectedPlayers = state.allPlayers.slice();
       if (state.step === 2) renderStep2();
     })
     .catch(function (err) {
@@ -320,7 +322,13 @@ function renderStep2() {
 }
 
 function renderSoloParticipants(container) {
-  var html = '<h3 class="text-sm font-medium text-slate-300 mb-3">Select Participants</h3>';
+  var allSelected = state.allPlayers.every(function (p) { return state.selectedPlayers.indexOf(p) !== -1; });
+
+  var html = '<div class="flex items-center justify-between mb-3">';
+  html += '<h3 class="text-sm font-medium text-slate-300">Select Participants</h3>';
+  html += '<button type="button" id="select-all-btn" class="text-xs text-sky-400 hover:text-sky-300 transition-colors">'
+    + (allSelected ? 'Deselect All' : 'Select All') + '</button>';
+  html += '</div>';
   html += '<div class="space-y-2">';
 
   state.allPlayers.forEach(function (player) {
@@ -340,6 +348,18 @@ function renderSoloParticipants(container) {
   html += '</div>';
   html += '<p id="participants-error" class="mt-3 text-xs text-red-400 hidden"></p>';
   container.innerHTML = html;
+
+  var selectAllBtn = document.getElementById('select-all-btn');
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener('click', function () {
+      if (allSelected) {
+        state.selectedPlayers = [];
+      } else {
+        state.selectedPlayers = state.allPlayers.slice();
+      }
+      renderSoloParticipants(container);
+    });
+  }
 
   container.querySelectorAll('.player-check').forEach(function (cb) {
     cb.addEventListener('change', function () {
