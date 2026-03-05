@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sandbox – SpoopTool</title>
+
+  <!-- Tailwind CSS play CDN — scans the document at runtime and generates utility classes. -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+
+  <!-- RuneScape bitmap fonts (shared across all SpoopTool pages). -->
+  <link rel="stylesheet" href="css/runescape-fonts.css" />
+  <!-- Page-specific styles: ASCII title animations. Everything else is Tailwind. -->
+  <link rel="stylesheet" href="css/sandbox.css" />
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
+  <div class="max-w-7xl mx-auto px-4 pt-14 sm:pt-3 pb-6 relative">
+
+    <!-- ── Top-right hamburger menu ─────────────────────────────────────── -->
+    <header class="absolute top-3 right-4 z-20 flex justify-end">
+      <div class="relative" id="header-menu-wrap">
+        <!-- Hamburger icon button -->
+        <button type="button" id="header-menu-btn" class="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-600/80" aria-label="Menu" aria-expanded="false" aria-haspopup="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <!-- Dropdown — hidden by default, toggled by sandbox.js -->
+        <div id="header-menu-dropdown" class="absolute right-0 top-full mt-1.5 w-44 rounded-lg border border-slate-600 bg-slate-800 shadow-xl py-1 hidden" role="menu">
+          <a href="/" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm text-sky-400 hover:bg-slate-700 rounded-lg">
+            ← SpoopTool
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- ── ASCII title ───────────────────────────────────────────────────── -->
+    <!-- sandbox.js injects the "SANDBOX" figlet art and wires up the
+         character-by-character fade-in, shimmer, and flash animations. -->
+    <div class="flex flex-col items-center mb-8">
+      <pre id="ascii-title" class="m-0" aria-hidden="true"><!-- filled by sandbox.js --></pre>
+    </div>
+
+    <!-- ── EHP Skill Rates section ──────────────────────────────────────── -->
+    <!-- Fetches from https://api.wiseoldman.net/v2/efficiency/rates?metric=ehp
+         Collapsible: click the header to show/hide the table body. -->
+    <section class="rounded-xl border border-slate-700 bg-slate-800/50">
+
+      <!-- Section header — also acts as the collapse toggle button -->
+      <div id="section-header" class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-800/40">
+        <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+          <span id="section-arrow" class="text-slate-500 text-xs">▼</span>
+          EHP Skill Rates
+        </h2>
+        <!-- Account type selector — clicking this does NOT collapse the section -->
+        <div class="flex items-center gap-2" id="section-controls">
+          <label for="type-select" class="text-sm text-slate-400">Account type:</label>
+          <select id="type-select" class="px-2 py-1 rounded bg-slate-700 border border-slate-600 text-sm focus:ring-1 focus:ring-sky-500">
+            <option value="main">Main</option>
+            <option value="ironman">Ironman</option>
+            <option value="ultimate">Ultimate</option>
+            <option value="hardcore">Hardcore</option>
+            <option value="f2p">F2P</option>
+            <option value="f2p_ironman">F2P Ironman</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Collapsible body — hidden/shown by sandbox.js -->
+      <div id="section-body">
+        <div class="overflow-x-clip">
+          <table class="w-full text-sm">
+            <!-- Sticky header row stays visible while scrolling through results -->
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-700 bg-slate-800">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Skill</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Method</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Start XP</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Start Lvl</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">End XP</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">End Lvl</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Rate (XP/hr)</th>
+              </tr>
+            </thead>
+            <!-- Rows injected by sandbox.js after the API responds -->
+            <tbody id="rates-tbody"></tbody>
+          </table>
+        </div>
+        <p id="rates-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
+        <p id="rates-error" class="px-4 py-6 text-red-400 text-center hidden"></p>
+      </div>
+    </section>
+
+    <!-- ── Level XP Thresholds section ──────────────────────────────────── -->
+    <!-- Computed client-side from the OSRS XP formula — no API call needed.
+         Collapsible: click the header to show/hide the table body. -->
+    <section class="mt-6 rounded-xl border border-slate-700 bg-slate-800/50">
+
+      <!-- Section header — acts as the collapse toggle button -->
+      <div id="xp-section-header" class="px-4 py-3 border-b border-slate-700 flex items-center gap-2 cursor-pointer select-none hover:bg-slate-800/40">
+        <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+          <span id="xp-section-arrow" class="text-slate-500 text-xs">▼</span>
+          Level XP Thresholds
+        </h2>
+      </div>
+
+      <!-- Collapsible body — hidden/shown by sandbox.js -->
+      <div id="xp-section-body" class="overflow-x-clip">
+        <table class="w-full text-sm">
+          <!-- Sticky header row stays visible while scrolling through all 99 levels -->
+          <thead class="sticky top-0 z-10">
+            <tr class="border-b border-slate-700 bg-slate-800">
+              <th class="text-right px-4 py-2 text-slate-400 font-medium">Level</th>
+              <th class="text-right px-4 py-2 text-slate-400 font-medium">Start XP</th>
+              <th class="text-right px-4 py-2 text-slate-400 font-medium">End XP</th>
+              <th class="text-right px-4 py-2 text-slate-400 font-medium">XP to Next Level</th>
+            </tr>
+          </thead>
+          <!-- 99 rows injected by sandbox.js on page load -->
+          <tbody id="xp-tbody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <p class="mt-8 text-center text-xs text-slate-500">Sandbox — not linked from main nav</p>
+  </div>
+
+  <!-- All page behaviour: menu, ASCII art, EHP table, XP table. -->
+  <!-- Loaded at the end of <body> so all DOM elements exist when it runs. -->
+  <script src="js/sandbox.js"></script>
+</body>
+</html>

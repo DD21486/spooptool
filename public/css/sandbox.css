@@ -1,0 +1,80 @@
+/* sandbox.css — styles for the SANDBOX ascii title animation.
+   All other styling is handled by Tailwind CSS (loaded via CDN in the HTML). */
+
+body { background-color: #0f172a; }
+
+/* ── ASCII title container ───────────────────────────────────────────────── */
+/* Renders the figlet-style "SANDBOX" art as a centred monospace block. */
+#ascii-title {
+  font-family: ui-monospace, monospace;
+  font-size: clamp(0.35rem, 1.5vw, 0.6rem); /* scales with viewport width */
+  line-height: 1.2;
+  white-space: pre;   /* preserve spaces and newlines in the art */
+  overflow-x: auto;
+  text-align: center;
+}
+
+/* Gradient text applied to the whole art block via background-clip trick. */
+#ascii-title .ascii-gradient-inner {
+  background: linear-gradient(90deg, #3b82f6, #06b6d4, #14b8a6, #10b981, #8b5cf6, #a855f7, #3b82f6);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: ascii-gradient 6s ease-in-out infinite;
+}
+
+/* Chrome can't paint background-clip:text when the text is inside child
+   <span> elements, so we fall back to a solid sky-blue colour instead. */
+#ascii-title.ascii-chrome .ascii-gradient-inner {
+  background: none;
+  background-image: none;
+  -webkit-text-fill-color: #38bdf8;
+  color: #38bdf8;
+  animation: none;
+}
+
+/* Slow left-right pan of the gradient so the colours shift over time. */
+@keyframes ascii-gradient {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+/* ── Per-character fade-in ───────────────────────────────────────────────── */
+/* Each character starts invisible; JS sets an animation-delay so they
+   appear row-by-row over ~3 seconds after the page loads. */
+#ascii-title .ascii-char {
+  opacity: 0;
+  animation: ascii-fade-in 0.08s ease-out forwards;
+  color: inherit;
+  -webkit-text-fill-color: inherit;
+}
+
+@keyframes ascii-fade-in {
+  to { opacity: 1; }
+}
+
+/* ── Shimmer effect ──────────────────────────────────────────────────────── */
+/* JS randomly picks visible characters and adds this class to create a
+   subtle pulsing glow after the initial fade-in completes. */
+#ascii-title .ascii-char.ascii-shimmer {
+  animation: ascii-shimmer 2s ease-in-out;
+}
+
+@keyframes ascii-shimmer {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Flash effect ────────────────────────────────────────────────────────── */
+/* JS randomly flashes individual characters a bright colour.
+   --flash-color is set inline per element so each flash can be a different hue. */
+#ascii-title .ascii-char.ascii-flash {
+  animation: ascii-flash 0.8s ease-in-out;
+}
+
+@keyframes ascii-flash {
+  0%, 100% { color: #94a3b8; }
+  50% { color: var(--flash-color, #fff); }
+}
