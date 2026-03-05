@@ -5,17 +5,13 @@
  * channel. Use this so collaborators can see deploy results without Vercel
  * team access (e.g. on Hobby plan).
  *
+ * Optional env:
+ *   DISCORD_DEPLOY_MENTION_IDS - Comma-separated Discord user IDs to @mention on failure only (e.g. 123456789,987654321). Enable Developer Mode in Discord, right-click user → Copy User ID.
+ *
  * Setup:
  * 1. Discord: Create an Incoming Webhook for the channel (Channel → Edit → Integrations → Webhooks).
  * 2. Vercel env: Add DISCORD_DEPLOY_WEBHOOK_URL with that webhook URL.
- * 3. Vercel webhook: In project Settings → Webhooks (or via API), add a webhook
- *    URL: https://your-app.vercel.app/api/vercel-deploy-notify
- *    Events: deployment.succeeded, deployment.error, deployment.canceled
- *
- * Vercel webhooks are created via Dashboard (Project → Settings → Integrations / Webhooks)
- * or via REST API: POST https://api.vercel.com/v1/webhooks with body
- * { "url": "https://...", "events": ["deployment.succeeded", "deployment.error", "deployment.canceled"] }
- * (requires Vercel API token from vercel.com/account/tokens)
+ * 3. Vercel webhook: Register URL https://your-app.vercel.app/api/vercel-deploy-notify for deployment.succeeded, deployment.error, deployment.canceled
  */
 
 function cors(res) {
@@ -51,11 +47,18 @@ module.exports = async function handler(req, res) {
   const projectName = project.name || 'SpoopTool';
   const deploymentUrl = deployment.url || deployment.links?.preview || '';
   const state = deployment.state || '';
-  const commitMessage = (deployment.meta && deployment.meta.githubCommitMessage) || (deployment.meta && deployment.meta.gitCommitMessage) || '';
+  const meta = deployment.meta || {};
+  const commitMessage = meta.githubCommitMessage || meta.gitCommitMessage || '';
 
   const isSuccess = type === 'deployment.succeeded' || state === 'READY';
   const isError = type === 'deployment.error' || state === 'ERROR';
   const isCanceled = type === 'deployment.canceled' || state === 'CANCELED';
+
+  const errorMessage = deployment.errorMessage || deployment.error || payload.errorMessage || payload.error || '';
+  const deploymentId = deployment.uid || deployment.id || '';
+  const vercelDashboardLink = deploymentId
+    ? `https://vercel.com/dashboard/deployments/${deploymentId}`
+    : '';
 
   let color = 0x3b82f6; // blue
   let title = 'Deploy';
@@ -72,17 +75,36 @@ module.exports = async function handler(req, res) {
     title = `Deploy: ${type || state || 'unknown'}`;
   }
 
-  const description = [
+  const descriptionParts = [
     `**${projectName}**`,
-    deploymentUrl ? `🔗 ${deploymentUrl}` : '',
-    commitMessage ? `\n${String(commitMessage).trim().slice(0, 200)}${commitMessage.length > 200 ? '…' : ''}` : '',
-  ].filter(Boolean).join('\n');
+    deploymentUrl ? `🔗 [Preview](${deploymentUrl})` : '',
+    commitMessage ? `\n${String(commitMessage).trim().slice(0, 300)}${commitMessage.length > 300 ? '…' : ''}` : '',
+  ];
+  if (isError && errorMessage) {
+    const errStr = String(errorMessage).trim().slice(0, 500);
+    descriptionParts.push(`\n**Error:**\n\`\`\`${errStr}${errorMessage.length > 500 ? '…' : ''}\`\`\``);
+  }
+  if (vercelDashboardLink) {
+    descriptionParts.push(`\n[View in Vercel →](${vercelDashboardLink})`);
+  }
+  const description = descriptionParts.filter(Boolean).join('\n') || 'No details.';
+
+  const mentionIds = (process.env.DISCORD_DEPLOY_MENTION_IDS || '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const mentionContent =
+    isError && mentionIds.length > 0
+      ? mentionIds.map((id) => `<@${id}>`).join(' ') + ' Deploy failed.'
+      : null;
 
   const discordBody = {
+    content: mentionContent || undefined,
+    allowed_mentions: mentionIds.length > 0 ? { parse: ['users'] } : undefined,
     embeds: [
       {
         title,
-        description: description || 'No details.',
+        description,
         color,
         footer: { text: 'Vercel → Discord' },
         timestamp: new Date().toISOString(),
