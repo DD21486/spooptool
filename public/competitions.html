@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Competitions – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: 'class' };
+  </script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <style>
+    body { background-color: #0f172a; }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    .bob { animation: bob 2.5s ease-in-out infinite; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
+  <div class="max-w-7xl mx-auto px-4 pt-14 sm:pt-6 pb-6 relative">
+
+    <!-- Top-right hamburger menu -->
+    <header class="absolute top-3 right-4 z-20 flex justify-end">
+      <div class="relative" id="header-menu-wrap">
+        <button type="button" id="header-menu-btn" class="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-600/80" aria-label="Menu" aria-expanded="false" aria-haspopup="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div id="header-menu-dropdown" class="absolute right-0 top-full mt-1.5 w-44 rounded-lg border border-slate-600 bg-slate-800 shadow-xl py-1 hidden" role="menu">
+          <a href="index.html" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm text-sky-400 hover:bg-slate-700 rounded-lg">
+            ← SpoopTool
+          </a>
+        </div>
+      </div>
+    </header>
+    <script>
+      (function () {
+        var btn = document.getElementById('header-menu-btn');
+        var dropdown = document.getElementById('header-menu-dropdown');
+        if (!btn || !dropdown) return;
+        function open() { dropdown.classList.remove('hidden'); btn.setAttribute('aria-expanded', 'true'); }
+        function close() { dropdown.classList.add('hidden'); btn.setAttribute('aria-expanded', 'false'); }
+        function toggle() { if (dropdown.classList.contains('hidden')) open(); else close(); }
+        btn.addEventListener('click', function (e) { e.stopPropagation(); toggle(); });
+        document.addEventListener('click', function () { close(); });
+        dropdown.addEventListener('click', function (e) { e.stopPropagation(); });
+      })();
+    </script>
+
+    <!-- Page title -->
+    <div class="flex flex-col items-center mt-12 mb-10">
+      <h1 class="text-4xl font-bold text-slate-100 tracking-tight">Competitions</h1>
+    </div>
+
+    <!-- Under construction card -->
+    <div class="max-w-md mx-auto rounded-xl border border-slate-700 bg-slate-800/50 px-10 py-12 flex flex-col items-center gap-5 text-center">
+      <img src="assets/Construction_icon.png" alt="Under construction" class="w-16 h-16 object-contain bob" width="64" height="64" />
+      <div>
+        <p class="text-xl font-semibold text-slate-100">Under Construction</p>
+        <p class="mt-2 text-sm text-slate-400">We're building something here.<br/>Check back soon!</p>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>
