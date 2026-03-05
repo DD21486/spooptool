@@ -902,12 +902,15 @@
     for (let i = 0; i < numSlots; i++) {
       const slotTs = startTs + i * slotMs;
       const slotDate = new Date(slotTs);
-      const isLatestSlot = slotTs + slotMs > now.getTime();
+      const isInRange = slotTs + slotMs > now.getTime();
       let value = historyBySlot.get(slotTs) ?? null;
-      if (value == null && isLatestSlot) value = currentSpoopScore;
+      if (value == null && (isInRange || i === numSlots - 1)) value = currentSpoopScore;
       values.push(value);
       const label = slotDate.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', hour12: false });
       labels.push(label);
+    }
+    if (!history || history.length === 0) {
+      for (let i = 0; i < values.length; i++) values[i] = currentSpoopScore;
     }
     return { labels, values };
   }
