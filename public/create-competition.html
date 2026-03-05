@@ -51,32 +51,22 @@
           <p id="name-error" class="mt-1.5 text-xs text-red-400 hidden"></p>
         </div>
 
-        <!-- Competition type: Solo vs Team -->
+        <!-- Competition type: Solo vs Team — rendered by JS -->
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Competition Type</label>
-          <div class="inline-flex rounded-lg border border-slate-600 overflow-hidden">
-            <button type="button" data-type="solo"
-              class="type-btn px-6 py-2 text-sm font-medium bg-sky-600 text-white transition-colors">Solo</button>
-            <button type="button" data-type="team"
-              class="type-btn px-6 py-2 text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors border-l border-slate-600">Team</button>
-          </div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Competition Type</label>
+          <div id="type-options" class="space-y-2"></div>
         </div>
 
-        <!-- Category: Skill vs Boss -->
+        <!-- Category: Skill vs Boss — rendered by JS -->
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-1.5">Category</label>
-          <div class="inline-flex rounded-lg border border-slate-600 overflow-hidden">
-            <button type="button" data-category="skill"
-              class="cat-btn px-6 py-2 text-sm font-medium bg-sky-600 text-white transition-colors">Skill</button>
-            <button type="button" data-category="boss"
-              class="cat-btn px-6 py-2 text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors border-l border-slate-600">Boss</button>
-          </div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Category</label>
+          <div id="category-options" class="space-y-2"></div>
         </div>
 
-        <!-- Metric — options rendered by JS based on category -->
+        <!-- Metric — rendered by JS based on selected category -->
         <div>
           <label class="block text-sm font-medium text-slate-300 mb-2">Metric</label>
-          <div id="metric-options" class="grid grid-cols-2 gap-2"></div>
+          <div id="metric-options" class="space-y-2"></div>
           <p id="metric-error" class="mt-1.5 text-xs text-red-400 hidden"></p>
         </div>
 
