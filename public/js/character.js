@@ -728,7 +728,7 @@
 
     const rangeLabel = lootPeriodHours === 24 ? 'Last 24 hours' : (lootPeriodHours === 168 ? 'Last 7 days' : 'all time');
     const lootTopHeading = document.getElementById('loot-top-heading');
-    if (lootTopHeading) lootTopHeading.textContent = 'Top 20 most valuable (' + rangeLabel + ')';
+    if (lootTopHeading) lootTopHeading.textContent = 'Recent drops (' + rangeLabel + ')';
 
     const spriteUrl = (id) => API + '/loot?icon=1&id=' + Number(id);
     function coinTierForValue(gp) {
@@ -753,8 +753,9 @@
       }
       return '<td class="px-4 py-2 text-center" title="' + escapeHtml(title) + '">' + content + '</td>';
     };
+    const hasIds = drops.length > 0 && drops.some((d) => d.id != null);
     lootTbody.innerHTML = drops.length === 0
-      ? '<tr><td colspan="5" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
+      ? '<tr><td colspan="6" class="px-4 py-6 text-slate-500 text-center">No loot recorded yet.</td></tr>'
       : drops.map((d) => {
           const valueStr = d.total_value_gp >= 1e6 ? (d.total_value_gp / 1e6).toFixed(2) + 'M' : formatNum(d.total_value_gp);
           const itemId = d.item_id != null && !Number.isNaN(Number(d.item_id)) ? Number(d.item_id) : null;
@@ -768,12 +769,17 @@
           const assetsBase = (typeof window !== 'undefined' && window.location && window.location.origin ? window.location.origin : '') + '/assets/';
           const coinImg = '<img src="' + escapeHtml(assetsBase + coinTier + '.webp') + '" alt="" width="16" height="16" class="w-4 h-4 object-contain shrink-0" loading="lazy" onerror="this.style.display=\'none\'">';
           const valueCell = '<td class="px-4 py-2 text-right font-mono text-slate-200"><div class="flex items-center justify-end gap-1.5">' + coinImg + '<span>' + escapeHtml(valueStr) + '</span></div></td>';
-          return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
+          const dropId = d.id != null ? String(d.id) : '';
+          const actionsCell = hasIds && dropId
+            ? '<td class="px-2 py-2 text-right align-middle"><div class="relative inline-block"><button type="button" class="loot-row-menu-btn opacity-0 group-hover:opacity-100 p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700 transition-opacity" data-drop-id="' + escapeHtml(dropId) + '" aria-label="Row actions">⋮</button><div class="loot-row-menu absolute right-0 top-full mt-0.5 py-1 min-w-[8rem] rounded-lg border border-slate-600 bg-slate-800 shadow-xl hidden z-10"><button type="button" class="loot-delete-entry-btn w-full text-left px-3 py-1.5 text-sm text-slate-200 hover:bg-slate-700" data-drop-id="' + escapeHtml(dropId) + '">Delete entry</button></div></div></td>'
+            : '<td class="px-2 py-2 w-10"></td>';
+          return '<tr class="group border-b border-slate-700/50 hover:bg-slate-800/50" data-drop-id="' + escapeHtml(dropId) + '">' +
             nameCell +
             fromCell +
             qtyCell +
             valueCell +
             luckCell(d) +
+            actionsCell +
             '</tr>';
         }).join('');
 
@@ -781,7 +787,7 @@
   }
 
   function fetchLoot() {
-    let url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=20&hours=' + lootPeriodHours;
+    let url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=50&hours=' + lootPeriodHours + '&perDrop=1';
     if (lootSourceFilter) url += '&source=' + encodeURIComponent(lootSourceFilter);
     fetch(url)
       .then((r) => r.json())
@@ -1309,5 +1315,88 @@
     lootSourceFilter = (this.value || '').trim();
     fetchLoot();
   });
+
+  (function setupLootDelete() {
+    const modal = document.getElementById('loot-delete-modal');
+    const confirmInput = document.getElementById('loot-delete-confirm-input');
+    const errorEl = document.getElementById('loot-delete-error');
+    const cancelBtn = document.getElementById('loot-delete-cancel');
+    const submitBtn = document.getElementById('loot-delete-submit');
+    let pendingDeleteId = null;
+
+    function closeAllMenus() {
+      document.querySelectorAll('.loot-row-menu').forEach((m) => m.classList.add('hidden'));
+    }
+
+    function openDeleteModal(dropId) {
+      pendingDeleteId = dropId;
+      if (confirmInput) confirmInput.value = '';
+      if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
+      if (submitBtn) submitBtn.disabled = true;
+      if (modal) { modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false'); }
+      if (confirmInput) confirmInput.focus();
+    }
+
+    function closeDeleteModal() {
+      pendingDeleteId = null;
+      if (modal) { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); }
+    }
+
+    if (lootTbody) {
+      lootTbody.addEventListener('click', function (e) {
+        const menuBtn = e.target.closest('.loot-row-menu-btn');
+        const deleteEntryBtn = e.target.closest('.loot-delete-entry-btn');
+        if (menuBtn) {
+          e.stopPropagation();
+          const menu = menuBtn.parentElement.querySelector('.loot-row-menu');
+          const isOpen = menu && !menu.classList.contains('hidden');
+          closeAllMenus();
+          if (menu && !isOpen) menu.classList.remove('hidden');
+        } else if (deleteEntryBtn) {
+          e.stopPropagation();
+          const dropId = deleteEntryBtn.getAttribute('data-drop-id');
+          closeAllMenus();
+          if (dropId) openDeleteModal(dropId);
+        }
+      });
+    }
+    document.addEventListener('click', closeAllMenus);
+
+    if (confirmInput) {
+      confirmInput.addEventListener('input', function () {
+        const ok = (this.value || '').trim() === 'DELETE';
+        if (submitBtn) submitBtn.disabled = !ok;
+      });
+      confirmInput.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') closeDeleteModal();
+      });
+    }
+    if (cancelBtn) cancelBtn.addEventListener('click', closeDeleteModal);
+    if (submitBtn) submitBtn.addEventListener('click', async function () {
+      if (this.disabled || !pendingDeleteId || !name) return;
+      if ((confirmInput.value || '').trim() !== 'DELETE') return;
+      if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
+      try {
+        const res = await fetch(API + '/loot', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: parseInt(pendingDeleteId, 10), player: name, confirm: 'DELETE' }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          if (errorEl) { errorEl.textContent = data.error || 'Failed to delete'; errorEl.classList.remove('hidden'); }
+          return;
+        }
+        closeDeleteModal();
+        fetchLoot();
+      } catch (err) {
+        if (errorEl) { errorEl.textContent = err.message || 'Request failed'; errorEl.classList.remove('hidden'); }
+      }
+    });
+    if (modal) modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeDeleteModal();
+    });
+  })();
+
   load();
 })();

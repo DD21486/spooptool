@@ -15,7 +15,7 @@ const { insertActivity } = require('../lib/activity-log');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 }
 
@@ -199,7 +199,7 @@ module.exports = async function handler(req, res) {
   if (req.method === 'GET' && (req.query.testLeaderboard === '1' || req.query.testLeaderboard === 'true')) {
     return handleTestLeaderboardWebhook(res);
   }
-  if (req.method !== 'GET' && req.method !== 'POST') {
+  if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
@@ -209,6 +209,33 @@ module.exports = async function handler(req, res) {
 
   try {
     const sql = neon(process.env.DATABASE_URL);
+
+    if (req.method === 'DELETE') {
+      let body;
+      try {
+        body = typeof req.body === 'object' && req.body !== null ? req.body : {};
+      } catch (_) {
+        body = {};
+      }
+      const idParam = body.id != null ? body.id : req.query.id;
+      const id = idParam != null ? parseInt(idParam, 10) : NaN;
+      const playerParam = body.player || body.username || req.query.player || req.query.username || '';
+      const player = String(playerParam).trim().replace(/\s+/g, ' ').substring(0, 12);
+      const confirm = String(body.confirm || '').trim();
+      if (confirm !== 'DELETE' || !player || !Number.isInteger(id) || id < 1) {
+        return res.status(400).json({ error: 'Missing or invalid id, player, or confirm (must be the word DELETE)' });
+      }
+      const rows = await sql`
+        SELECT id, username FROM loot_drops
+        WHERE id = ${id} AND LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+        LIMIT 1
+      `;
+      if (rows.length === 0) {
+        return res.status(404).json({ error: 'Loot entry not found or not owned by this player' });
+      }
+      await sql`DELETE FROM loot_drops WHERE id = ${id} AND LOWER(TRIM(username)) = LOWER(TRIM(${player}))`;
+      return res.status(200).json({ ok: true });
+    }
 
     if (req.method === 'GET') {
       const player = (req.query.player || req.query.username || '').trim().replace(/\s+/g, ' ');
@@ -422,6 +449,155 @@ module.exports = async function handler(req, res) {
           WHERE character_id = ${characterId}
         `;
         baselineRows.forEach((r) => { if (r.boss_key) luckBossKeys.add(r.boss_key); });
+      }
+
+      const perDrop = req.query.perDrop === '1' || req.query.perDrop === 'true';
+      if (perDrop) {
+        let rawRows;
+        try {
+          if (monthParam) {
+            rawRows = sourceFilter != null
+              ? await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= date_trunc('month', NOW())
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= date_trunc('month', NOW())
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `;
+          } else if (periodFilter != null) {
+            rawRows = sourceFilter != null
+              ? await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND at >= NOW() - make_interval(hours => ${periodFilter})
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `;
+          } else {
+            rawRows = sourceFilter != null
+              ? await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    AND TRIM(source) = TRIM(${sourceFilter})
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `
+              : await sql`
+                  SELECT id, item_id, item_name, quantity, total_value_gp, source, at, luck_delta
+                  FROM loot_drops
+                  WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                  ORDER BY at DESC
+                  LIMIT ${limit}
+                `;
+          }
+        } catch (rawErr) {
+          const msg = (rawErr && rawErr.message) || String(rawErr);
+          if (msg.includes('luck_delta') || msg.includes('does not exist')) {
+            if (monthParam) {
+              rawRows = sourceFilter != null
+                ? await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= date_trunc('month', NOW())
+                      AND TRIM(source) = TRIM(${sourceFilter})
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `
+                : await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= date_trunc('month', NOW())
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `;
+            } else if (periodFilter != null) {
+              rawRows = sourceFilter != null
+                ? await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= NOW() - make_interval(hours => ${periodFilter})
+                      AND TRIM(source) = TRIM(${sourceFilter})
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `
+                : await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND at >= NOW() - make_interval(hours => ${periodFilter})
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `;
+            } else {
+              rawRows = sourceFilter != null
+                ? await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                      AND TRIM(source) = TRIM(${sourceFilter})
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `
+                : await sql`
+                    SELECT id, item_id, item_name, quantity, total_value_gp, source, at
+                    FROM loot_drops
+                    WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+                    ORDER BY at DESC
+                    LIMIT ${limit}
+                  `;
+            }
+            rawRows = rawRows.map((r) => ({ ...r, luck_delta: null }));
+          } else {
+            throw rawErr;
+          }
+        }
+        const drops = rawRows.map((r) => {
+          const src = r.source != null ? String(r.source).trim() : '';
+          const affectsLuck = src !== '' && luckBossKeys.has(src.toLowerCase());
+          const luckDelta = r.luck_delta != null && Number.isFinite(Number(r.luck_delta)) ? Number(r.luck_delta) : null;
+          return {
+            id: r.id,
+            item_id: r.item_id != null ? r.item_id : null,
+            item_name: r.item_name,
+            quantity: r.quantity,
+            total_value_gp: Number(r.total_value_gp),
+            source: r.source != null ? r.source : null,
+            affects_luck: affectsLuck,
+            luck_delta: luckDelta,
+          };
+        });
+        res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=90');
+        return res.status(200).json({
+          totalDrops: a.total_drops,
+          totalValueGp: Number(a.total_value_gp),
+          lootHistory: lootHistory.length ? lootHistory : undefined,
+          drops,
+          sources,
+        });
       }
 
       let grouped;

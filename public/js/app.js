@@ -1934,6 +1934,360 @@
     if (e.target === addModal) closeAddModal();
   });
 
+  (function setupRaidLootHandout() {
+    const RAID_STORAGE_KEY = 'spooptool_raid_handout_unlocked';
+    const RAID_PWD_STORAGE_KEY = 'spooptool_raid_handout_pwd';
+    const modal = document.getElementById('raid-loot-handout-modal');
+    const passwordView = document.getElementById('raid-handout-password-view');
+    const formView = document.getElementById('raid-handout-form-view');
+    const passwordInput = document.getElementById('raid-handout-password');
+    const passwordError = document.getElementById('raid-handout-password-error');
+    const unlockBtn = document.getElementById('raid-handout-unlock');
+    const itemSelect = document.getElementById('raid-handout-item');
+    const itemValueEl = document.getElementById('raid-handout-item-value');
+    const primarySelect = document.getElementById('raid-handout-primary');
+    const atInput = document.getElementById('raid-handout-at');
+    const splitCheckbox = document.getElementById('raid-handout-split');
+    const splitSection = document.getElementById('raid-handout-split-section');
+    const partnersContainer = document.getElementById('raid-handout-partners');
+    const addPartnerBtn = document.getElementById('raid-handout-add-partner');
+    const splitTotalEl = document.getElementById('raid-handout-split-total');
+    const submitErrorEl = document.getElementById('raid-handout-submit-error');
+    const confirmBtn = document.getElementById('raid-handout-confirm');
+    const cancelBtn = document.getElementById('raid-handout-cancel');
+    const confirmDialog = document.getElementById('raid-handout-confirm-dialog');
+    const confirmText = document.getElementById('raid-handout-confirm-text');
+    const confirmNo = document.getElementById('raid-handout-confirm-no');
+    const confirmYes = document.getElementById('raid-handout-confirm-yes');
+    const headerMenuDropdown = document.getElementById('header-menu-dropdown');
+
+    let raidHandoutItems = [];
+    let raidHandoutPassword = '';
+
+    function formatGp(n) {
+      if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B';
+      if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M';
+      if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+      return String(n);
+    }
+
+    function closeRaidHandoutModal() {
+      if (modal) {
+        modal.classList.add('hidden');
+        modal.setAttribute('aria-hidden', 'true');
+      }
+      if (headerMenuDropdown) headerMenuDropdown.classList.add('hidden');
+    }
+
+    function showFormView() {
+      if (passwordView) passwordView.classList.add('hidden');
+      if (formView) formView.classList.remove('hidden');
+      populateRaidHandoutForm();
+    }
+
+    function populateRaidHandoutForm() {
+      if (!itemSelect || !primarySelect) return;
+      itemSelect.innerHTML = '<option value="">Select item…</option>';
+      raidHandoutItems.forEach((it, i) => {
+        const opt = document.createElement('option');
+        opt.value = i;
+        opt.textContent = it.name + ' (' + it.raid + ') — ' + formatGp(it.valueGp) + ' gp';
+        itemSelect.appendChild(opt);
+      });
+      itemValueEl.textContent = '';
+      primarySelect.innerHTML = '<option value="">Select player…</option>';
+      const list = characterList && characterList.length ? characterList : [];
+      list.forEach((u) => {
+        const opt = document.createElement('option');
+        opt.value = typeof u === 'string' ? u : (u && u.username) || '';
+        opt.textContent = opt.value || '—';
+        primarySelect.appendChild(opt);
+      });
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const h = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      if (atInput) atInput.value = y + '-' + m + '-' + d + 'T' + h + ':' + min;
+      if (splitCheckbox) splitCheckbox.checked = false;
+      if (splitSection) splitSection.classList.add('hidden');
+      partnersContainer.innerHTML = '';
+      updateSplitTotal();
+    }
+
+    function updateItemValue() {
+      const idx = parseInt(itemSelect.value, 10);
+      if (Number.isNaN(idx) || idx < 0 || !raidHandoutItems[idx]) {
+        itemValueEl.textContent = '';
+        return;
+      }
+      itemValueEl.textContent = 'Value: ' + formatGp(raidHandoutItems[idx].valueGp) + ' gp';
+    }
+
+    function addPartnerRow() {
+      const row = document.createElement('div');
+      row.className = 'flex items-center gap-2 flex-wrap';
+      const sel = document.createElement('select');
+      sel.className = 'flex-1 min-w-[100px] px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm';
+      sel.innerHTML = '<option value="">Unknown</option>';
+      (characterList || []).forEach((u) => {
+        const un = typeof u === 'string' ? u : (u && u.username) || '';
+        if (un) {
+          const o = document.createElement('option');
+          o.value = un;
+          o.textContent = un;
+          sel.appendChild(o);
+        }
+      });
+      const pct = document.createElement('input');
+      pct.type = 'number';
+      pct.min = 0;
+      pct.max = 100;
+      pct.step = 0.5;
+      pct.placeholder = '%';
+      pct.className = 'w-16 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm';
+      const preview = document.createElement('span');
+      preview.className = 'text-xs text-slate-500';
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = 'Remove';
+      remove.className = 'text-red-400 hover:text-red-300 text-xs';
+      function updatePreview() {
+        const val = raidHandoutItems[parseInt(itemSelect.value, 10)];
+        const v = val ? val.valueGp : 0;
+        const p = parseFloat(pct.value, 10) || 0;
+        preview.textContent = p ? formatGp(Math.floor((v * p) / 100)) + ' gp' : '';
+      }
+      pct.addEventListener('input', function () {
+        updatePreview();
+        updateSplitTotal();
+      });
+      row.appendChild(sel);
+      row.appendChild(pct);
+      row.appendChild(preview);
+      row.appendChild(remove);
+      partnersContainer.appendChild(row);
+      remove.addEventListener('click', function () {
+        row.remove();
+        updateSplitTotal();
+      });
+      updatePreview();
+      updateSplitTotal();
+    }
+
+    function getPrimaryPercent() {
+      if (!splitCheckbox || !splitCheckbox.checked) return 100;
+      const rows = partnersContainer.querySelectorAll('.flex.items-center.gap-2');
+      let partnerSum = 0;
+      rows.forEach((r) => {
+        const inp = r.querySelector('input[type="number"]');
+        if (inp) partnerSum += parseFloat(inp.value, 10) || 0;
+      });
+      return Math.max(0, Math.min(100, 100 - partnerSum));
+    }
+
+    function updateSplitTotal() {
+      const primaryP = getPrimaryPercent();
+      const rows = partnersContainer.querySelectorAll('.flex.items-center.gap-2');
+      let partnerSum = 0;
+      rows.forEach((r) => {
+        const inp = r.querySelector('input[type="number"]');
+        if (inp) partnerSum += parseFloat(inp.value, 10) || 0;
+      });
+      const total = primaryP + partnerSum;
+      const ok = Math.abs(total - 100) < 0.01;
+      if (splitTotalEl) {
+        splitTotalEl.textContent = 'Primary: ' + primaryP + '% + partners: ' + partnerSum + '% = ' + total + '%' + (ok ? ' ✓' : ' (must be 100%)');
+        splitTotalEl.classList.toggle('text-red-400', !ok);
+        splitTotalEl.classList.toggle('text-slate-500', ok);
+      }
+    }
+
+    function buildHandoutPayload() {
+      const idx = parseInt(itemSelect.value, 10);
+      const item = Number.isNaN(idx) || idx < 0 ? null : raidHandoutItems[idx];
+      const primary = (primarySelect.value || '').trim();
+      if (!item || !primary) return null;
+      const atVal = atInput.value ? new Date(atInput.value) : new Date();
+      const primaryPercent = getPrimaryPercent();
+      const partners = [];
+      partnersContainer.querySelectorAll('.flex.items-center.gap-2').forEach((r) => {
+        const sel = r.querySelector('select');
+        const inp = r.querySelector('input[type="number"]');
+        const p = parseFloat(inp && inp.value, 10) || 0;
+        if (p <= 0) return;
+        partners.push({ username: (sel && sel.value) || null, percent: p });
+      });
+      return {
+        password: raidHandoutPassword,
+        itemName: item.name,
+        valueGp: item.valueGp,
+        primaryUsername: primary,
+        primaryPercent: primaryPercent,
+        at: atVal.toISOString(),
+        splitPartners: partners,
+      };
+    }
+
+    function buildConfirmMessage() {
+      const idx = parseInt(itemSelect.value, 10);
+      const item = Number.isNaN(idx) || idx < 0 ? null : raidHandoutItems[idx];
+      const primary = (primarySelect.value || '').trim();
+      if (!item || !primary) return '';
+      const atVal = atInput.value ? new Date(atInput.value) : new Date();
+      const dateStr = atVal.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
+      const names = [primary];
+      partnersContainer.querySelectorAll('.flex.items-center.gap-2').forEach((r) => {
+        const sel = r.querySelector('select');
+        const un = (sel && sel.value) || 'Unknown';
+        if (un && !names.includes(un)) names.push(un);
+      });
+      return 'Record drop: ' + item.name + ' (' + formatGp(item.valueGp) + ' gp) to ' + names.join(', ') + ' on ' + dateStr + '?';
+    }
+
+    document.getElementById('btn-raid-loot-handout').addEventListener('click', async function () {
+      if (headerMenuDropdown) headerMenuDropdown.classList.add('hidden');
+      if (!modal) return;
+      const unlocked = sessionStorage.getItem(RAID_STORAGE_KEY) === '1';
+      if (unlocked) {
+        try { raidHandoutPassword = sessionStorage.getItem(RAID_PWD_STORAGE_KEY) || ''; } catch (_) {}
+        showFormView();
+      } else {
+        if (passwordView) passwordView.classList.remove('hidden');
+        if (formView) formView.classList.add('hidden');
+        if (passwordInput) passwordInput.value = '';
+        if (passwordError) { passwordError.classList.add('hidden'); passwordError.textContent = ''; }
+      }
+      modal.classList.remove('hidden');
+      modal.setAttribute('aria-hidden', 'false');
+      if (!unlocked) passwordInput.focus();
+      if (raidHandoutItems.length === 0) {
+        try {
+          const r = await fetch(API + '/raid-loot-handout');
+          const data = await r.json().catch(() => ({}));
+          raidHandoutItems = (data.items || []).slice();
+          if (unlocked) showFormView();
+        } catch (_) {}
+      } else if (unlocked) {
+        showFormView();
+      }
+    });
+
+    unlockBtn.addEventListener('click', async function () {
+      const pwd = (passwordInput.value || '').trim();
+      if (!pwd) {
+        passwordError.textContent = 'Enter password';
+        passwordError.classList.remove('hidden');
+        return;
+      }
+      passwordError.classList.add('hidden');
+      try {
+        const res = await fetch(API + '/raid-loot-handout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: pwd, raidUnlock: true }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data.ok === true) {
+          raidHandoutPassword = pwd;
+          sessionStorage.setItem(RAID_STORAGE_KEY, '1');
+          try { sessionStorage.setItem(RAID_PWD_STORAGE_KEY, pwd); } catch (_) {}
+          showFormView();
+        } else {
+          passwordError.textContent = 'Invalid password';
+          passwordError.classList.remove('hidden');
+        }
+      } catch (e) {
+        passwordError.textContent = e.message || 'Request failed';
+        passwordError.classList.remove('hidden');
+      }
+    });
+
+    passwordInput.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') unlockBtn.click();
+    });
+
+    itemSelect.addEventListener('change', updateItemValue);
+    splitCheckbox.addEventListener('change', function () {
+      splitSection.classList.toggle('hidden', !splitCheckbox.checked);
+      updateSplitTotal();
+    });
+    addPartnerBtn.addEventListener('click', addPartnerRow);
+
+    cancelBtn.addEventListener('click', closeRaidHandoutModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeRaidHandoutModal();
+    });
+
+    confirmBtn.addEventListener('click', function () {
+      const payload = buildHandoutPayload();
+      if (!payload) {
+        submitErrorEl.textContent = 'Select an item and primary player.';
+        submitErrorEl.classList.remove('hidden');
+        return;
+      }
+      if (splitCheckbox.checked) {
+        const total = getPrimaryPercent() + payload.splitPartners.reduce((s, p) => s + p.percent, 0);
+        if (Math.abs(total - 100) > 0.01) {
+          submitErrorEl.textContent = 'Split total must equal 100%.';
+          submitErrorEl.classList.remove('hidden');
+          return;
+        }
+      }
+      submitErrorEl.classList.add('hidden');
+      confirmText.textContent = buildConfirmMessage();
+      confirmDialog.classList.remove('hidden');
+      confirmDialog.setAttribute('aria-hidden', 'false');
+    });
+
+    confirmNo.addEventListener('click', function () {
+      confirmDialog.classList.add('hidden');
+      confirmDialog.setAttribute('aria-hidden', 'true');
+    });
+    confirmDialog.addEventListener('click', function (e) {
+      if (e.target === confirmDialog) {
+        confirmDialog.classList.add('hidden');
+        confirmDialog.setAttribute('aria-hidden', 'true');
+      }
+    });
+
+    confirmYes.addEventListener('click', async function () {
+      const payload = buildHandoutPayload();
+      if (!payload) return;
+      if (!raidHandoutPassword) {
+        try { raidHandoutPassword = sessionStorage.getItem(RAID_PWD_STORAGE_KEY) || ''; } catch (_) {}
+      }
+      if (!raidHandoutPassword) {
+        submitErrorEl.textContent = 'Password required. Unlock again and try recording.';
+        submitErrorEl.classList.remove('hidden');
+        confirmDialog.classList.add('hidden');
+        return;
+      }
+      payload.password = raidHandoutPassword;
+      confirmDialog.classList.add('hidden');
+      submitErrorEl.classList.add('hidden');
+      try {
+        const res = await fetch(API + '/raid-loot-handout', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          submitErrorEl.textContent = data.error || 'Failed to record drop';
+          submitErrorEl.classList.remove('hidden');
+          return;
+        }
+        closeRaidHandoutModal();
+        loadFromSnapshots();
+      } catch (e) {
+        submitErrorEl.textContent = e.message || 'Request failed';
+        submitErrorEl.classList.remove('hidden');
+      }
+    });
+  })();
+
   setHomeViewMode('last24');
   loadFromSnapshots();
 })();

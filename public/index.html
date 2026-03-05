@@ -134,6 +134,9 @@
             <img src="assets/throne_icon.png" alt="" class="w-5 h-5 object-contain shrink-0" width="20" height="20" />
             Competitions
           </a>
+          <button type="button" id="btn-raid-loot-handout" role="menuitem" class="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-slate-200 hover:bg-slate-700 border-none bg-transparent cursor-pointer">
+            Raid Loot Handout
+          </button>
           <button type="button" id="btn-settings" role="menuitem" class="flex items-center gap-2 w-full px-3 py-2 text-sm text-left text-slate-200 hover:bg-slate-700 rounded-none border-none bg-transparent cursor-pointer" title="Copy loot webhook URL" aria-label="Settings">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 shrink-0 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Settings
@@ -538,6 +541,70 @@
       </div>
     </div>
   </div>
+
+  <!-- Raid Loot Handout modal: password gate then form -->
+  <div id="raid-loot-handout-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-lg rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog" aria-modal="true">
+      <div id="raid-handout-password-view">
+        <h3 class="text-lg font-semibold text-slate-100 mb-2">Raid Loot Handout</h3>
+        <p class="text-slate-400 text-sm mb-3">Enter password to continue.</p>
+        <label for="raid-handout-password" class="block text-sm font-medium text-slate-300 mb-1">Password</label>
+        <input type="password" id="raid-handout-password" class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm focus:ring-1 focus:ring-sky-500 mb-3" autocomplete="off" />
+        <p id="raid-handout-password-error" class="text-red-400 text-sm mb-3 hidden"></p>
+        <div class="flex justify-end">
+          <button type="button" id="raid-handout-unlock" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Unlock</button>
+        </div>
+      </div>
+      <div id="raid-handout-form-view" class="hidden">
+        <h3 class="text-lg font-semibold text-slate-100 mb-3">Record raid drop</h3>
+        <div class="space-y-3 mb-4">
+          <div>
+            <label for="raid-handout-item" class="block text-sm font-medium text-slate-300 mb-1">Item</label>
+            <select id="raid-handout-item" class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm focus:ring-1 focus:ring-sky-500">
+              <option value="">Select item…</option>
+            </select>
+            <p id="raid-handout-item-value" class="text-xs text-slate-500 mt-1"></p>
+          </div>
+          <div>
+            <label for="raid-handout-primary" class="block text-sm font-medium text-slate-300 mb-1">Primary player (who got the drop)</label>
+            <select id="raid-handout-primary" class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm focus:ring-1 focus:ring-sky-500">
+              <option value="">Select player…</option>
+            </select>
+          </div>
+          <div>
+            <label for="raid-handout-at" class="block text-sm font-medium text-slate-300 mb-1">Date & time</label>
+            <input type="datetime-local" id="raid-handout-at" class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm focus:ring-1 focus:ring-sky-500" />
+          </div>
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="raid-handout-split" class="w-4 h-4 rounded border-slate-500 bg-slate-700 text-sky-600 focus:ring-sky-500" />
+            <label for="raid-handout-split" class="text-sm text-slate-300">Was this loot split?</label>
+          </div>
+        </div>
+        <div id="raid-handout-split-section" class="hidden mb-4 space-y-2">
+          <p class="text-sm font-medium text-slate-300">Split partners (total must be 100%)</p>
+          <div id="raid-handout-partners"></div>
+          <button type="button" id="raid-handout-add-partner" class="text-sm text-sky-400 hover:text-sky-300">+ Add partner</button>
+          <p id="raid-handout-split-total" class="text-xs text-slate-500"></p>
+        </div>
+        <p id="raid-handout-submit-error" class="text-red-400 text-sm mb-3 hidden"></p>
+        <div class="flex justify-end gap-2">
+          <button type="button" id="raid-handout-cancel" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm font-medium">Cancel</button>
+          <button type="button" id="raid-handout-confirm" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Record drop</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Raid handout confirmation dialog -->
+  <div id="raid-handout-confirm-dialog" class="fixed inset-0 z-[60] flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-sm rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl">
+      <p id="raid-handout-confirm-text" class="text-slate-200 text-sm mb-4"></p>
+      <div class="flex justify-end gap-2">
+        <button type="button" id="raid-handout-confirm-no" class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm font-medium">Cancel</button>
+        <button type="button" id="raid-handout-confirm-yes" class="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-sm font-medium">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="/js/app.js"></script>
 </body>
