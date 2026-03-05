@@ -1,6 +1,6 @@
 {
   "installCommand": "npm install",
-  "buildCommand": "echo 'Static + serverless'",
+  "buildCommand": "false",
   "outputDirectory": "public",
   "rewrites": [
     { "source": "/api/loot-webhook-url", "destination": "/api/loot?webhook=1" },
