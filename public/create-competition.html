@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>New Competition – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="css/runescape-fonts.css" />
+  <style>
+    body { background-color: #0f172a; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
+  <div class="max-w-2xl mx-auto px-4 pt-14 sm:pt-6 pb-12 relative">
+
+    <!-- Top-right hamburger menu -->
+    <header class="absolute top-3 right-4 z-20 flex justify-end">
+      <div class="relative" id="header-menu-wrap">
+        <button type="button" id="header-menu-btn" class="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 border border-slate-600/80" aria-label="Menu" aria-expanded="false" aria-haspopup="true">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
+        </button>
+        <div id="header-menu-dropdown" class="absolute right-0 top-full mt-1.5 w-48 rounded-lg border border-slate-600 bg-slate-800 shadow-xl py-1 hidden" role="menu">
+          <a href="competitions.html" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm text-sky-400 hover:bg-slate-700 rounded-lg">
+            &larr; Competitions
+          </a>
+          <a href="index.html" role="menuitem" class="flex items-center gap-2 px-3 py-2 text-sm text-slate-400 hover:bg-slate-700 rounded-lg">
+            &larr; SpoopTool
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <!-- Page title -->
+    <div class="flex flex-col items-center mt-8 mb-8">
+      <h1 class="text-3xl font-bold text-slate-100 tracking-tight">New Competition</h1>
+    </div>
+
+    <!-- Step indicator — filled by create-competition.js -->
+    <div id="step-indicator" class="mb-8"></div>
+
+    <!-- ── Step 1: Basics ──────────────────────────────────────────────────── -->
+    <div id="step-1">
+      <div class="rounded-xl border border-slate-700 bg-slate-800/50 p-6 space-y-6">
+
+        <!-- Competition name -->
+        <div>
+          <label for="comp-name" class="block text-sm font-medium text-slate-300 mb-1.5">Competition Name</label>
+          <input id="comp-name" type="text" placeholder="e.g. Summer Skilling Race" maxlength="80"
+            class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+          <p id="name-error" class="mt-1.5 text-xs text-red-400 hidden"></p>
+        </div>
+
+        <!-- Competition type: Solo vs Team -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Competition Type</label>
+          <div class="inline-flex rounded-lg border border-slate-600 overflow-hidden">
+            <button type="button" data-type="solo"
+              class="type-btn px-6 py-2 text-sm font-medium bg-sky-600 text-white transition-colors">Solo</button>
+            <button type="button" data-type="team"
+              class="type-btn px-6 py-2 text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors border-l border-slate-600">Team</button>
+          </div>
+        </div>
+
+        <!-- Category: Skill vs Boss -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-1.5">Category</label>
+          <div class="inline-flex rounded-lg border border-slate-600 overflow-hidden">
+            <button type="button" data-category="skill"
+              class="cat-btn px-6 py-2 text-sm font-medium bg-sky-600 text-white transition-colors">Skill</button>
+            <button type="button" data-category="boss"
+              class="cat-btn px-6 py-2 text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors border-l border-slate-600">Boss</button>
+          </div>
+        </div>
+
+        <!-- Metric — options rendered by JS based on category -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Metric</label>
+          <div id="metric-options" class="grid grid-cols-2 gap-2"></div>
+          <p id="metric-error" class="mt-1.5 text-xs text-red-400 hidden"></p>
+        </div>
+
+        <!-- Start & end time -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label for="start-time" class="block text-sm font-medium text-slate-300 mb-1.5">Start Time</label>
+            <input id="start-time" type="datetime-local"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+          </div>
+          <div>
+            <label for="end-time" class="block text-sm font-medium text-slate-300 mb-1.5">End Time</label>
+            <input id="end-time" type="datetime-local"
+              class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm" />
+          </div>
+        </div>
+        <p id="time-error" class="text-xs text-red-400 hidden -mt-3"></p>
+
+      </div>
+
+      <div class="flex justify-end mt-4">
+        <button id="step1-next" class="px-6 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
+          Next: Participants &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Step 2: Participants ────────────────────────────────────────────── -->
+    <div id="step-2" class="hidden">
+      <!-- Content filled by JS -->
+      <div id="step2-content" class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+        <p class="text-slate-500 text-sm text-center py-8">Loading players&hellip;</p>
+      </div>
+      <div class="flex justify-between mt-4">
+        <button id="step2-back" class="px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors">
+          &larr; Back
+        </button>
+        <button id="step2-next" class="px-6 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors">
+          Next &rarr;
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Step 3: Skill / Boss Selection ─────────────────────────────────── -->
+    <div id="step-3" class="hidden">
+      <!-- Content filled by JS -->
+      <div id="step3-content" class="rounded-xl border border-slate-700 bg-slate-800/50 p-6">
+      </div>
+      <div class="flex justify-between mt-4">
+        <button id="step3-back" class="px-6 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors">
+          &larr; Back
+        </button>
+        <button id="step3-create" class="px-6 py-2.5 rounded-lg bg-green-600 hover:bg-green-500 text-white text-sm font-medium transition-colors">
+          Create Competition &check;
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Creator code modal ──────────────────────────────────────────────── -->
+  <!-- Shown once after competition creation. Fixed overlay, hidden by default. -->
+  <div id="creator-modal" class="fixed inset-0 z-50 hidden">
+    <!-- Backdrop -->
+    <div class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <!-- Modal card -->
+    <div class="relative flex items-center justify-center min-h-screen p-4">
+      <div class="bg-slate-800 rounded-xl border border-slate-600 shadow-2xl p-8 max-w-sm w-full text-center">
+        <div class="w-14 h-14 mx-auto mb-5 rounded-full bg-amber-400/10 border border-amber-400/30 flex items-center justify-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 18.75h-9m9 0a3 3 0 013 3h-15a3 3 0 013-3m9 0v-4.5A3.75 3.75 0 0012 10.5a3.75 3.75 0 00-3.75 3.75v4.5m3.75-12V3.75"/></svg>
+        </div>
+        <h2 class="text-xl font-bold text-slate-100 mb-2">Competition Created!</h2>
+        <p class="text-slate-400 text-sm mb-6">
+          Your creator code is shown below.<br/>
+          <span class="text-amber-400 font-semibold">Write it down</span> — you'll need it to edit or delete this competition.
+        </p>
+        <!-- Creator code display -->
+        <div class="bg-slate-900 rounded-lg border border-slate-600 px-6 py-4 mb-4">
+          <p id="creator-code-display" class="text-3xl font-mono font-bold text-amber-400 tracking-[0.25em]">000000000</p>
+        </div>
+        <!-- Copy button -->
+        <button id="copy-code-btn" class="w-full px-4 py-2.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors mb-1">
+          Copy to Clipboard
+        </button>
+        <p id="copy-feedback" class="text-xs text-green-400 h-5 mb-3"></p>
+        <!-- Navigate to competition -->
+        <a href="competitions.html" id="go-to-competition-btn" class="block w-full px-4 py-2.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-sm font-medium transition-colors text-center">
+          View Competition &rarr;
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/create-competition.js"></script>
+</body>
+</html>
