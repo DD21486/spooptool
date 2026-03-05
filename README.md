@@ -68,3 +68,5 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 ## Notes
 
 **`url.parse()` deprecation warning:** You may see `[DEP0169] DeprecationWarning: url.parse()...` in Vercel function logs. This comes from a dependency or the Node runtime, not from SpoopTool’s code. It’s harmless. To hide it in production, add an environment variable in Vercel: **Key** `NODE_OPTIONS`, **Value** `--no-deprecation` (Project → Settings → Environment Variables, then redeploy).
+
+<!-- redeploy -->
