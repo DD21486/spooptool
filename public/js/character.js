@@ -787,6 +787,7 @@
   }
 
   function fetchLoot() {
+    if (lootLoading) lootLoading.classList.remove('hidden');
     let url = API + '/loot?player=' + encodeURIComponent(name) + '&limit=50&hours=' + lootPeriodHours + '&perDrop=1';
     if (lootSourceFilter) url += '&source=' + encodeURIComponent(lootSourceFilter);
     fetch(url)
@@ -1376,6 +1377,11 @@
       if (this.disabled || !pendingDeleteId || !name) return;
       if ((confirmInput.value || '').trim() !== 'DELETE') return;
       if (errorEl) { errorEl.classList.add('hidden'); errorEl.textContent = ''; }
+      const originalLabel = submitBtn.textContent;
+      submitBtn.textContent = 'Deleting…';
+      submitBtn.disabled = true;
+      if (cancelBtn) cancelBtn.disabled = true;
+      if (confirmInput) confirmInput.disabled = true;
       try {
         const res = await fetch(API + '/loot', {
           method: 'DELETE',
@@ -1384,12 +1390,20 @@
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok) {
+          submitBtn.textContent = originalLabel;
+          submitBtn.disabled = false;
+          if (cancelBtn) cancelBtn.disabled = false;
+          if (confirmInput) confirmInput.disabled = false;
           if (errorEl) { errorEl.textContent = data.error || 'Failed to delete'; errorEl.classList.remove('hidden'); }
           return;
         }
         closeDeleteModal();
         fetchLoot();
       } catch (err) {
+        submitBtn.textContent = originalLabel;
+        submitBtn.disabled = (confirmInput.value || '').trim() === 'DELETE';
+        if (cancelBtn) cancelBtn.disabled = false;
+        if (confirmInput) confirmInput.disabled = false;
         if (errorEl) { errorEl.textContent = err.message || 'Request failed'; errorEl.classList.remove('hidden'); }
       }
     });

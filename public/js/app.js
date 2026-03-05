@@ -1186,12 +1186,24 @@
     const typeIcon = (t) => (t === 'loot'
       ? '<img src="/assets/Coins_4.webp" alt="" width="12" height="12" loading="lazy" />'
       : '<img src="/assets/Skills_icon.png" alt="" width="12" height="12" loading="lazy" />');
+    const deletedSuffix = ' — Deleted by user';
     tbody.innerHTML = activity.map((a) => {
       const time = formatActivityTime(a.at);
       const badge = '<span class="' + typeBadgeClass(a.type) + '">' + typeIcon(a.type) + '<span>' + typeLabel(a.type) + '</span></span>';
-      const descriptionHtml = a.type === 'xp_kc'
-        ? formatXpKcActivityDescription(a.description)
-        : '<span class="text-slate-300">' + (a.description || '').replace(/</g, '&lt;') + '</span>';
+      let descriptionHtml;
+      if (a.type === 'xp_kc') {
+        descriptionHtml = formatXpKcActivityDescription(a.description);
+      } else {
+        const desc = (a.description || '').replace(/</g, '&lt;');
+        const deletedIdx = desc.indexOf(deletedSuffix);
+        if (deletedIdx !== -1) {
+          const mainPart = desc.slice(0, deletedIdx);
+          const suffixPart = desc.slice(deletedIdx);
+          descriptionHtml = '<span class="text-slate-300"><s class="text-slate-500">' + mainPart + '</s><span class="text-slate-500">' + suffixPart + '</span></span>';
+        } else {
+          descriptionHtml = '<span class="text-slate-300">' + desc + '</span>';
+        }
+      }
       return '<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">' +
         '<td class="px-4 py-2 text-slate-400 whitespace-nowrap">' + time + '</td>' +
         '<td class="px-4 py-2 font-medium">' + (a.username || '—') + '</td>' +

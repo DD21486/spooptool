@@ -62,6 +62,16 @@ function send500(res, detail) {
   return res.status(500).json({ error: 'Server error', detail: detail || 'Unknown error' });
 }
 
+function formatGpShort(n) {
+  const num = Number(n);
+  if (num >= 1_000_000_000) return (num / 1_000_000_000).toFixed(1) + 'B';
+  if (num >= 1_000_000) return (num / 1_000_000).toFixed(1) + 'M';
+  if (num >= 1_000) return (num / 1_000).toFixed(1) + 'K';
+  return String(num);
+}
+
+const DELETED_BY_USER_SUFFIX = ' — Deleted by user';
+
 /** GET /api/loot-icon?id=123 — proxy OSRS item sprite (merged into /api/loot?icon=1 for serverless count). */
 const LOOT_SPRITE_URLS = [
   (id) => 'https://chisel.weirdgloop.org/static/img/osrs-sprite/' + id + '.png',
@@ -226,14 +236,43 @@ module.exports = async function handler(req, res) {
         return res.status(400).json({ error: 'Missing or invalid id, player, or confirm (must be the word DELETE)' });
       }
       const rows = await sql`
-        SELECT id, username FROM loot_drops
+        SELECT id, username, item_name, total_value_gp FROM loot_drops
         WHERE id = ${id} AND LOWER(TRIM(username)) = LOWER(TRIM(${player}))
         LIMIT 1
       `;
       if (rows.length === 0) {
         return res.status(404).json({ error: 'Loot entry not found or not owned by this player' });
       }
+      const itemName = (rows[0].item_name || '').trim();
+      const valueGp = Number(rows[0].total_value_gp) || 0;
       await sql`DELETE FROM loot_drops WHERE id = ${id} AND LOWER(TRIM(username)) = LOWER(TRIM(${player}))`;
+
+      if (itemName && valueGp >= 0) {
+        const valueStr = formatGpShort(valueGp);
+        try {
+          const activityRows = await sql`
+            SELECT id, description FROM activity_log
+            WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
+              AND type = 'loot'
+              AND description IS NOT NULL
+              AND description NOT LIKE ${'%' + DELETED_BY_USER_SUFFIX}
+              AND description LIKE ${'%' + itemName.replace(/%/g, '\\%').replace(/_/g, '\\_') + '%'}
+              AND description LIKE ${'%' + valueStr + '%'}
+            ORDER BY at DESC
+            LIMIT 1
+          `;
+          if (activityRows.length > 0) {
+            const currentDesc = (activityRows[0].description || '').trim();
+            const newDesc = currentDesc + DELETED_BY_USER_SUFFIX;
+            await sql`
+              UPDATE activity_log SET description = ${newDesc}
+              WHERE id = ${activityRows[0].id}
+            `;
+          }
+        } catch (activityErr) {
+          console.error('Activity log update after loot delete', activityErr?.message || activityErr);
+        }
+      }
       return res.status(200).json({ ok: true });
     }
 
