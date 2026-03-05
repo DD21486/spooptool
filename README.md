@@ -65,6 +65,8 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
    If you have multiple Vercel projects, set `VERCEL_PROJECT_ID=prj_xxxx` (find it in **Project** → **Settings** → **General**).
    When the script prints "Webhook created successfully", the next deploy will post to Discord.
 
+   **Optional – ping people when a deploy fails:** Add env var `DISCORD_DEPLOY_MENTION_IDS` with comma-separated Discord **user IDs** (e.g. `123456789,987654321`). Those users will be @mentioned only when a deployment **fails**. To get a user ID: Discord → User Settings → Advanced → enable Developer Mode, then right‑click the user → Copy User ID.
+
 ## Notes
 
 **`url.parse()` deprecation warning:** You may see `[DEP0169] DeprecationWarning: url.parse()...` in Vercel function logs. This comes from a dependency or the Node runtime, not from SpoopTool’s code. It’s harmless. To hide it in production, add an environment variable in Vercel: **Key** `NODE_OPTIONS`, **Value** `--no-deprecation` (Project → Settings → Environment Variables, then redeploy).
