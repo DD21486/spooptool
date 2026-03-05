@@ -1138,6 +1138,43 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
+  /** Parse xp_kc description "+1.5M overall XP, +3 vorkath, +1 zulrah" into structured HTML with XP block, horizontal separator, and boss row with icons + vertical separators. */
+  function formatXpKcActivityDescription(description) {
+    const desc = (description || '').trim();
+    if (!desc) return '<span class="text-slate-500">—</span>';
+    const parts = desc.split(/\s*,\s*/);
+    let xpPart = null;
+    const bossParts = [];
+    for (const p of parts) {
+      const trimmed = p.trim();
+      if (trimmed.endsWith(' overall XP')) {
+        xpPart = trimmed;
+      } else {
+        const m = trimmed.match(/^\+(\d+)\s+(.+)$/);
+        if (m) bossParts.push({ delta: m[1], key: m[2].trim() });
+      }
+    }
+    const segs = [];
+    if (xpPart) {
+      segs.push('<span class="text-slate-300">' + escapeHtml(xpPart) + '</span>');
+    }
+    if (bossParts.length > 0) {
+      const separator = '<span class="border-l border-sky-400/70 h-4 mx-2 self-center inline-block align-middle" aria-hidden="true"></span>';
+      const bossItems = bossParts.map(function (b) {
+        const src = bossImageSrc(b.key);
+        const name = formatBossKey(b.key);
+        return '<span class="inline-flex items-center gap-1.5 align-middle"><span class="text-green-400 font-medium tabular-nums">+' + escapeHtml(b.delta) + '</span> <img src="' + escapeHtml(src) + '" alt="" title="' + escapeHtml(name) + '" class="w-5 h-5 object-contain rounded-sm shrink-0" width="20" height="20" loading="lazy" onerror="this.style.display=\'none\'"></span>';
+      }).join(separator);
+      const bossBlock = '<div class="flex flex-wrap items-center gap-0">' + bossItems + '</div>';
+      if (xpPart) {
+        segs.push('<div class="mt-3 pt-3 border-t border-sky-400/70">' + bossBlock + '</div>');
+      } else {
+        segs.push(bossBlock);
+      }
+    }
+    return segs.length ? '<div class="activity-xpkc-readout">' + segs.join('') + '</div>' : '<span class="text-slate-500">—</span>';
+  }
+
   function renderActivity(activity) {
     const tbody = document.getElementById('activity-tbody');
     const emptyEl = document.getElementById('activity-empty');
@@ -1149,14 +1186,20 @@
     }
     if (emptyEl) emptyEl.classList.add('hidden');
     const typeLabel = (t) => (t === 'loot' ? 'Loot' : 'XP/KC');
-    const typeClass = (t) => (t === 'loot' ? 'bg-amber-600/80 text-slate-100' : 'bg-sky-600/80 text-slate-100');
+    const typeBadgeClass = (t) => (t === 'loot' ? 'activity-badge activity-badge-loot' : 'activity-badge activity-badge-xpkc');
+    const typeIcon = (t) => (t === 'loot'
+      ? '<img src="/assets/Coins_4.webp" alt="" width="12" height="12" loading="lazy" />'
+      : '<img src="/assets/Skills_icon.png" alt="" width="12" height="12" loading="lazy" />');
     tbody.innerHTML = activity.map((a) => {
       const time = formatActivityTime(a.at);
-      const badge = '<span class="inline-block px-1.5 py-0.5 rounded text-xs font-medium ' + typeClass(a.type) + '">' + typeLabel(a.type) + '</span>';
+      const badge = '<span class="' + typeBadgeClass(a.type) + '">' + typeIcon(a.type) + '<span>' + typeLabel(a.type) + '</span></span>';
+      const descriptionHtml = a.type === 'xp_kc'
+        ? formatXpKcActivityDescription(a.description)
+        : '<span class="text-slate-300">' + (a.description || '').replace(/</g, '&lt;') + '</span>';
       return '<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">' +
         '<td class="px-4 py-2 text-slate-400 whitespace-nowrap">' + time + '</td>' +
         '<td class="px-4 py-2 font-medium">' + (a.username || '—') + '</td>' +
-        '<td class="px-4 py-2">' + badge + ' <span class="text-slate-300">' + (a.description || '').replace(/</g, '&lt;') + '</span></td>' +
+        '<td class="px-4 py-2">' + badge + ' ' + descriptionHtml + '</td>' +
         '</tr>';
     }).join('');
   }
