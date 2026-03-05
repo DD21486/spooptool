@@ -50,6 +50,21 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 
 **Boss kill leader change → Discord:** After each snapshot cron run, SpoopTool checks who has the most total boss kills. If that leader changed (someone overtook the previous leader), it can post to Discord. Add env var `DISCORD_LEADERBOARD_WEBHOOK_URL` with an incoming webhook URL for the channel where you want these notifications. Run `sql/migration_leaderboard_state.sql` in Neon so the cron can store the previous leader and detect changes.
 
+**Deploy results → Discord (for collaborators):** On Vercel Hobby you can’t add team members, but you can still share deploy status. Vercel can send webhooks when a deployment succeeds, fails, or is canceled; SpoopTool can forward those to a Discord channel.
+
+**Quick setup:**
+
+1. **Discord** – In the channel where you want deploy messages: **Edit Channel** → **Integrations** → **Webhooks** → **New Webhook**. Copy the webhook URL.
+2. **Vercel env** – In your Vercel project: **Settings** → **Environment Variables**. Add **Name** `DISCORD_DEPLOY_WEBHOOK_URL`, **Value** the Discord webhook URL. Save and **redeploy once** so the API route has the variable.
+3. **Register the webhook with Vercel (one-time)** – From the project root, run:
+   ```bash
+   VERCEL_TOKEN=your_token_here APP_URL=https://your-app.vercel.app node scripts/setup-vercel-deploy-webhook.js
+   ```
+   - **VERCEL_TOKEN:** The token you created at [vercel.com/account/tokens](https://vercel.com/account/tokens). Replace `your_token_here` with it.
+   - **APP_URL:** Your live app URL (e.g. `https://spooptool.vercel.app`), no trailing slash.
+   If you have multiple Vercel projects, set `VERCEL_PROJECT_ID=prj_xxxx` (find it in **Project** → **Settings** → **General**).
+   When the script prints "Webhook created successfully", the next deploy will post to Discord.
+
 ## Notes
 
 **`url.parse()` deprecation warning:** You may see `[DEP0169] DeprecationWarning: url.parse()...` in Vercel function logs. This comes from a dependency or the Node runtime, not from SpoopTool’s code. It’s harmless. To hide it in production, add an environment variable in Vercel: **Key** `NODE_OPTIONS`, **Value** `--no-deprecation` (Project → Settings → Environment Variables, then redeploy).
