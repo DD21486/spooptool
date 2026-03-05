@@ -1138,7 +1138,7 @@
     return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
   }
 
-  /** Parse xp_kc description "+1.5M overall XP, +3 vorkath, +1 zulrah" into structured HTML with XP block, horizontal separator, and boss row with icons + vertical separators. */
+  /** Parse xp_kc description "+1.5M overall XP, +3 vorkath, +1 zulrah" into one inline row: XP, vertical separator(s), boss items with icons. */
   function formatXpKcActivityDescription(description) {
     const desc = (description || '').trim();
     if (!desc) return '<span class="text-slate-500">—</span>';
@@ -1154,25 +1154,21 @@
         if (m) bossParts.push({ delta: m[1], key: m[2].trim() });
       }
     }
+    const vSep = '<span class="border-l border-sky-400/70 h-4 mx-2 inline-block align-middle shrink-0" aria-hidden="true"></span>';
     const segs = [];
     if (xpPart) {
-      segs.push('<span class="text-slate-300">' + escapeHtml(xpPart) + '</span>');
+      segs.push('<span class="text-slate-300 whitespace-nowrap">' + escapeHtml(xpPart) + '</span>');
     }
     if (bossParts.length > 0) {
-      const separator = '<span class="border-l border-sky-400/70 h-4 mx-2 self-center inline-block align-middle" aria-hidden="true"></span>';
+      if (xpPart) segs.push(vSep);
       const bossItems = bossParts.map(function (b) {
         const src = bossImageSrc(b.key);
         const name = formatBossKey(b.key);
-        return '<span class="inline-flex items-center gap-1.5 align-middle"><span class="text-green-400 font-medium tabular-nums">+' + escapeHtml(b.delta) + '</span> <img src="' + escapeHtml(src) + '" alt="" title="' + escapeHtml(name) + '" class="w-5 h-5 object-contain rounded-sm shrink-0" width="20" height="20" loading="lazy" onerror="this.style.display=\'none\'"></span>';
-      }).join(separator);
-      const bossBlock = '<div class="flex flex-wrap items-center gap-0">' + bossItems + '</div>';
-      if (xpPart) {
-        segs.push('<div class="mt-3 pt-3 border-t border-sky-400/70">' + bossBlock + '</div>');
-      } else {
-        segs.push(bossBlock);
-      }
+        return '<span class="inline-flex items-center gap-1.5 align-middle shrink-0"><span class="text-green-400 font-medium tabular-nums">+' + escapeHtml(b.delta) + '</span> <img src="' + escapeHtml(src) + '" alt="" title="' + escapeHtml(name) + '" class="w-5 h-5 object-contain rounded-sm shrink-0" width="20" height="20" loading="lazy" onerror="this.style.display=\'none\'"></span>';
+      }).join(vSep);
+      segs.push(bossItems);
     }
-    return segs.length ? '<div class="activity-xpkc-readout">' + segs.join('') + '</div>' : '<span class="text-slate-500">—</span>';
+    return segs.length ? '<span class="inline-flex flex-nowrap items-center gap-0">' + segs.join('') + '</span>' : '<span class="text-slate-500">—</span>';
   }
 
   function renderActivity(activity) {
@@ -1199,7 +1195,7 @@
       return '<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">' +
         '<td class="px-4 py-2 text-slate-400 whitespace-nowrap">' + time + '</td>' +
         '<td class="px-4 py-2 font-medium">' + (a.username || '—') + '</td>' +
-        '<td class="px-4 py-2">' + badge + ' ' + descriptionHtml + '</td>' +
+        '<td class="px-4 py-2 whitespace-nowrap align-middle">' + badge + ' <span class="inline align-middle">' + descriptionHtml + '</span></td>' +
         '</tr>';
     }).join('');
   }
