@@ -879,38 +879,44 @@
   }
 
   let spoop7DayChartInstance = null;
-  /** Build 28 points: every 6 hours for the last 7 days (UTC slots 0, 6, 12, 18). Uses history from API; current score for latest slot. */
+  /** Parse API timestamp as UTC (avoid local-time interpretation when server sends without Z). */
+  function parseSlotUtc(at) {
+    if (at == null) return NaN;
+    const s = typeof at === 'string' ? (at.endsWith('Z') || at.includes('+') ? at : at.trim() + 'Z') : at;
+    return new Date(s).getTime();
+  }
+  /** Build 29 points: every 6 hours for the last 7 days (UTC slots 0, 6, 12, 18). Uses only API history; current score only for the latest slot when missing. */
   function build7DaySeries(history, currentSpoopScore) {
     const now = new Date();
+    const slotMs = 6 * 60 * 60 * 1000;
+    const endTs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), Math.floor(now.getUTCHours() / 6) * 6, 0, 0, 0);
+    const numSlots = 29;
+    const startTs = endTs - (numSlots - 1) * slotMs;
+
     const historyBySlot = new Map();
     (history || []).forEach((h) => {
-      const d = new Date(h.at);
-      const slotTs = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate(), Math.floor(d.getUTCHours() / 6) * 6, 0, 0, 0);
-      historyBySlot.set(slotTs, Number(h.spoopScore) || 0);
+      const t = parseSlotUtc(h.at);
+      if (Number.isNaN(t)) return;
+      const slotTs = Date.UTC(
+        new Date(t).getUTCFullYear(),
+        new Date(t).getUTCMonth(),
+        new Date(t).getUTCDate(),
+        Math.floor(new Date(t).getUTCHours() / 6) * 6,
+        0, 0, 0
+      );
+      if (slotTs >= startTs && slotTs <= endTs) historyBySlot.set(slotTs, Number(h.spoopScore) || 0);
     });
 
     const labels = [];
     const values = [];
-    const slotMs = 6 * 60 * 60 * 1000;
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 7);
-    sevenDaysAgo.setUTCMinutes(0, 0, 0);
-    sevenDaysAgo.setUTCHours(Math.floor(sevenDaysAgo.getUTCHours() / 6) * 6, 0, 0, 0);
-    const startTs = sevenDaysAgo.getTime();
-    const numSlots = 28;
-
     for (let i = 0; i < numSlots; i++) {
       const slotTs = startTs + i * slotMs;
       const slotDate = new Date(slotTs);
-      const isInRange = slotTs + slotMs > now.getTime();
       let value = historyBySlot.get(slotTs) ?? null;
-      if (value == null && (isInRange || i === numSlots - 1)) value = currentSpoopScore;
+      if (value == null && i === numSlots - 1) value = currentSpoopScore;
       values.push(value);
       const label = slotDate.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', hour12: false });
       labels.push(label);
-    }
-    if (!history || history.length === 0) {
-      for (let i = 0; i < values.length; i++) values[i] = currentSpoopScore;
     }
     return { labels, values };
   }
