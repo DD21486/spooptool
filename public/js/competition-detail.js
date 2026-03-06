@@ -473,27 +473,54 @@ function startCountdown(comp) {
 }
 
 // ── Page initialisation ───────────────────────────────────────────────────────
-// Reads the ?id= URL param, looks up the competition, and renders everything.
+// Reads the ?id= URL param, fetches the competition from /api/competitions/:id,
+// and renders everything. Falls back to MOCK_COMPETITIONS for unknown numeric IDs
+// that are also present in the mock dataset (handy for local dev without a DB).
 
-function init() {
-  var params = new URLSearchParams(window.location.search);
-  var id     = params.get('id') || '1'; // default to id=1 for demo
-  var comp   = MOCK_COMPETITIONS[id];
-
-  if (!comp) {
-    document.getElementById('comp-header').innerHTML =
-      '<p class="text-slate-400">Competition not found.</p>';
-    return;
-  }
-
+function renderPage(comp) {
   var sorted = comp.type === 'team' ? processTeams(comp) : processSolo(comp);
-
   renderHeader(comp);
   renderScheduleCard(comp);
   renderLeaderCard(comp, sorted);
   renderContributorCard(comp, sorted);
   renderLeaderboard(comp, sorted);
   startCountdown(comp);
+}
+
+function showLoadingState() {
+  var headerEl = document.getElementById('comp-header');
+  if (headerEl) headerEl.innerHTML = '<p class="text-slate-500 text-sm animate-pulse">Loading\u2026</p>';
+}
+
+function showError(msg) {
+  var headerEl = document.getElementById('comp-header');
+  if (headerEl) headerEl.innerHTML = '<p class="text-slate-400">' + escHtml(msg) + '</p>';
+}
+
+function init() {
+  var urlParams = new URLSearchParams(window.location.search);
+  var id = urlParams.get('id') || '1';
+
+  showLoadingState();
+
+  fetch('/api/competitions/' + encodeURIComponent(id))
+    .then(function (res) {
+      if (res.status === 404) throw new Error('Competition not found.');
+      if (!res.ok) throw new Error('Server error (HTTP ' + res.status + ').');
+      return res.json();
+    })
+    .then(function (comp) {
+      renderPage(comp);
+    })
+    .catch(function (err) {
+      // If fetch fails entirely (e.g. local dev with no API), try the mock data.
+      var mock = MOCK_COMPETITIONS[id];
+      if (mock) {
+        renderPage(mock);
+      } else {
+        showError(err.message || 'Failed to load competition.');
+      }
+    });
 }
 
 init();

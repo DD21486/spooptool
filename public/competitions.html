@@ -96,46 +96,95 @@
       </div>
     </div>
 
-    <!-- Active / upcoming competitions list (mock data — will be API-driven once DB is wired up) -->
+    <!-- Competitions list — loaded from /api/competitions -->
     <div class="mb-8">
       <h2 class="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Active &amp; Upcoming</h2>
-      <div class="space-y-3">
-
-        <!-- Mock: Summer Woodcutting Race -->
-        <a href="competition-detail.html?id=1"
-          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
-          <img src="assets/Woodcutting_icon.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Summer Woodcutting Race</p>
-            <p class="text-xs text-slate-500 mt-0.5">Team &middot; Woodcutting XP &middot; Ends in 5 days</p>
-          </div>
-          <span class="text-xs px-2 py-0.5 rounded-full border border-green-400/30 bg-green-400/10 text-green-400 shrink-0">Active</span>
-        </a>
-
-        <!-- Mock: Vorkath Grind -->
-        <a href="competition-detail.html?id=2"
-          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
-          <img src="assets/bosses/Vorkath.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Vorkath Grind</p>
-            <p class="text-xs text-slate-500 mt-0.5">Solo &middot; Kill Count &middot; Ends in 6 days</p>
-          </div>
-          <span class="text-xs px-2 py-0.5 rounded-full border border-green-400/30 bg-green-400/10 text-green-400 shrink-0">Active</span>
-        </a>
-
-        <!-- Mock: Total XP Blitz -->
-        <a href="competition-detail.html?id=3"
-          class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4 hover:border-slate-500 hover:bg-slate-800 transition-colors group">
-          <img src="assets/Skills_icon.png" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />
-          <div class="flex-1 min-w-0">
-            <p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">Total XP Blitz</p>
-            <p class="text-xs text-slate-500 mt-0.5">Solo &middot; Total XP &middot; Starts in 2 days</p>
-          </div>
-          <span class="text-xs px-2 py-0.5 rounded-full border border-amber-400/30 bg-amber-400/10 text-amber-400 shrink-0">Upcoming</span>
-        </a>
-
+      <div id="comp-list">
+        <p class="text-sm text-slate-500 text-center py-6">Loading competitions&hellip;</p>
       </div>
     </div>
+
+    <script>
+      (function () {
+        function escHtml(s) {
+          return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+        }
+        function getIcon(comp) {
+          if (comp.category === 'boss') {
+            var b = (comp.boss || '').replace(/[^a-zA-Z0-9]/g, '');
+            return 'assets/bosses/' + b + '.png';
+          }
+          if (comp.skillScope === 'total' || !comp.skill) return 'assets/Skills_icon.png';
+          if (comp.skill === 'Runecrafting') return 'assets/Runecraft_icon.png';
+          return 'assets/' + comp.skill + '_icon.png';
+        }
+        function getStatus(comp) {
+          var n = Date.now();
+          if (n < new Date(comp.startTime).getTime()) return 'upcoming';
+          if (n > new Date(comp.endTime).getTime())   return 'ended';
+          return 'active';
+        }
+        function getSubtitle(comp, status) {
+          var typeLabel = comp.type === 'team' ? 'Team' : 'Solo';
+          var metricLabel = comp.category === 'boss'
+            ? (comp.metric === 'ehb' ? 'EHB' : 'Kill Count')
+            : (comp.metric === 'ehp' ? 'EHP' : 'XP');
+          var scopeLabel = comp.category === 'boss'
+            ? ((comp.boss || '') + ' ' + metricLabel)
+            : (comp.skillScope === 'total'
+                ? 'Total ' + metricLabel
+                : ((comp.skill || '') + ' ' + metricLabel));
+          var diff, days;
+          if (status === 'upcoming') {
+            diff = new Date(comp.startTime).getTime() - Date.now();
+            days = Math.ceil(diff / 86400000);
+            return typeLabel + ' \u00b7 ' + scopeLabel + ' \u00b7 Starts in ' + days + (days === 1 ? ' day' : ' days');
+          }
+          if (status === 'active') {
+            diff = new Date(comp.endTime).getTime() - Date.now();
+            days = Math.ceil(diff / 86400000);
+            return typeLabel + ' \u00b7 ' + scopeLabel + ' \u00b7 Ends in ' + days + (days === 1 ? ' day' : ' days');
+          }
+          return typeLabel + ' \u00b7 ' + scopeLabel + ' \u00b7 Ended';
+        }
+        function renderList(comps) {
+          var el = document.getElementById('comp-list');
+          if (!el) return;
+          var active = comps.filter(function (c) { return getStatus(c) !== 'ended'; });
+          if (!active.length) {
+            el.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">No active or upcoming competitions.</p>';
+            return;
+          }
+          var html = '<div class="space-y-3">';
+          active.forEach(function (comp) {
+            var status = getStatus(comp);
+            var badgeClass = status === 'active'
+              ? 'border-green-400/30 bg-green-400/10 text-green-400'
+              : 'border-amber-400/30 bg-amber-400/10 text-amber-400';
+            var badgeLabel = status.charAt(0).toUpperCase() + status.slice(1);
+            html += '<a href="competition-detail.html?id=' + comp.id + '"'
+              + ' class="flex items-center gap-4 rounded-xl border border-slate-700 bg-slate-800/50 px-5 py-4'
+              + ' hover:border-slate-500 hover:bg-slate-800 transition-colors group">';
+            html += '<img src="' + escHtml(getIcon(comp)) + '" alt="" class="w-9 h-9 object-contain shrink-0" width="36" height="36" />';
+            html += '<div class="flex-1 min-w-0">';
+            html += '<p class="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors truncate">' + escHtml(comp.name) + '</p>';
+            html += '<p class="text-xs text-slate-500 mt-0.5">' + escHtml(getSubtitle(comp, status)) + '</p>';
+            html += '</div>';
+            html += '<span class="text-xs px-2 py-0.5 rounded-full border shrink-0 ' + badgeClass + '">' + badgeLabel + '</span>';
+            html += '</a>';
+          });
+          html += '</div>';
+          el.innerHTML = html;
+        }
+        fetch('/api/competitions')
+          .then(function (r) { return r.json(); })
+          .then(renderList)
+          .catch(function () {
+            var el = document.getElementById('comp-list');
+            if (el) el.innerHTML = '<p class="text-sm text-red-400 text-center py-6">Failed to load competitions.</p>';
+          });
+      })();
+    </script>
 
   </div>
 

@@ -721,16 +721,49 @@ document.getElementById('step3-create').addEventListener('click', function () {
 
 // ── Create competition ────────────────────────────────────────────────────────
 
-function generateCreatorCode() {
-  var code = '';
-  for (var i = 0; i < 9; i++) code += Math.floor(Math.random() * 10);
-  return code;
-}
-
 function createCompetition() {
-  document.getElementById('creator-code-display').textContent = generateCreatorCode();
-  document.getElementById('creator-modal').classList.remove('hidden');
-  document.body.style.overflow = 'hidden';
+  var createBtn = document.getElementById('step3-create');
+  if (createBtn) { createBtn.disabled = true; createBtn.textContent = 'Creating\u2026'; }
+
+  var payload = {
+    name:             state.name,
+    type:             state.type,
+    category:         state.category,
+    metric:           state.metric,
+    startTime:        state.startTime,
+    endTime:          state.endTime,
+    selectedPlayers:  state.selectedPlayers,
+    teams:            state.teams,
+    skillScope:       state.skillScope,
+    sameSkillForAll:  state.sameSkillForAll,
+    selectedSkill:    state.selectedSkill,
+    playerSkills:     state.playerSkills,
+    selectedBoss:     state.selectedBoss,
+  };
+
+  fetch('/api/competitions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+    .then(function (res) {
+      if (!res.ok) return res.json().then(function (e) { throw new Error(e.error || ('HTTP ' + res.status)); });
+      return res.json();
+    })
+    .then(function (data) {
+      // Show creator code in modal
+      document.getElementById('creator-code-display').textContent = data.creatorCode || data.creator_code || '';
+      // Update the "View Competition" button to link to the real competition
+      var viewBtn = document.getElementById('go-to-competition-btn');
+      if (viewBtn) viewBtn.href = 'competition-detail.html?id=' + data.id;
+      document.getElementById('creator-modal').classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    })
+    .catch(function (err) {
+      var errEl = document.getElementById('selection-error');
+      if (errEl) { errEl.textContent = 'Failed to create competition: ' + err.message; errEl.classList.remove('hidden'); }
+      if (createBtn) { createBtn.disabled = false; createBtn.innerHTML = 'Create Competition &#10003;'; }
+    });
 }
 
 // ── Creator code modal ────────────────────────────────────────────────────────
