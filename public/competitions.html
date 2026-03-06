@@ -96,11 +96,27 @@
       </div>
     </div>
 
-    <!-- Competitions list — loaded from /api/competitions -->
+    <!-- Active & Upcoming competitions — loaded from /api/competitions -->
     <div class="mb-8">
       <h2 class="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Active &amp; Upcoming</h2>
       <div id="comp-list">
         <p class="text-sm text-slate-500 text-center py-6">Loading competitions&hellip;</p>
+      </div>
+    </div>
+
+    <!-- Past competitions -->
+    <div class="mb-8">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-sm font-medium text-slate-500 uppercase tracking-wide">Past</h2>
+        <select id="past-filter" class="text-xs bg-slate-800 border border-slate-600 text-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer">
+          <option value="10">Last 10</option>
+          <option value="30d">Last 30 days</option>
+          <option value="1y">Last year</option>
+          <option value="all">All</option>
+        </select>
+      </div>
+      <div id="past-comp-list">
+        <p class="text-sm text-slate-500 text-center py-6">Loading&hellip;</p>
       </div>
     </div>
 
@@ -147,6 +163,17 @@
           }
           return typeLabel + ' \u00b7 ' + scopeLabel + ' \u00b7 Ended';
         }
+        function getScopeLabel(comp) {
+          var metricLabel = comp.category === 'boss'
+            ? (comp.metric === 'ehb' ? 'EHB' : 'Kill Count')
+            : (comp.metric === 'ehp' ? 'EHP' : 'XP');
+          if (comp.category === 'boss') return (comp.boss || '') + ' ' + metricLabel;
+          if (comp.skillScope === 'total') return 'Total ' + metricLabel;
+          return (comp.skill || '') + ' ' + metricLabel;
+        }
+        function formatDate(d) {
+          return new Date(d).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+        }
         function renderList(comps) {
           var el = document.getElementById('comp-list');
           if (!el) return;
@@ -176,12 +203,64 @@
           html += '</div>';
           el.innerHTML = html;
         }
+        function applyPastFilter(ended, filter) {
+          if (filter === '10') return ended.slice(0, 10);
+          var cutoff;
+          if (filter === '30d') cutoff = Date.now() - 30  * 86400000;
+          if (filter === '1y')  cutoff = Date.now() - 365 * 86400000;
+          if (cutoff) return ended.filter(function (c) { return new Date(c.endTime).getTime() >= cutoff; });
+          return ended; // 'all'
+        }
+        function renderPastList(ended, filter) {
+          var el = document.getElementById('past-comp-list');
+          if (!el) return;
+          var filtered = applyPastFilter(ended, filter);
+          if (!filtered.length) {
+            el.innerHTML = '<p class="text-sm text-slate-500 text-center py-6">No past competitions.</p>';
+            return;
+          }
+          var html = '<div class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden">'
+            + '<table class="w-full text-sm"><thead>'
+            + '<tr class="border-b border-slate-700 bg-slate-800">'
+            + '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">Competition</th>'
+            + '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400 hidden sm:table-cell">Type</th>'
+            + '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400 hidden sm:table-cell">Metric</th>'
+            + '<th class="text-right px-4 py-2.5 text-xs font-medium text-slate-400">Ended</th>'
+            + '</tr></thead><tbody>';
+          filtered.forEach(function (comp) {
+            html += '<tr class="border-b border-slate-700/50 last:border-0 hover:bg-slate-800/40 cursor-pointer"'
+              + ' onclick="window.location.href=\'competition-detail.html?id=' + comp.id + '\'">';
+            html += '<td class="px-4 py-3">'
+              + '<div class="flex items-center gap-3">'
+              + '<img src="' + escHtml(getIcon(comp)) + '" alt="" class="w-6 h-6 object-contain shrink-0" width="24" height="24" />'
+              + '<span class="font-medium text-slate-100">' + escHtml(comp.name) + '</span>'
+              + '</div></td>';
+            html += '<td class="px-4 py-3 text-slate-400 hidden sm:table-cell">' + (comp.type === 'team' ? 'Team' : 'Solo') + '</td>';
+            html += '<td class="px-4 py-3 text-slate-400 hidden sm:table-cell">' + escHtml(getScopeLabel(comp)) + '</td>';
+            html += '<td class="px-4 py-3 text-slate-500 text-right text-xs">' + escHtml(formatDate(comp.endTime)) + '</td>';
+            html += '</tr>';
+          });
+          html += '</tbody></table></div>';
+          el.innerHTML = html;
+        }
         fetch('/api/competitions/_')
           .then(function (r) { return r.json(); })
-          .then(renderList)
+          .then(function (comps) {
+            renderList(comps);
+            var ended = comps.filter(function (c) { return getStatus(c) === 'ended'; });
+            renderPastList(ended, '10');
+            var filterEl = document.getElementById('past-filter');
+            if (filterEl) {
+              filterEl.addEventListener('change', function () {
+                renderPastList(ended, filterEl.value);
+              });
+            }
+          })
           .catch(function () {
             var el = document.getElementById('comp-list');
             if (el) el.innerHTML = '<p class="text-sm text-red-400 text-center py-6">Failed to load competitions.</p>';
+            var pastEl = document.getElementById('past-comp-list');
+            if (pastEl) pastEl.innerHTML = '<p class="text-sm text-red-400 text-center py-6">Failed to load competitions.</p>';
           });
       })();
     </script>
