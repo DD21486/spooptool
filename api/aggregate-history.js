@@ -2,12 +2,47 @@
  * GET /api/aggregate-history?hours=24
  * Returns bucketed time series of combined total XP and total boss KC across all characters for the last N hours.
  * GET /api/weekly-winners (rewrite → ?path=weekly-winners): last week's leader usernames for XP, Boss KC, Loot.
+ * GET /api/ge-prices (rewrite → ?path=ge): proxy to OSRS Wiki prices API (no DB).
  */
 
 const { neon } = require('@neondatabase/serverless');
 
+const GE_PRICES_BASE = 'https://prices.runescape.wiki/api/v1/osrs';
+const GE_USER_AGENT = 'SpoopTool GE Tracker - https://github.com/spooptool';
+
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
+}
+
+async function handleGeProxy(req, res) {
+  const route = (req.query.route || 'latest').toString().trim().toLowerCase();
+  const allowed = ['latest', 'mapping', '5m', '1h', 'timeseries'];
+  if (!allowed.includes(route)) {
+    return res.status(400).json({ error: 'Invalid route. Use: latest, mapping, 5m, 1h, timeseries' });
+  }
+  const id = (req.query.id || '').toString().trim();
+  const timestep = (req.query.timestep || '1h').toString().trim();
+  const timestamp = (req.query.timestamp || '').toString().trim();
+  const params = new URLSearchParams();
+  if (id) params.set('id', id);
+  if (timestep && route === 'timeseries') params.set('timestep', timestep);
+  if (timestamp && (route === '5m' || route === '1h')) params.set('timestamp', timestamp);
+  const qs = params.toString();
+  const url = qs ? `${GE_PRICES_BASE}/${route}?${qs}` : `${GE_PRICES_BASE}/${route}`;
+  try {
+    const resp = await fetch(url, {
+      headers: { 'User-Agent': GE_USER_AGENT },
+    });
+    if (!resp.ok) {
+      return res.status(resp.status).json({ error: 'GE API error', status: resp.status });
+    }
+    const data = await resp.json();
+    res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    return res.status(200).json(data);
+  } catch (err) {
+    console.error('GE proxy', err);
+    return res.status(502).json({ error: 'Failed to fetch GE prices' });
+  }
 }
 
 function xpFromData(data) {
@@ -81,11 +116,15 @@ module.exports = async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
+  const path = (req.query.path || '').trim();
+  if (path === 'ge') {
+    return await handleGeProxy(req, res);
+  }
+
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
   }
 
-  const path = (req.query.path || '').trim();
   if (path === 'weekly-winners') {
     try {
       const sql = neon(process.env.DATABASE_URL);

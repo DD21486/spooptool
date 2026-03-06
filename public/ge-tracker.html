@@ -9,8 +9,11 @@
     tailwind.config = { darkMode: 'class' };
   </script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
     body { background-color: #0f172a; }
+    .ge-table th { white-space: nowrap; }
+    .ge-table td, .ge-table th { padding: 0.5rem 0.75rem; }
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
@@ -41,15 +44,277 @@
     })();
   </script>
 
-  <div class="max-w-4xl mx-auto px-4 pt-14 sm:pt-6 pb-12">
-    <h1 class="text-3xl font-bold text-slate-100 mt-12 mb-6">GE Tracker</h1>
+  <div class="max-w-7xl mx-auto px-4 pt-14 sm:pt-6 pb-12">
+    <h1 class="text-3xl font-bold text-slate-100 mt-8 mb-2">GE Tracker</h1>
+    <p class="text-slate-400 text-sm mb-6">Live prices from the OSRS Wiki. Margins account for 1% GE tax on sale.</p>
 
-    <div class="prose prose-invert max-w-none text-slate-300 space-y-4">
-      <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.</p>
-      <p>Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-      <p>Curabitur pretium tincidunt lacus. Nulla facilisi. Ut convallis, sem sit amet interdum consectetuer, odio augue aliquam leo, nec dapibus tortor nibh sed augue. Integer eu magna sit amet metus fermentum posuere.</p>
+    <div class="flex flex-wrap items-center gap-4 mb-4">
+      <label class="flex items-center gap-2 text-sm text-slate-300">
+        <span>Min margin %</span>
+        <input type="number" id="filter-min-margin" value="2" min="0" step="0.5" class="w-20 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm" />
+      </label>
+      <label class="flex items-center gap-2 text-sm text-slate-300">
+        <span>Min price (gp)</span>
+        <input type="number" id="filter-min-price" value="0" min="0" step="100" class="w-28 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm" />
+      </label>
+      <label class="flex items-center gap-2 text-sm text-slate-300">
+        <span>Max price (gp)</span>
+        <input type="number" id="filter-max-price" value="0" min="0" step="100000" placeholder="No max" class="w-28 px-2 py-1 rounded bg-slate-700 border border-slate-600 text-slate-200 text-sm" />
+      </label>
+      <input type="text" id="filter-search" placeholder="Search item…" class="w-48 px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm placeholder-slate-500" />
+      <button type="button" id="sort-margin" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium">Sort: Margin %</button>
+      <button type="button" id="sort-roi" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm">Sort: ROI</button>
+      <button type="button" id="sort-profit4h" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm">Sort: Profit/4h</button>
+      <span id="ge-loading" class="text-slate-500 text-sm">Loading…</span>
+      <span id="ge-meta" class="text-slate-500 text-sm hidden"></span>
+    </div>
+
+    <div class="rounded-xl border border-slate-700 bg-slate-800/50 overflow-hidden overflow-x-auto">
+      <table class="w-full text-sm ge-table">
+        <thead>
+          <tr class="border-b border-slate-700 bg-slate-800/80">
+            <th class="text-left text-slate-400 font-medium">Item</th>
+            <th class="text-right text-slate-400 font-medium">Buy (instant)</th>
+            <th class="text-right text-slate-400 font-medium">Sell (instant)</th>
+            <th class="text-right text-slate-400 font-medium">Margin</th>
+            <th class="text-right text-slate-400 font-medium">Margin %</th>
+            <th class="text-right text-slate-400 font-medium">Net % (after tax)</th>
+            <th class="text-right text-slate-400 font-medium">ROI %</th>
+            <th class="text-right text-slate-400 font-medium">Limit/4h</th>
+            <th class="text-right text-slate-400 font-medium">Profit/4h</th>
+            <th class="text-center text-slate-400 font-medium w-20">Chart</th>
+          </tr>
+        </thead>
+        <tbody id="ge-tbody">
+          <tr><td colspan="10" class="text-center py-8 text-slate-500">Load prices to see flip opportunities.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <p class="text-slate-500 text-xs mt-3">Data: OSRS Wiki real-time prices (RuneLite). Buy = price to buy instantly, Sell = price you get when selling instantly. Net % and ROI use 1% GE tax on the sale.</p>
+  </div>
+
+  <!-- Item detail / timeseries modal -->
+  <div id="ge-item-modal" class="fixed inset-0 z-50 flex hidden items-center justify-center bg-black/60 p-4" aria-hidden="true">
+    <div class="w-full max-w-2xl rounded-xl border border-slate-600 bg-slate-800 p-5 shadow-xl" role="dialog">
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="ge-item-modal-title" class="text-lg font-semibold text-slate-100">Item</h3>
+        <button type="button" id="ge-item-modal-close" class="p-1.5 rounded text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>
+      </div>
+      <div class="h-64">
+        <canvas id="ge-item-chart"></canvas>
+      </div>
+      <p id="ge-item-modal-meta" class="text-slate-500 text-xs mt-2"></p>
     </div>
   </div>
+
+  <script>
+(function () {
+  const API = '/api/ge-prices';
+  const GE_TAX = 0.01;
+
+  let mapping = [];
+  let latest = {};
+  let sortBy = 'marginPct';
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    const t = String(s);
+    return t.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  }
+
+  function formatGp(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
+    return String(Math.round(n));
+  }
+
+  function buildRows() {
+    const minMarginPct = parseFloat(document.getElementById('filter-min-margin').value, 10) || 0;
+    const minPrice = parseFloat(document.getElementById('filter-min-price').value, 10) || 0;
+    let maxPrice = parseFloat(document.getElementById('filter-max-price').value, 10) || 0;
+    if (maxPrice <= 0) maxPrice = Infinity;
+    const search = (document.getElementById('filter-search').value || '').trim().toLowerCase();
+
+    const rows = [];
+    for (const item of mapping) {
+      const id = item.id;
+      const data = latest[id];
+      if (!data) continue;
+      const high = data.high != null ? Number(data.high) : null;
+      const low = data.low != null ? Number(data.low) : null;
+      if (high == null || low == null || high <= 0) continue;
+      const buy = low;
+      const sell = high;
+      const margin = sell - buy;
+      const marginPct = buy > 0 ? (margin / buy) * 100 : 0;
+      const sellAfterTax = sell * (1 - GE_TAX);
+      const netProfit = sellAfterTax - buy;
+      const netPct = buy > 0 ? (netProfit / buy) * 100 : 0;
+      const roi = buy > 0 ? (netProfit / buy) * 100 : 0;
+      const limit = item.limit != null ? Math.max(0, parseInt(item.limit, 10) || 0) : 0;
+      const profit4h = limit > 0 ? netProfit * limit : 0;
+
+      if (marginPct < minMarginPct) continue;
+      if (item.value != null && Number(item.value) < minPrice) continue;
+      if (item.value != null && Number(item.value) > maxPrice) continue;
+      if (search && !(item.name || '').toLowerCase().includes(search)) continue;
+
+      rows.push({
+        id,
+        name: item.name || '',
+        buy,
+        sell,
+        margin,
+        marginPct,
+        netPct,
+        roi,
+        limit,
+        profit4h,
+      });
+    }
+
+    if (sortBy === 'marginPct') rows.sort((a, b) => b.marginPct - a.marginPct);
+    else if (sortBy === 'roi') rows.sort((a, b) => b.roi - a.roi);
+    else if (sortBy === 'profit4h') rows.sort((a, b) => b.profit4h - a.profit4h);
+    return rows;
+  }
+
+  function renderTable() {
+    const tbody = document.getElementById('ge-tbody');
+    const rows = buildRows();
+    const metaEl = document.getElementById('ge-meta');
+    if (metaEl) {
+      metaEl.textContent = rows.length + ' items';
+      metaEl.classList.remove('hidden');
+    }
+
+    if (rows.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-slate-500">No items match filters.</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = rows.map((r) => {
+      return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
+        '<td class="text-slate-200">' + escapeHtml(r.name) + '</td>' +
+        '<td class="text-right font-mono text-slate-300">' + formatGp(r.buy) + '</td>' +
+        '<td class="text-right font-mono text-slate-300">' + formatGp(r.sell) + '</td>' +
+        '<td class="text-right font-mono text-emerald-400">' + formatGp(r.margin) + '</td>' +
+        '<td class="text-right font-mono text-slate-300">' + r.marginPct.toFixed(2) + '%</td>' +
+        '<td class="text-right font-mono text-slate-300">' + r.netPct.toFixed(2) + '%</td>' +
+        '<td class="text-right font-mono text-slate-300">' + r.roi.toFixed(2) + '%</td>' +
+        '<td class="text-right font-mono text-slate-400">' + (r.limit ? formatGp(r.limit) : '—') + '</td>' +
+        '<td class="text-right font-mono text-emerald-400">' + (r.profit4h ? formatGp(r.profit4h) : '—') + '</td>' +
+        '<td class="text-center"><button type="button" class="ge-chart-btn px-2 py-1 rounded text-sky-400 hover:bg-slate-700 text-xs" data-id="' + r.id + '" data-name="' + escapeHtml(r.name) + '">Chart</button></td>' +
+        '</tr>';
+    }).join('');
+
+    tbody.querySelectorAll('.ge-chart-btn').forEach((btn) => {
+      btn.addEventListener('click', function () {
+        const id = this.getAttribute('data-id');
+        const name = this.getAttribute('data-name');
+        openItemChart(id, name);
+      });
+    });
+  }
+
+  let itemChartInstance = null;
+  const modal = document.getElementById('ge-item-modal');
+  const modalTitle = document.getElementById('ge-item-modal-title');
+  const modalMeta = document.getElementById('ge-item-modal-meta');
+  const modalClose = document.getElementById('ge-item-modal-close');
+  const chartCanvas = document.getElementById('ge-item-chart');
+
+  function openItemChart(id, name) {
+    modal.classList.remove('hidden');
+    modal.setAttribute('aria-hidden', 'false');
+    modalTitle.textContent = name || 'Item ' + id;
+    modalMeta.textContent = 'Loading…';
+    if (itemChartInstance) {
+      itemChartInstance.destroy();
+      itemChartInstance = null;
+    }
+
+    fetch(API + '?route=timeseries&id=' + encodeURIComponent(id) + '&timestep=1h')
+      .then((res) => res.json())
+      .then((data) => {
+        const dataPoints = Array.isArray(data.data) ? data.data : [];
+        if (dataPoints.length === 0) {
+          modalMeta.textContent = 'No time-series data for this item.';
+          return;
+        }
+        const labels = dataPoints.map((d) => {
+          const t = d.timestamp != null ? new Date(d.timestamp * 1000) : null;
+          return t ? t.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit' }) : '';
+        });
+        const highData = dataPoints.map((d) => d.avgHigh != null ? d.avgHigh : d.high);
+        const lowData = dataPoints.map((d) => d.avgLow != null ? d.avgLow : d.low);
+        const marginData = highData.map((h, i) => (h != null && lowData[i] != null ? h - lowData[i] : null));
+
+        if (itemChartInstance) itemChartInstance.destroy();
+        const ctx = chartCanvas.getContext('2d');
+        itemChartInstance = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels,
+            datasets: [
+              { label: 'Sell (high)', data: highData, borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.1)', fill: false, tension: 0.2 },
+              { label: 'Buy (low)', data: lowData, borderColor: '#ef4444', backgroundColor: 'rgba(239,68,68,0.1)', fill: false, tension: 0.2 },
+              { label: 'Margin', data: marginData, borderColor: '#eab308', backgroundColor: 'rgba(234,179,8,0.1)', fill: false, tension: 0.2 },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { labels: { color: '#cbd5e1' } } },
+            scales: {
+              x: { ticks: { color: '#94a3b8', maxTicksLimit: 10 } },
+              y: { ticks: { color: '#94a3b8' } },
+            },
+          },
+        });
+        modalMeta.textContent = dataPoints.length + ' hourly points. Margin = sell − buy.';
+      })
+      .catch(() => {
+        modalMeta.textContent = 'Failed to load chart data.';
+      });
+  }
+
+  modalClose.addEventListener('click', function () {
+    modal.classList.add('hidden');
+    modal.setAttribute('aria-hidden', 'true');
+  });
+  modal.addEventListener('click', function (e) {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+
+  document.getElementById('sort-margin').addEventListener('click', function () { sortBy = 'marginPct'; renderTable(); });
+  document.getElementById('sort-roi').addEventListener('click', function () { sortBy = 'roi'; renderTable(); });
+  document.getElementById('sort-profit4h').addEventListener('click', function () { sortBy = 'profit4h'; renderTable(); });
+  document.getElementById('filter-min-margin').addEventListener('input', renderTable);
+  document.getElementById('filter-min-price').addEventListener('input', renderTable);
+  document.getElementById('filter-max-price').addEventListener('input', renderTable);
+  document.getElementById('filter-search').addEventListener('input', renderTable);
+
+  const loadingEl = document.getElementById('ge-loading');
+  Promise.all([
+    fetch(API + '?route=mapping').then((r) => r.json()),
+    fetch(API + '?route=latest').then((r) => r.json()),
+  ])
+    .then(([mapData, latestData]) => {
+      mapping = Array.isArray(mapData) ? mapData : [];
+      latest = latestData && typeof latestData === 'object' ? latestData : {};
+      loadingEl.textContent = '';
+      renderTable();
+    })
+    .catch((err) => {
+      loadingEl.textContent = 'Failed to load. Check console.';
+      console.error('GE Tracker', err);
+      document.getElementById('ge-tbody').innerHTML = '<tr><td colspan="10" class="text-center py-8 text-red-400">Failed to load prices. The GE API may be down or CORS/proxy issue.</td></tr>';
+    });
+})();
+  </script>
 
 </body>
 </html>
