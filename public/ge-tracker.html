@@ -90,7 +90,7 @@
           </tr>
         </thead>
         <tbody id="ge-tbody">
-          <tr><td colspan="10" class="text-center py-8 text-slate-500">Load prices to see flip opportunities.</td></tr>
+          <tr><td colspan="10" class="text-center py-8 text-slate-500">Loading…</td></tr>
         </tbody>
       </table>
     </div>
@@ -326,8 +326,8 @@
         setError('API error: ' + (payload.error || 'Unknown'));
         return;
       }
-      var mapData = payload && (payload.mapping ?? payload.data && payload.data.mapping);
-      var latestData = payload && (payload.latest ?? payload.data && payload.data.latest);
+      var mapData = payload && (payload.mapping ?? (payload.data && payload.data.mapping));
+      var latestData = payload && (payload.latest ?? (payload.data && payload.data.latest));
       if (Array.isArray(mapData)) {
         mapping = mapData;
       } else if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {
