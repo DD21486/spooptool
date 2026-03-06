@@ -88,26 +88,51 @@ function computeDelta(startData, endData, comp, participantSkill) {
   return 0;
 }
 
-// Fetch start + end snapshots for a set of character IDs in two queries.
-// Returns { startByChar, endByChar } keyed by character_id.
-async function fetchSnapshots(sql, charIds, startTime, effectiveEnd) {
-  if (!charIds.length) return { startByChar: {}, endByChar: {} };
-
+// Fetch start + end snapshots for all participants in a solo competition.
+async function fetchSnapshotsSolo(sql, compId, startTime, effectiveEnd) {
   const [startSnaps, endSnaps] = await Promise.all([
     sql`
-      SELECT DISTINCT ON (character_id) character_id, data
-      FROM character_snapshots
-      WHERE character_id = ANY(${charIds}) AND at <= ${startTime}
-      ORDER BY character_id, at DESC
+      SELECT DISTINCT ON (cs.character_id) cs.character_id, cs.data
+      FROM character_snapshots cs
+      JOIN competition_participants cp ON cp.character_id = cs.character_id
+      WHERE cp.competition_id = ${compId} AND cs.at <= ${startTime}
+      ORDER BY cs.character_id, cs.at DESC
     `,
     sql`
-      SELECT DISTINCT ON (character_id) character_id, data
-      FROM character_snapshots
-      WHERE character_id = ANY(${charIds}) AND at <= ${effectiveEnd}
-      ORDER BY character_id, at DESC
+      SELECT DISTINCT ON (cs.character_id) cs.character_id, cs.data
+      FROM character_snapshots cs
+      JOIN competition_participants cp ON cp.character_id = cs.character_id
+      WHERE cp.competition_id = ${compId} AND cs.at <= ${effectiveEnd}
+      ORDER BY cs.character_id, cs.at DESC
     `,
   ]);
+  const startByChar = {};
+  for (const r of startSnaps) startByChar[r.character_id] = r.data;
+  const endByChar = {};
+  for (const r of endSnaps) endByChar[r.character_id] = r.data;
+  return { startByChar, endByChar };
+}
 
+// Fetch start + end snapshots for all participants in a team competition.
+async function fetchSnapshotsTeam(sql, compId, startTime, effectiveEnd) {
+  const [startSnaps, endSnaps] = await Promise.all([
+    sql`
+      SELECT DISTINCT ON (cs.character_id) cs.character_id, cs.data
+      FROM character_snapshots cs
+      JOIN competition_team_members ctm ON ctm.character_id = cs.character_id
+      JOIN competition_teams ct ON ct.id = ctm.team_id
+      WHERE ct.competition_id = ${compId} AND cs.at <= ${startTime}
+      ORDER BY cs.character_id, cs.at DESC
+    `,
+    sql`
+      SELECT DISTINCT ON (cs.character_id) cs.character_id, cs.data
+      FROM character_snapshots cs
+      JOIN competition_team_members ctm ON ctm.character_id = cs.character_id
+      JOIN competition_teams ct ON ct.id = ctm.team_id
+      WHERE ct.competition_id = ${compId} AND cs.at <= ${effectiveEnd}
+      ORDER BY cs.character_id, cs.at DESC
+    `,
+  ]);
   const startByChar = {};
   for (const r of startSnaps) startByChar[r.character_id] = r.data;
   const endByChar = {};
@@ -266,10 +291,9 @@ async function getCompetition(req, res, sql, id) {
       WHERE cp.competition_id = ${comp.id}
     `;
 
-    const charIds = participants.map(p => p.character_id);
     const { startByChar, endByChar } = isUpcoming
       ? { startByChar: {}, endByChar: {} }
-      : await fetchSnapshots(sql, charIds, comp.start_time, effectiveEnd);
+      : await fetchSnapshotsSolo(sql, comp.id, comp.start_time, effectiveEnd);
 
     result.participants = participants.map(p => {
       const value = computeDelta(
@@ -286,7 +310,6 @@ async function getCompetition(req, res, sql, id) {
     });
 
   } else {
-    // Fetch all team rows in a single join
     const rows = await sql`
       SELECT ct.id AS team_id, ct.name AS team_name, ct.skill AS team_skill,
              ctm.character_id, c.username
@@ -297,10 +320,9 @@ async function getCompetition(req, res, sql, id) {
       ORDER BY ct.id
     `;
 
-    const charIds = [...new Set(rows.map(r => r.character_id))];
     const { startByChar, endByChar } = isUpcoming
       ? { startByChar: {}, endByChar: {} }
-      : await fetchSnapshots(sql, charIds, comp.start_time, effectiveEnd);
+      : await fetchSnapshotsTeam(sql, comp.id, comp.start_time, effectiveEnd);
 
     // Group by team
     const teamMap = {};

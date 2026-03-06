@@ -548,13 +548,7 @@ function init() {
       renderPage(comp);
     })
     .catch(function (err) {
-      // If fetch fails entirely (e.g. local dev with no API), try the mock data.
-      var mock = MOCK_COMPETITIONS[id];
-      if (mock) {
-        renderPage(mock);
-      } else {
-        showError(err.message || 'Failed to load competition.');
-      }
+      showError(err.message || 'Failed to load competition.');
     });
 }
 
