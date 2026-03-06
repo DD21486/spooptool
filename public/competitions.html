@@ -176,7 +176,7 @@
           html += '</div>';
           el.innerHTML = html;
         }
-        fetch('/api/competitions')
+        fetch('/api/competitions/_')
           .then(function (r) { return r.json(); })
           .then(renderList)
           .catch(function () {

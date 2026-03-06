@@ -741,7 +741,7 @@ function createCompetition() {
     selectedBoss:     state.selectedBoss,
   };
 
-  fetch('/api/competitions', {
+  fetch('/api/competitions/_', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(payload),
