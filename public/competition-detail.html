@@ -53,6 +53,36 @@
 
     </div>
 
+    <!-- Delete competition -->
+    <div class="flex justify-end mb-4">
+      <button type="button" id="delete-comp-btn"
+        class="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 border border-red-400/30 bg-red-400/5 hover:bg-red-400/15 transition-colors">
+        Delete Competition
+      </button>
+    </div>
+
+    <!-- Delete confirmation modal -->
+    <div id="delete-modal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 hidden">
+      <div class="w-full max-w-sm rounded-xl border border-slate-700 bg-slate-800 p-6 shadow-2xl">
+        <h2 class="text-base font-semibold text-slate-100 mb-1">Delete Competition</h2>
+        <p class="text-sm text-slate-400 mb-4">Enter the creator code to confirm deletion. This cannot be undone.</p>
+        <label for="delete-code-input" class="block text-xs font-medium text-slate-400 mb-1">Creator Code</label>
+        <input type="text" id="delete-code-input" maxlength="9" placeholder="000000000"
+          class="w-full px-3 py-2 rounded-lg bg-slate-700 border border-slate-600 text-slate-100 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 mb-2 font-mono" />
+        <p id="delete-error" class="text-xs text-red-400 mb-3 hidden">Incorrect creator code.</p>
+        <div class="flex gap-2">
+          <button type="button" id="delete-cancel-btn"
+            class="flex-1 px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium transition-colors">
+            Cancel
+          </button>
+          <button type="button" id="delete-confirm-btn"
+            class="flex-1 px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-medium transition-colors">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Leaderboard card -->
     <div class="rounded-xl border border-slate-700 bg-slate-800/50">
       <div class="px-4 py-3 border-b border-slate-700">

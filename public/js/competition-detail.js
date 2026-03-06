@@ -448,6 +448,62 @@ function renderLeaderboard(comp, sorted) {
   });
 }
 
+// ── Delete competition ────────────────────────────────────────────────────────
+
+function initDeleteButton(compId) {
+  var openBtn    = document.getElementById('delete-comp-btn');
+  var modal      = document.getElementById('delete-modal');
+  var cancelBtn  = document.getElementById('delete-cancel-btn');
+  var confirmBtn = document.getElementById('delete-confirm-btn');
+  var codeInput  = document.getElementById('delete-code-input');
+  var errorEl    = document.getElementById('delete-error');
+  if (!openBtn || !modal) return;
+
+  function openModal() {
+    codeInput.value = '';
+    errorEl.classList.add('hidden');
+    confirmBtn.disabled = false;
+    confirmBtn.textContent = 'Delete';
+    modal.classList.remove('hidden');
+    codeInput.focus();
+  }
+  function closeModal() { modal.classList.add('hidden'); }
+
+  openBtn.addEventListener('click', openModal);
+  cancelBtn.addEventListener('click', closeModal);
+  modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+
+  confirmBtn.addEventListener('click', function () {
+    var code = codeInput.value.trim();
+    if (!code) return;
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = 'Deleting\u2026';
+    errorEl.classList.add('hidden');
+
+    fetch('/api/competitions/_?compId=' + encodeURIComponent(compId), {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ creatorCode: code }),
+    })
+      .then(function (res) {
+        if (res.status === 403) {
+          errorEl.classList.remove('hidden');
+          confirmBtn.disabled = false;
+          confirmBtn.textContent = 'Delete';
+          return;
+        }
+        if (!res.ok) throw new Error('Server error');
+        window.location.href = 'competitions.html';
+      })
+      .catch(function () {
+        errorEl.textContent = 'Something went wrong. Try again.';
+        errorEl.classList.remove('hidden');
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = 'Delete';
+      });
+  });
+}
+
 // ── Snapshot / score refresh ──────────────────────────────────────────────────
 // POSTs to /api/competitions/:id/snapshot to fetch fresh Hiscores for all
 // participants, then reloads the competition detail so scores are up to date.
@@ -520,6 +576,7 @@ function renderPage(comp) {
   renderContributorCard(comp, sorted);
   renderLeaderboard(comp, sorted);
   startCountdown(comp);
+  initDeleteButton(comp.id);
 }
 
 function showLoadingState() {
