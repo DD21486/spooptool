@@ -393,7 +393,7 @@ function renderLeaderboard(comp, sorted) {
         + escHtml(formatMetricValue(team._startTotal || 0, comp)) + '</td>';
       tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-400 font-semibold">'
         + escHtml(formatMetricValue(team._endTotal || 0, comp)) + '</td>';
-      tbodyHtml += '<td class="px-4 py-3 text-right font-mono font-semibold text-sky-300">'
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono font-semibold text-green-400">'
         + escHtml(formatMetricValue(team._total, comp)) + '</td>';
       tbodyHtml += '</tr>';
 
@@ -447,7 +447,7 @@ function renderLeaderboard(comp, sorted) {
         + escHtml(formatMetricValue(player.startValue || 0, comp)) + '</td>';
       tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-500">'
         + escHtml(formatMetricValue(player.endValue || 0, comp)) + '</td>';
-      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-sky-300">'
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-green-400">'
         + escHtml(formatMetricValue(player.value, comp)) + '</td>';
       tbodyHtml += '</tr>';
     });
