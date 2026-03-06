@@ -531,6 +531,9 @@ function initRefreshButton(compId, status) {
   if (!btn) return;
   if (status !== 'active') return; // only show for active competitions
 
+  // Reset state in case this is called after a re-render following a refresh
+  btn.disabled = false;
+  btn.textContent = 'Refresh Scores';
   btn.classList.remove('hidden');
 
   btn.addEventListener('click', function () {
@@ -538,7 +541,10 @@ function initRefreshButton(compId, status) {
     btn.textContent = 'Refreshing\u2026';
 
     fetch('/api/competitions/_?compId=' + encodeURIComponent(compId) + '&action=refresh', { method: 'POST' })
-      .then(function () { init(); })
+      .then(function () {
+        btn.textContent = 'Updated!';
+        setTimeout(function () { init(); }, 800);
+      })
       .catch(function () {
         btn.disabled = false;
         btn.textContent = 'Refresh Scores';
