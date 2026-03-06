@@ -10,7 +10,6 @@
     { "source": "/api/weekly-winners", "destination": "/api/aggregate-history?path=weekly-winners" },
     { "source": "/api/test-leaderboard-webhook", "destination": "/api/loot?testLeaderboard=1" },
     { "source": "/api/player-history", "destination": "/api/player-deltas?path=history" },
-    { "source": "/api/character-snapshot", "destination": "/api/characters-with-snapshots" },
-    { "source": "/api/competitions", "destination": "/api/competitions/_" }
+    { "source": "/api/character-snapshot", "destination": "/api/characters-with-snapshots" }
   ]
 }

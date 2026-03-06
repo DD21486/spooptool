@@ -442,7 +442,7 @@ module.exports = async function handler(req, res) {
   // params is an array of path segments after /api/competitions/
   const raw = req.query.params;
   const params = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const id     = params[0] && params[0] !== '_' ? parseInt(params[0], 10) : null;
+  const id     = params[0] ? parseInt(params[0], 10) : null;
   const action = params[1] || null; // e.g. 'snapshot'
 
   try {
