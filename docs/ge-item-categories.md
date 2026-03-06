@@ -10,7 +10,7 @@ Example:
 
 ```json
 {
-  "Herbs": ["Guam leaf", "Grimy guam leaf", "Ranarr weed", "Grimy ranarr weed", ...],
+  "Herbs & Seeds": ["Guam leaf", "Grimy guam leaf", "Ranarr seed", "Potato seed", ...],
   "Ores & Bars": ["Copper ore", "Tin ore", "Iron ore", ...]
 }
 ```
@@ -27,6 +27,14 @@ Matching is **case-insensitive**: "Guam leaf" and "guam leaf" both match. The fi
 
 Filter buttons are shown in the order of the keys in the JSON. "All" is always first (hardcoded). To reorder categories, reorder the keys in `ge-categories.json`.
 
-## Herbs list
+## Herbs & Seeds list
 
-The **Herbs** list includes grimy and clean herbs from the main Herblore table, plus Jungle Potion herbs (Ardrigal, Rogue's purse, Sito foil, Snake weed, Volencia moss) and other herbs (Bruma herb, Doogle leaves, Elder cadantine, Goutweed, Grym leaf, Buchu leaf, Noxifer, Golpar, etc.). Add or remove names to match the wiki/GE as needed.
+The **Herbs & Seeds** category includes:
+- **Herbs**: grimy and clean herbs from the main Herblore table, plus Jungle Potion herbs (Ardrigal, Rogue's purse, Sito foil, Snake weed, Volencia moss) and other herbs (Bruma herb, Doogle leaves, Elder cadantine, Goutweed, Grym leaf, Buchu leaf, Noxifer, Golpar, Huasca, etc.).
+- **Seeds**: allotment, flower, herb, hops, bush, tree, fruit tree, special (seaweed, grape, mushroom, belladonna, Hespori), coral frags, anima, hardwood, special trees, cacti, and other seeds (Tithe Farm, CoX, Garden of Tranquillity, etc.) as per the [OSRS Wiki Seeds](https://oldschool.runescape.wiki/w/Seeds) page.
+
+Item names must match the GE/Wiki mapping exactly. Add or remove names as needed.
+
+## Ores list
+
+The **Ores** category includes all ores from the [OSRS Wiki Category:Ores](https://oldschool.runescape.wiki/w/Category:Ores): Adamantite ore, Blasted ore, Blurite ore, Coal, Copper ore, Daeyalt ore, Gold ore, Granite, Iron ore, Lead ore, Lovakite ore, Mithril ore, Nickel ore, Runite ore, Sandstone, Silver ore, Tin ore.

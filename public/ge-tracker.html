@@ -137,6 +137,10 @@
               <option value="168" selected>7d</option>
             </select>
           </label>
+          <label class="flex items-center gap-1.5 text-slate-400 text-xs sm:text-sm cursor-pointer" title="Hide items with no trades in the past hour">
+            <input type="checkbox" id="filter-hide-no-volume" checked class="rounded border-slate-600 bg-slate-700 text-amber-500 focus:ring-amber-500/30" />
+            <span>Hide no volume (1h)</span>
+          </label>
           <button type="button" id="sort-margin" class="ge-btn-sort">Margin %</button>
           <button type="button" id="sort-profit4h" class="ge-btn-sort">Profit/4h</button>
         </div>
@@ -420,6 +424,8 @@
         var nameLower = (item.name || '').toLowerCase().trim();
         if (!catSet.has(nameLower)) continue;
       }
+      var hideNoVolume = document.getElementById('filter-hide-no-volume') && document.getElementById('filter-hide-no-volume').checked;
+      if (hideNoVolume && (!volume || volume <= 0)) continue;
 
       rows.push({
         id,
@@ -694,6 +700,7 @@
   document.getElementById('filter-max-price').addEventListener('input', renderTable);
   document.getElementById('filter-limit').addEventListener('input', renderTable);
   document.getElementById('filter-max-age').addEventListener('change', renderTable);
+  document.getElementById('filter-hide-no-volume').addEventListener('change', renderTable);
   document.getElementById('filter-search').addEventListener('input', renderTable);
 
   document.querySelectorAll('.ge-th-sort').forEach(function (th) {
