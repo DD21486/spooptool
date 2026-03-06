@@ -410,6 +410,21 @@ async function writeSnapshots(sql, charRows, snapshotAt) {
   return { written, errors };
 }
 
+// ── REFRESH SNAPSHOT ──────────────────────────────────────────────────────────
+// Fetches live Hiscores for every participant and writes a snapshot at NOW().
+// Called by the manual "Refresh Scores" button during an active competition.
+async function refreshSnapshotCompetition(req, res, sql, id) {
+  const compRows = await sql`SELECT id, type FROM competitions WHERE id = ${id}`;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+
+  const charRows = await getCompCharRows(sql, compRows[0].type, id);
+  if (!charRows.length) return res.status(200).json({ ok: true, snapshots: 0 });
+
+  const snapshotAt = new Date().toISOString();
+  const { written, errors } = await writeSnapshots(sql, charRows, snapshotAt);
+  return res.status(200).json({ ok: true, snapshots: written, errors: errors.length ? errors : undefined });
+}
+
 // ── FINAL SNAPSHOT ────────────────────────────────────────────────────────────
 // Fetches live Hiscores for every participant and writes a snapshot at end_time.
 // Called by the frontend when the end countdown hits 0.
@@ -491,6 +506,8 @@ module.exports = async function handler(req, res) {
       if (req.method === 'POST') return await snapshotCompetition(req, res, sql, id);
     } else if (action === 'start-snapshot') {
       if (req.method === 'POST') return await startSnapshotCompetition(req, res, sql, id);
+    } else if (action === 'refresh') {
+      if (req.method === 'POST') return await refreshSnapshotCompetition(req, res, sql, id);
     } else {
       if (req.method === 'GET')    return await getCompetition(req, res, sql, id);
       if (req.method === 'DELETE') return await deleteCompetition(req, res, sql, id);

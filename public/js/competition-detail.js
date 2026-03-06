@@ -524,6 +524,28 @@ function initDeleteButton(compId) {
   });
 }
 
+// ── Refresh button ────────────────────────────────────────────────────────────
+
+function initRefreshButton(compId, status) {
+  var btn = document.getElementById('refresh-scores-btn');
+  if (!btn) return;
+  if (status !== 'active') return; // only show for active competitions
+
+  btn.classList.remove('hidden');
+
+  btn.addEventListener('click', function () {
+    btn.disabled = true;
+    btn.textContent = 'Refreshing\u2026';
+
+    fetch('/api/competitions/_?compId=' + encodeURIComponent(compId) + '&action=refresh', { method: 'POST' })
+      .then(function () { init(); })
+      .catch(function () {
+        btn.disabled = false;
+        btn.textContent = 'Refresh Scores';
+      });
+  });
+}
+
 // ── Snapshot / score refresh ──────────────────────────────────────────────────
 // POSTs to /api/competitions/:id/snapshot to fetch fresh Hiscores for all
 // participants, then reloads the competition detail so scores are up to date.
@@ -584,12 +606,14 @@ function startCountdown(comp) {
 
 function renderPage(comp) {
   var sorted = comp.type === 'team' ? processTeams(comp) : processSolo(comp);
+  var status = getStatus(comp);
   renderHeader(comp);
   renderScheduleCard(comp);
   renderLeaderCard(comp, sorted);
   renderContributorCard(comp, sorted);
   renderLeaderboard(comp, sorted);
   startCountdown(comp);
+  initRefreshButton(comp.id, status);
   initDeleteButton(comp.id);
 }
 
