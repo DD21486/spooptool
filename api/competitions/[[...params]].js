@@ -258,13 +258,13 @@ async function getCompetition(req, res, sql, id) {
   const now          = Date.now();
   const endMs        = new Date(comp.end_time).getTime();
   const isUpcoming   = new Date(comp.start_time).getTime() > now;
-  // For active competitions: use the current time so scores reflect live progress.
-  // For ended competitions: allow up to 2 hours past end_time so the next hourly
-  // cron snapshot (taken shortly after the competition closed) is included rather
-  // than being stuck on a snapshot that may be up to 59 minutes stale.
+  // For active competitions: use current time so scores reflect live progress.
+  // For ended competitions: use end_time exactly so scores are frozen.
+  // snapshotCompetition stores its snapshot at end_time (not NOW()) so it lands
+  // on the boundary and is captured here.
   const effectiveEnd = now <= endMs
     ? new Date(now).toISOString()
-    : new Date(endMs + 2 * 60 * 60 * 1000).toISOString();
+    : comp.end_time;
 
   const result = {
     id:               comp.id,
@@ -351,54 +351,45 @@ async function getCompetition(req, res, sql, id) {
   return res.status(200).json(result);
 }
 
-// ── FINAL SNAPSHOT ────────────────────────────────────────────────────────────
-// Fetches live Hiscores for every participant and writes a character_snapshot row.
-// Called by the frontend when a competition ends (countdown hits 0) or via the
-// "Refresh Scores" button on an ended competition.
-async function snapshotCompetition(req, res, sql, id) {
-  const compRows = await sql`SELECT id, type FROM competitions WHERE id = ${id}`;
-  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+// ── SNAPSHOT HELPERS ──────────────────────────────────────────────────────────
 
-  // Collect all character rows for this competition
-  let charRows;
-  if (compRows[0].type === 'solo') {
-    charRows = await sql`
+function buildSnapshotData(player) {
+  if (!player || !player.main) return null;
+  const skills = {};
+  for (const [key, d] of Object.entries(player.main.skills || {})) {
+    skills[key] = { rank: d.rank, level: d.level, xp: d.xp != null ? d.xp : d.experience };
+  }
+  const bosses = {};
+  for (const [key, b] of Object.entries(player.main.bosses || {})) {
+    if (b && typeof b === 'object') {
+      const raw = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
+      const count = typeof raw === 'number' ? raw : parseInt(raw, 10);
+      bosses[key] = { rank: b.rank, count: Number.isFinite(count) && count >= 0 ? count : 0 };
+    }
+  }
+  return { skills, bosses };
+}
+
+async function getCompCharRows(sql, compType, id) {
+  if (compType === 'solo') {
+    return sql`
       SELECT c.id, c.username
       FROM competition_participants cp
       JOIN characters c ON c.id = cp.character_id
       WHERE cp.competition_id = ${id}
     `;
-  } else {
-    charRows = await sql`
-      SELECT DISTINCT c.id, c.username
-      FROM competition_teams ct
-      JOIN competition_team_members ctm ON ctm.team_id = ct.id
-      JOIN characters c ON c.id = ctm.character_id
-      WHERE ct.competition_id = ${id}
-    `;
   }
+  return sql`
+    SELECT DISTINCT c.id, c.username
+    FROM competition_teams ct
+    JOIN competition_team_members ctm ON ctm.team_id = ct.id
+    JOIN characters c ON c.id = ctm.character_id
+    WHERE ct.competition_id = ${id}
+  `;
+}
 
-  if (!charRows.length) return res.status(200).json({ ok: true, snapshots: 0 });
-
+async function writeSnapshots(sql, charRows, snapshotAt) {
   const { getStats } = require('osrs-json-hiscores');
-
-  function buildSnapshotData(player) {
-    if (!player || !player.main) return null;
-    const skills = {};
-    for (const [key, d] of Object.entries(player.main.skills || {})) {
-      skills[key] = { rank: d.rank, level: d.level, xp: d.xp != null ? d.xp : d.experience };
-    }
-    const bosses = {};
-    for (const [key, b] of Object.entries(player.main.bosses || {})) {
-      if (b && typeof b === 'object') {
-        const raw = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
-        const count = typeof raw === 'number' ? raw : parseInt(raw, 10);
-        bosses[key] = { rank: b.rank, count: Number.isFinite(count) && count >= 0 ? count : 0 };
-      }
-    }
-    return { skills, bosses };
-  }
-
   let written = 0;
   const errors = [];
   for (const char of charRows) {
@@ -408,7 +399,7 @@ async function snapshotCompetition(req, res, sql, id) {
       if (data) {
         await sql`
           INSERT INTO character_snapshots (character_id, at, data)
-          VALUES (${char.id}, NOW(), ${JSON.stringify(data)})
+          VALUES (${char.id}, ${snapshotAt}, ${JSON.stringify(data)})
         `;
         written++;
       }
@@ -416,7 +407,36 @@ async function snapshotCompetition(req, res, sql, id) {
       errors.push({ username: char.username, error: (e.message || String(e)).slice(0, 100) });
     }
   }
+  return { written, errors };
+}
 
+// ── FINAL SNAPSHOT ────────────────────────────────────────────────────────────
+// Fetches live Hiscores for every participant and writes a snapshot at end_time.
+// Called by the frontend when the end countdown hits 0.
+async function snapshotCompetition(req, res, sql, id) {
+  const compRows = await sql`SELECT id, type, end_time FROM competitions WHERE id = ${id}`;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+
+  const charRows = await getCompCharRows(sql, compRows[0].type, id);
+  if (!charRows.length) return res.status(200).json({ ok: true, snapshots: 0 });
+
+  const { written, errors } = await writeSnapshots(sql, charRows, compRows[0].end_time);
+  return res.status(200).json({ ok: true, snapshots: written, errors: errors.length ? errors : undefined });
+}
+
+// ── START SNAPSHOT ────────────────────────────────────────────────────────────
+// Fetches live Hiscores for every participant and writes a snapshot at start_time.
+// Called by the frontend when the start countdown hits 0 (upcoming → active).
+// This gives accurate baselines so XP/KC gained is measured from the exact moment
+// the competition begins rather than the previous hourly cron snapshot.
+async function startSnapshotCompetition(req, res, sql, id) {
+  const compRows = await sql`SELECT id, type, start_time FROM competitions WHERE id = ${id}`;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+
+  const charRows = await getCompCharRows(sql, compRows[0].type, id);
+  if (!charRows.length) return res.status(200).json({ ok: true, snapshots: 0 });
+
+  const { written, errors } = await writeSnapshots(sql, charRows, compRows[0].start_time);
   return res.status(200).json({ ok: true, snapshots: written, errors: errors.length ? errors : undefined });
 }
 
@@ -469,6 +489,8 @@ module.exports = async function handler(req, res) {
       if (req.method === 'POST') return await createCompetition(req, res, sql);
     } else if (action === 'snapshot') {
       if (req.method === 'POST') return await snapshotCompetition(req, res, sql, id);
+    } else if (action === 'start-snapshot') {
+      if (req.method === 'POST') return await startSnapshotCompetition(req, res, sql, id);
     } else {
       if (req.method === 'GET')    return await getCompetition(req, res, sql, id);
       if (req.method === 'DELETE') return await deleteCompetition(req, res, sql, id);

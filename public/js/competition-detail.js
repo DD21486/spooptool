@@ -534,6 +534,12 @@ function triggerFinalSnapshot(compId, onDone) {
     .catch(function () { onDone(); }); // always proceed even if it fails
 }
 
+function triggerStartSnapshot(compId, onDone) {
+  fetch('/api/competitions/_?compId=' + encodeURIComponent(compId) + '&action=start-snapshot', { method: 'POST' })
+    .then(function () { onDone(); })
+    .catch(function () { onDone(); }); // always proceed even if it fails
+}
+
 // ── Live countdown ────────────────────────────────────────────────────────────
 // Updates the #countdown-display element every second.
 
@@ -559,7 +565,10 @@ function startCountdown(comp) {
         if (cdEl) cdEl.textContent = 'Finalizing scores\u2026';
         triggerFinalSnapshot(comp.id, function () { init(); });
       } else {
-        init(); // competition just started, re-render to show active state
+        // Competition just started: snapshot all participants for an accurate baseline.
+        var cdEl2 = document.getElementById('countdown-display');
+        if (cdEl2) cdEl2.textContent = 'Recording starting scores\u2026';
+        triggerStartSnapshot(comp.id, function () { init(); });
       }
     }
   }
