@@ -150,7 +150,7 @@
     const rows = [];
     for (const item of mapping) {
       const id = item.id;
-      const data = latest[id];
+      const data = latest[String(id)] ?? latest[Number(id)] ?? latest[id];
       if (!data) continue;
       const high = data.high != null ? Number(data.high) : null;
       const low = data.low != null ? Number(data.low) : null;
@@ -326,8 +326,8 @@
         setError('API error: ' + (payload.error || 'Unknown'));
         return;
       }
-      var mapData = payload && payload.mapping;
-      var latestData = payload && payload.latest;
+      var mapData = payload && (payload.mapping ?? payload.data && payload.data.mapping);
+      var latestData = payload && (payload.latest ?? payload.data && payload.data.latest);
       if (Array.isArray(mapData)) {
         mapping = mapData;
       } else if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {
@@ -342,6 +342,7 @@
       }
       latest = latestData && typeof latestData === 'object' && !Array.isArray(latestData) ? latestData : {};
       loadingEl.textContent = '';
+      console.log('GE init: mapping length=', mapping.length, 'latest keys=', Object.keys(latest).length);
       if (mapping.length === 0 && Object.keys(latest).length > 0) {
         mapping = Object.keys(latest).filter(function (k) { return /^\d+$/.test(k); }).map(function (id) { return { id: parseInt(id, 10), name: 'Item ' + id, limit: 0, value: null }; });
       }
