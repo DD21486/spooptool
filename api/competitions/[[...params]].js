@@ -461,14 +461,13 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'Invalid DATABASE_URL' });
   }
 
-  // params is an array of path segments after /api/competitions/
-  const raw = req.query.params;
-  const params = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const id     = params[0] && params[0] !== '_' ? parseInt(params[0], 10) : null;
-  const action = params[1] || null; // e.g. 'snapshot'
+  // ID comes from ?compId= query param (path segments not reliable in non-Next.js Vercel).
+  // Action comes from ?action= query param (e.g. 'snapshot').
+  const id     = req.query.compId ? parseInt(req.query.compId, 10) : null;
+  const action = req.query.action || null;
 
   try {
-    if (!id) {
+    if (!id || isNaN(id)) {
       if (req.method === 'GET')  return await listCompetitions(req, res, sql);
       if (req.method === 'POST') return await createCompetition(req, res, sql);
     } else if (action === 'snapshot') {

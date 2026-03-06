@@ -453,7 +453,7 @@ function renderLeaderboard(comp, sorted) {
 // participants, then reloads the competition detail so scores are up to date.
 
 function triggerFinalSnapshot(compId, onDone) {
-  fetch('/api/competitions/' + compId + '/snapshot', { method: 'POST' })
+  fetch('/api/competitions/_?compId=' + encodeURIComponent(compId) + '&action=snapshot', { method: 'POST' })
     .then(function () { onDone(); })
     .catch(function () { onDone(); }); // always proceed even if it fails
 }
@@ -538,7 +538,7 @@ function init() {
 
   showLoadingState();
 
-  fetch('/api/competitions/' + encodeURIComponent(id))
+  fetch('/api/competitions/_?compId=' + encodeURIComponent(id))
     .then(function (res) {
       if (res.status === 404) throw new Error('Competition not found.');
       if (!res.ok) throw new Error('Server error (HTTP ' + res.status + ').');
