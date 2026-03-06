@@ -48,6 +48,8 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 
 **Raid Loot Handout (manual):** The top-right menu includes **Raid Loot Handout** for recording raid chest drops (CoX, ToB, ToA) that Dink doesn’t report. To enable it, add env var `RAID_LOOT_PASSWORD` in Vercel (e.g. a shared secret like `Hadley`). Users must enter this password once per session to open the form; the same password is required when submitting a drop.
 
+**GE Tracker:** The menu includes **GE Tracker** for Grand Exchange flip ideas (margins, ROI). Data is fetched from the OSRS Wiki API. To cache prices in your DB (faster loads, works if the wiki is slow): run `sql/migration_ge_prices.sql` in Neon, then optionally set `GE_SYNC_SECRET` in Vercel and call `GET /api/aggregate-history?path=ge&route=sync&secret=YOUR_SECRET` once (or on a schedule) to populate the cache.
+
 **Boss kill leader change → Discord:** After each snapshot cron run, SpoopTool checks who has the most total boss kills. If that leader changed (someone overtook the previous leader), it can post to Discord. Add env var `DISCORD_LEADERBOARD_WEBHOOK_URL` with an incoming webhook URL for the channel where you want these notifications. Run `sql/migration_leaderboard_state.sql` in Neon so the cron can store the previous leader and detect changes.
 
 **Deploy results → Discord (for collaborators):** On Vercel Hobby you can’t add team members, but you can still share deploy status. Vercel can send webhooks when a deployment succeeds, fails, or is canceled; SpoopTool can forward those to a Discord channel.

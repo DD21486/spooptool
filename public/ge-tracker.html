@@ -46,7 +46,7 @@
 
   <div class="max-w-7xl mx-auto px-4 pt-14 sm:pt-6 pb-12">
     <h1 class="text-3xl font-bold text-slate-100 mt-8 mb-2">GE Tracker</h1>
-    <p class="text-slate-400 text-sm mb-6">Live prices from the OSRS Wiki. Margins account for 1% GE tax on sale.</p>
+    <p class="text-slate-400 text-sm mb-6">Live prices from the OSRS Wiki. Margins account for 1% GE tax on sale. Open this page from your deployed app (e.g. your-app.vercel.app) so the API can load.</p>
 
     <div class="flex flex-wrap items-center gap-4 mb-4">
       <label class="flex items-center gap-2 text-sm text-slate-300">
@@ -354,7 +354,7 @@
     .catch(function (err) {
       loadingEl.textContent = '';
       console.error('GE Tracker', err);
-      setError('Failed to load: ' + (err.message || 'Check network tab. Ensure you run via Vercel or a dev server that serves /api (e.g. vercel dev).'));
+      setError('Failed to load: ' + (err.message || 'Unknown.') + ' Open this page from your deployed URL (e.g. https://your-app.vercel.app/ge-tracker.html), not as a local file.');
     });
 })();
   </script>

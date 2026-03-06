@@ -2,7 +2,7 @@
  * GET /api/aggregate-history?hours=24
  * Returns bucketed time series of combined total XP and total boss KC across all characters for the last N hours.
  * GET /api/weekly-winners (rewrite → ?path=weekly-winners): last week's leader usernames for XP, Boss KC, Loot.
- * GET /api/ge-prices (rewrite → ?path=ge): proxy to OSRS Wiki prices API (no DB).
+ * GET /api/ge-prices (rewrite → ?path=ge): GE data from DB cache or OSRS Wiki API (and save to DB when fetched).
  */
 
 const { neon } = require('@neondatabase/serverless');
@@ -14,11 +14,57 @@ function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
 }
 
-async function handleGeProxy(req, res) {
+async function fetchFromWiki(route, params) {
+  const qs = params.toString();
+  const url = qs ? `${GE_PRICES_BASE}/${route}?${qs}` : `${GE_PRICES_BASE}/${route}`;
+  const resp = await fetch(url, { headers: { 'User-Agent': GE_USER_AGENT } });
+  if (!resp.ok) throw new Error('Wiki API ' + resp.status);
+  return resp.json();
+}
+
+async function handleGeProxy(req, res, sql) {
   const route = (req.query.route || 'latest').toString().trim().toLowerCase();
-  const allowed = ['latest', 'mapping', '5m', '1h', 'timeseries'];
+  const allowed = ['latest', 'mapping', '5m', '1h', 'timeseries', 'sync'];
   if (!allowed.includes(route)) {
-    return res.status(400).json({ error: 'Invalid route. Use: latest, mapping, 5m, 1h, timeseries' });
+    return res.status(400).json({ error: 'Invalid route. Use: latest, mapping, 5m, 1h, timeseries, sync' });
+  }
+  if (route === 'sync') {
+    if (!sql) return res.status(500).json({ error: 'Database required for sync' });
+    const secret = (req.query.secret || '').trim();
+    const want = (process.env.GE_SYNC_SECRET || '').trim();
+    if (want && secret !== want) return res.status(401).json({ error: 'Invalid sync secret' });
+    try {
+      const [mapData, latestData] = await Promise.all([
+        fetchFromWiki('mapping', new URLSearchParams()),
+        fetchFromWiki('latest', new URLSearchParams()),
+      ]);
+      let savedPrices = 0;
+      let savedItems = 0;
+      if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {
+        const now = new Date();
+        for (const k of Object.keys(latestData).filter((x) => /^\d+$/.test(x))) {
+          try {
+            await sql`INSERT INTO ge_item_prices (item_id, high, low, at) VALUES (${parseInt(k, 10)}, ${latestData[k].high}, ${latestData[k].low}, ${now})
+              ON CONFLICT (item_id) DO UPDATE SET high = EXCLUDED.high, low = EXCLUDED.low, at = EXCLUDED.at`;
+            savedPrices++;
+          } catch (_) { /* table missing */ }
+        }
+      }
+      if (Array.isArray(mapData) && mapData.length > 0) {
+        for (const e of mapData) {
+          try {
+            await sql`INSERT INTO ge_items (item_id, name, "limit", value, members, at) VALUES (${e.id}, ${(e.name || '').toString().substring(0, 255)}, ${e.limit != null ? e.limit : null}, ${e.value != null ? e.value : null}, ${e.members === true}, NOW())
+              ON CONFLICT (item_id) DO UPDATE SET name = EXCLUDED.name, "limit" = EXCLUDED."limit", value = EXCLUDED.value, members = EXCLUDED.members, at = NOW()`;
+            savedItems++;
+          } catch (_) { /* table missing */ }
+        }
+      }
+      res.setHeader('Cache-Control', 'no-store');
+      return res.status(200).json({ ok: true, savedPrices, savedItems });
+    } catch (err) {
+      console.error('GE sync', err);
+      return res.status(502).json({ error: 'Sync failed: ' + (err.message || '') });
+    }
   }
   const id = (req.query.id || '').toString().trim();
   const timestep = (req.query.timestep || '1h').toString().trim();
@@ -27,16 +73,50 @@ async function handleGeProxy(req, res) {
   if (id) params.set('id', id);
   if (timestep && route === 'timeseries') params.set('timestep', timestep);
   if (timestamp && (route === '5m' || route === '1h')) params.set('timestamp', timestamp);
-  const qs = params.toString();
-  const url = qs ? `${GE_PRICES_BASE}/${route}?${qs}` : `${GE_PRICES_BASE}/${route}`;
-  try {
-    const resp = await fetch(url, {
-      headers: { 'User-Agent': GE_USER_AGENT },
-    });
-    if (!resp.ok) {
-      return res.status(resp.status).json({ error: 'GE API error', status: resp.status });
+
+  if (route === 'latest' && sql) {
+    try {
+      const rows = await sql`SELECT item_id, high, low, at FROM ge_item_prices`;
+      if (rows.length > 0) {
+        const out = {};
+        const atMs = (d) => d && d.getTime ? d.getTime() : 0;
+        rows.forEach((r) => {
+          out[String(r.item_id)] = {
+            high: r.high != null ? Number(r.high) : null,
+            low: r.low != null ? Number(r.low) : null,
+            highTime: atMs(r.at),
+            lowTime: atMs(r.at),
+          };
+        });
+        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+        return res.status(200).json(out);
+      }
+    } catch (dbErr) {
+      if (dbErr && !(dbErr.message || '').includes('ge_item_prices')) console.error('GE DB read latest', dbErr.message);
     }
-    const data = await resp.json();
+  }
+
+  if (route === 'mapping' && sql) {
+    try {
+      const rows = await sql`SELECT item_id, name, "limit", value, members FROM ge_items ORDER BY item_id`;
+      if (rows.length > 0) {
+        const out = rows.map((r) => ({
+          id: r.item_id,
+          name: r.name,
+          limit: r.limit != null ? r.limit : null,
+          value: r.value != null ? r.value : null,
+          members: r.members,
+        }));
+        res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+        return res.status(200).json(out);
+      }
+    } catch (dbErr) {
+      if (dbErr && !(dbErr.message || '').includes('ge_items')) console.error('GE DB read mapping', dbErr.message);
+    }
+  }
+
+  try {
+    const data = await fetchFromWiki(route, params);
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
     return res.status(200).json(data);
   } catch (err) {
@@ -118,7 +198,11 @@ module.exports = async function handler(req, res) {
 
   const path = (req.query.path || '').trim();
   if (path === 'ge') {
-    return await handleGeProxy(req, res);
+    let sql = null;
+    if (process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== '') {
+      try { sql = neon(process.env.DATABASE_URL); } catch (_) {}
+    }
+    return await handleGeProxy(req, res, sql);
   }
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
