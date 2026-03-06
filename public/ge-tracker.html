@@ -191,6 +191,12 @@
       </table>
     </div>
 
+    <div id="ge-category-filter" class="mb-4 flex flex-wrap items-center gap-2">
+      <span class="text-slate-500 text-sm mr-1">Show:</span>
+      <button type="button" class="ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600/80 text-slate-100 border border-amber-500/50" data-category="">All</button>
+      <span id="ge-category-buttons"></span>
+    </div>
+
     <div class="rounded-xl border border-slate-600/80 bg-slate-800/40 overflow-hidden overflow-x-auto shadow-lg">
       <table class="w-full text-sm ge-table">
         <thead>
@@ -279,6 +285,9 @@
   let sortBy = 'marginPct';
   let sortAsc = false;
   let watchlist = [];
+  let categoryFilter = '';
+  let categories = {};
+  let categoryNames = [];
   loadWatchlist();
 
   function loadWatchlist() {
@@ -406,6 +415,11 @@
       if (item.value != null && Number(item.value) < minPrice) continue;
       if (item.value != null && Number(item.value) > maxPrice) continue;
       if (search && !(item.name || '').toLowerCase().includes(search)) continue;
+      if (categoryFilter && categories[categoryFilter]) {
+        var catSet = categories[categoryFilter];
+        var nameLower = (item.name || '').toLowerCase().trim();
+        if (!catSet.has(nameLower)) continue;
+      }
 
       rows.push({
         id,
@@ -717,6 +731,47 @@
   const loadingEl = document.getElementById('ge-loading');
   const tbody = document.getElementById('ge-tbody');
 
+  function renderCategoryButtons() {
+    var container = document.getElementById('ge-category-buttons');
+    if (!container) return;
+    container.innerHTML = '';
+    categoryNames.forEach(function (name) {
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600';
+      btn.setAttribute('data-category', name);
+      btn.textContent = name;
+      btn.addEventListener('click', function () {
+        categoryFilter = this.getAttribute('data-category');
+        document.querySelectorAll('.ge-cat-btn').forEach(function (b) {
+          if ((b.getAttribute('data-category') || '') === categoryFilter) {
+            b.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600/80 text-slate-100 border border-amber-500/50';
+          } else {
+            b.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600';
+          }
+        });
+        renderTable();
+      });
+      container.appendChild(btn);
+    });
+    var allBtn = document.querySelector('.ge-cat-btn[data-category=""]');
+    if (allBtn) allBtn.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600/80 text-slate-100 border border-amber-500/50';
+  }
+
+  document.querySelectorAll('.ge-cat-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      categoryFilter = this.getAttribute('data-category') || '';
+      document.querySelectorAll('.ge-cat-btn').forEach(function (b) {
+        if ((b.getAttribute('data-category') || '') === categoryFilter) {
+          b.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-amber-600/80 text-slate-100 border border-amber-500/50';
+        } else {
+          b.className = 'ge-cat-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-700 border border-slate-600 text-slate-300 hover:bg-slate-600';
+        }
+      });
+      renderTable();
+    });
+  });
+
   function setError(msg) {
     loadingEl.textContent = '';
     if (tbody) tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-red-400">' + escapeHtml(msg) + '</td></tr>';
@@ -765,6 +820,21 @@
       console.error('GE Tracker', err);
       setError('Failed to load: ' + (err.message || 'Unknown.') + ' Open this page from your deployed URL (e.g. https://your-app.vercel.app/ge-tracker.html), not as a local file.');
     });
+
+  fetch('/data/ge-categories.json')
+    .then(function (r) { return r.ok ? r.json() : {}; })
+    .then(function (raw) {
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        categoryNames = Object.keys(raw);
+        categories = {};
+        categoryNames.forEach(function (k) {
+          var arr = raw[k];
+          categories[k] = new Set((Array.isArray(arr) ? arr : []).map(function (n) { return (n || '').toLowerCase().trim(); }));
+        });
+        renderCategoryButtons();
+      }
+    })
+    .catch(function () {});
 })();
   </script>
 
