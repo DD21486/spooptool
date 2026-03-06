@@ -2,10 +2,11 @@
 // Catch-all handler for all competition CRUD operations.
 //
 // Routes:
-//   GET    /api/competitions          → list all competitions (summary)
-//   POST   /api/competitions          → create a new competition
-//   GET    /api/competitions/:id      → get competition detail with live scores
-//   DELETE /api/competitions/:id      → delete (requires creator_code in body)
+//   GET    /api/competitions               → list all competitions (summary)
+//   POST   /api/competitions               → create a new competition
+//   GET    /api/competitions/:id           → get competition detail with live scores
+//   DELETE /api/competitions/:id           → delete (requires creator_code in body)
+//   POST   /api/competitions/:id/snapshot  → fetch fresh Hiscores for all participants and store snapshots
 
 const { neon } = require('@neondatabase/serverless');
 
@@ -232,8 +233,16 @@ async function getCompetition(req, res, sql, id) {
   if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
   const comp = compRows[0];
 
-  const isUpcoming   = new Date(comp.start_time).getTime() > Date.now();
-  const effectiveEnd = new Date(Math.min(Date.now(), new Date(comp.end_time).getTime())).toISOString();
+  const now          = Date.now();
+  const endMs        = new Date(comp.end_time).getTime();
+  const isUpcoming   = new Date(comp.start_time).getTime() > now;
+  // For active competitions: use the current time so scores reflect live progress.
+  // For ended competitions: allow up to 2 hours past end_time so the next hourly
+  // cron snapshot (taken shortly after the competition closed) is included rather
+  // than being stuck on a snapshot that may be up to 59 minutes stale.
+  const effectiveEnd = now <= endMs
+    ? new Date(now).toISOString()
+    : new Date(endMs + 2 * 60 * 60 * 1000).toISOString();
 
   const result = {
     id:               comp.id,
@@ -323,6 +332,75 @@ async function getCompetition(req, res, sql, id) {
   return res.status(200).json(result);
 }
 
+// ── FINAL SNAPSHOT ────────────────────────────────────────────────────────────
+// Fetches live Hiscores for every participant and writes a character_snapshot row.
+// Called by the frontend when a competition ends (countdown hits 0) or via the
+// "Refresh Scores" button on an ended competition.
+async function snapshotCompetition(req, res, sql, id) {
+  const compRows = await sql`SELECT id, type FROM competitions WHERE id = ${id}`;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+
+  // Collect all character rows for this competition
+  let charRows;
+  if (compRows[0].type === 'solo') {
+    charRows = await sql`
+      SELECT c.id, c.username
+      FROM competition_participants cp
+      JOIN characters c ON c.id = cp.character_id
+      WHERE cp.competition_id = ${id}
+    `;
+  } else {
+    charRows = await sql`
+      SELECT DISTINCT c.id, c.username
+      FROM competition_teams ct
+      JOIN competition_team_members ctm ON ctm.team_id = ct.id
+      JOIN characters c ON c.id = ctm.character_id
+      WHERE ct.competition_id = ${id}
+    `;
+  }
+
+  if (!charRows.length) return res.status(200).json({ ok: true, snapshots: 0 });
+
+  const { getStats } = require('osrs-json-hiscores');
+
+  function buildSnapshotData(player) {
+    if (!player || !player.main) return null;
+    const skills = {};
+    for (const [key, d] of Object.entries(player.main.skills || {})) {
+      skills[key] = { rank: d.rank, level: d.level, xp: d.xp != null ? d.xp : d.experience };
+    }
+    const bosses = {};
+    for (const [key, b] of Object.entries(player.main.bosses || {})) {
+      if (b && typeof b === 'object') {
+        const raw = b.score != null ? b.score : (b.count != null ? b.count : b.kc);
+        const count = typeof raw === 'number' ? raw : parseInt(raw, 10);
+        bosses[key] = { rank: b.rank, count: Number.isFinite(count) && count >= 0 ? count : 0 };
+      }
+    }
+    return { skills, bosses };
+  }
+
+  let written = 0;
+  const errors = [];
+  for (const char of charRows) {
+    try {
+      const player = await getStats(char.username);
+      const data = buildSnapshotData(player);
+      if (data) {
+        await sql`
+          INSERT INTO character_snapshots (character_id, at, data)
+          VALUES (${char.id}, NOW(), ${JSON.stringify(data)})
+        `;
+        written++;
+      }
+    } catch (e) {
+      errors.push({ username: char.username, error: (e.message || String(e)).slice(0, 100) });
+    }
+  }
+
+  return res.status(200).json({ ok: true, snapshots: written, errors: errors.length ? errors : undefined });
+}
+
 // ── DELETE ────────────────────────────────────────────────────────────────────
 async function deleteCompetition(req, res, sql, id) {
   let body;
@@ -364,12 +442,15 @@ module.exports = async function handler(req, res) {
   // params is an array of path segments after /api/competitions/
   const raw = req.query.params;
   const params = Array.isArray(raw) ? raw : raw ? [raw] : [];
-  const id = params[0] ? parseInt(params[0], 10) : null;
+  const id     = params[0] ? parseInt(params[0], 10) : null;
+  const action = params[1] || null; // e.g. 'snapshot'
 
   try {
     if (!id) {
       if (req.method === 'GET')  return await listCompetitions(req, res, sql);
       if (req.method === 'POST') return await createCompetition(req, res, sql);
+    } else if (action === 'snapshot') {
+      if (req.method === 'POST') return await snapshotCompetition(req, res, sql, id);
     } else {
       if (req.method === 'GET')    return await getCompetition(req, res, sql, id);
       if (req.method === 'DELETE') return await deleteCompetition(req, res, sql, id);

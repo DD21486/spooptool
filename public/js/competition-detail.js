@@ -448,12 +448,40 @@ function renderLeaderboard(comp, sorted) {
   });
 }
 
+// ── Snapshot / score refresh ──────────────────────────────────────────────────
+// POSTs to /api/competitions/:id/snapshot to fetch fresh Hiscores for all
+// participants, then reloads the competition detail so scores are up to date.
+
+function triggerFinalSnapshot(compId, onDone) {
+  fetch('/api/competitions/' + compId + '/snapshot', { method: 'POST' })
+    .then(function () { onDone(); })
+    .catch(function () { onDone(); }); // always proceed even if it fails
+}
+
 // ── Live countdown ────────────────────────────────────────────────────────────
 // Updates the #countdown-display element every second.
 
 function startCountdown(comp) {
   var status = getStatus(comp);
-  if (status === 'ended') return; // no countdown needed
+
+  // For ended competitions: show a Refresh button so scores can be updated on demand.
+  if (status === 'ended') {
+    var el = document.getElementById('schedule-content');
+    if (el && !el.querySelector('#refresh-scores-btn')) {
+      var btn = document.createElement('button');
+      btn.id = 'refresh-scores-btn';
+      btn.type = 'button';
+      btn.textContent = 'Refresh Scores';
+      btn.className = 'mt-4 w-full px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium transition-colors';
+      btn.addEventListener('click', function () {
+        btn.disabled = true;
+        btn.textContent = 'Refreshing\u2026';
+        triggerFinalSnapshot(comp.id, function () { init(); });
+      });
+      el.appendChild(btn);
+    }
+    return;
+  }
 
   var targetDate = status === 'upcoming' ? comp.startTime : comp.endTime;
 
@@ -461,10 +489,17 @@ function startCountdown(comp) {
     var el = document.getElementById('countdown-display');
     if (!el) return;
     el.textContent = formatCountdown(targetDate);
-    // If the competition just started or ended, re-render the page to update status
+    // Competition just started or ended — take a fresh snapshot then re-render.
     if (new Date(targetDate).getTime() <= Date.now()) {
       clearInterval(intervalId);
-      init(); // re-render everything with updated status
+      if (status === 'active') {
+        // Competition just ended: snapshot all participants for an accurate final score.
+        var cdEl = document.getElementById('countdown-display');
+        if (cdEl) cdEl.textContent = 'Finalizing scores\u2026';
+        triggerFinalSnapshot(comp.id, function () { init(); });
+      } else {
+        init(); // competition just started, re-render to show active state
+      }
     }
   }
 
