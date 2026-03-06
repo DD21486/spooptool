@@ -24,9 +24,41 @@ async function fetchFromWiki(route, params) {
 
 async function handleGeProxy(req, res, sql) {
   const route = (req.query.route || 'latest').toString().trim().toLowerCase();
-  const allowed = ['latest', 'mapping', '5m', '1h', 'timeseries', 'sync'];
+  const allowed = ['latest', 'mapping', 'init', '5m', '1h', 'timeseries', 'sync'];
   if (!allowed.includes(route)) {
-    return res.status(400).json({ error: 'Invalid route. Use: latest, mapping, 5m, 1h, timeseries, sync' });
+    return res.status(400).json({ error: 'Invalid route. Use: latest, mapping, init, 5m, 1h, timeseries, sync' });
+  }
+  if (route === 'init') {
+    try {
+      let mapData = null;
+      let latestData = null;
+      if (sql) {
+        try {
+          const mapRows = await sql`SELECT item_id, name, "limit", value, members FROM ge_items ORDER BY item_id`;
+          if (mapRows.length > 0) mapData = mapRows.map((r) => ({ id: r.item_id, name: r.name, limit: r.limit, value: r.value, members: r.members }));
+        } catch (_) {}
+        try {
+          const priceRows = await sql`SELECT item_id, high, low, at FROM ge_item_prices`;
+          if (priceRows.length > 0) {
+            const atMs = (d) => d && d.getTime ? d.getTime() : 0;
+            latestData = {};
+            priceRows.forEach((r) => {
+              latestData[String(r.item_id)] = { high: r.high != null ? Number(r.high) : null, low: r.low != null ? Number(r.low) : null, highTime: atMs(r.at), lowTime: atMs(r.at) };
+            });
+          }
+        } catch (_) {}
+      }
+      if (!mapData || !latestData || Object.keys(latestData).length === 0) {
+        const [wikiMap, wikiLatest] = await Promise.all([fetchFromWiki('mapping', new URLSearchParams()), fetchFromWiki('latest', new URLSearchParams())]);
+        mapData = Array.isArray(wikiMap) ? wikiMap : mapData;
+        latestData = wikiLatest && typeof wikiLatest === 'object' && !Array.isArray(wikiLatest) ? wikiLatest : latestData;
+      }
+      res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+      return res.status(200).json({ mapping: mapData || [], latest: latestData || {} });
+    } catch (err) {
+      console.error('GE init', err);
+      return res.status(502).json({ error: 'Failed to load GE data' });
+    }
   }
   if (route === 'sync') {
     if (!sql) return res.status(500).json({ error: 'Database required for sync' });

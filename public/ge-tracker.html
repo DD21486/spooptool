@@ -202,7 +202,7 @@
     }
 
     if (rows.length === 0) {
-      var hint = total === 0 && mapping.length === 0 ? ' No item list loaded — check Network tab for /api/aggregate-history?path=ge&route=mapping and route=latest.' : '';
+      var hint = total === 0 && mapping.length === 0 ? ' No item list loaded — check Network tab for /api/aggregate-history?path=ge&route=init.' : '';
       tbody.innerHTML = '<tr><td colspan="10" class="text-center py-8 text-slate-500">No items match filters.' + hint + '</td></tr>';
       return;
     }
@@ -319,19 +319,15 @@
     if (document.getElementById('ge-meta')) { document.getElementById('ge-meta').textContent = ''; document.getElementById('ge-meta').classList.add('hidden'); }
   }
 
-  Promise.all([
-    fetch(geUrl('mapping')).then(function (r) { if (!r.ok) throw new Error('Mapping: ' + r.status); return r.json(); }),
-    fetch(geUrl('latest')).then(function (r) { if (!r.ok) throw new Error('Latest: ' + r.status); return r.json(); }),
-  ])
-    .then(([mapData, latestData]) => {
-      if (mapData && mapData.error) {
-        setError('API error: ' + (mapData.error || 'Unknown'));
+  fetch(geUrl('init'))
+    .then(function (r) { if (!r.ok) throw new Error('GE data: ' + r.status); return r.json(); })
+    .then(function (payload) {
+      if (payload && payload.error) {
+        setError('API error: ' + (payload.error || 'Unknown'));
         return;
       }
-      if (latestData && latestData.error) {
-        setError('API error: ' + (latestData.error || 'Unknown'));
-        return;
-      }
+      var mapData = payload && payload.mapping;
+      var latestData = payload && payload.latest;
       if (Array.isArray(mapData)) {
         mapping = mapData;
       } else if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {
