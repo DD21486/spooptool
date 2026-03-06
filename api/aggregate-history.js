@@ -63,8 +63,22 @@ async function handleGeProxy(req, res, sql) {
           latestData = latestData || {};
         }
       }
+      let volume1h = {};
+      try {
+        const raw1h = await fetchFromWiki('1h', new URLSearchParams());
+        const dataWrap = raw1h && typeof raw1h === 'object' && raw1h.data ? raw1h.data : raw1h;
+        if (dataWrap && typeof dataWrap === 'object' && !Array.isArray(dataWrap)) {
+          for (const [itemId, v] of Object.entries(dataWrap)) {
+            if (v && typeof v === 'object' && /^\d+$/.test(itemId)) {
+              const hv = v.highPriceVolume != null ? Number(v.highPriceVolume) : 0;
+              const lv = v.lowPriceVolume != null ? Number(v.lowPriceVolume) : 0;
+              volume1h[itemId] = hv + lv;
+            }
+          }
+        }
+      } catch (_) {}
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
-      return res.status(200).json({ mapping: mapData || [], latest: latestData || {} });
+      return res.status(200).json({ mapping: mapData || [], latest: latestData || {}, volume1h });
     } catch (err) {
       console.error('GE init', err);
       return res.status(502).json({ error: 'Failed to load GE data' });
