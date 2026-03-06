@@ -179,16 +179,16 @@ function formatCountdown(targetDate) {
 // For team competitions: adds a `_total` field to each team and returns teams
 // sorted by total descending, with players within each team also sorted.
 function processTeams(comp) {
-  return comp.teams.map(function (team) {
-    var total = team.players.reduce(function (sum, p) { return sum + p.value; }, 0);
-    var sortedPlayers = team.players.slice().sort(function (a, b) { return b.value - a.value; });
+  return (comp.teams || []).map(function (team) {
+    var total = (team.players || []).reduce(function (sum, p) { return sum + p.value; }, 0);
+    var sortedPlayers = (team.players || []).slice().sort(function (a, b) { return b.value - a.value; });
     return Object.assign({}, team, { _total: total, players: sortedPlayers });
   }).sort(function (a, b) { return b._total - a._total; });
 }
 
 // For solo competitions: returns participants sorted by value descending.
 function processSolo(comp) {
-  return comp.participants.slice().sort(function (a, b) { return b.value - a.value; });
+  return (comp.participants || []).slice().sort(function (a, b) { return b.value - a.value; });
 }
 
 // ── Header menu toggle ────────────────────────────────────────────────────────

@@ -291,7 +291,7 @@ async function getCompetition(req, res, sql, id) {
       WHERE cp.competition_id = ${comp.id}
     `;
 
-    const { startByChar, endByChar } = isUpcoming
+    const { startByChar, endByChar } = isUpcoming || !participants.length
       ? { startByChar: {}, endByChar: {} }
       : await fetchSnapshotsSolo(sql, comp.id, comp.start_time, effectiveEnd);
 
@@ -320,7 +320,7 @@ async function getCompetition(req, res, sql, id) {
       ORDER BY ct.id
     `;
 
-    const { startByChar, endByChar } = isUpcoming
+    const { startByChar, endByChar } = isUpcoming || !rows.length
       ? { startByChar: {}, endByChar: {} }
       : await fetchSnapshotsTeam(sql, comp.id, comp.start_time, effectiveEnd);
 
