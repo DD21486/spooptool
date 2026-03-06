@@ -180,9 +180,12 @@ function formatCountdown(targetDate) {
 // sorted by total descending, with players within each team also sorted.
 function processTeams(comp) {
   return (comp.teams || []).map(function (team) {
-    var total = (team.players || []).reduce(function (sum, p) { return sum + p.value; }, 0);
-    var sortedPlayers = (team.players || []).slice().sort(function (a, b) { return b.value - a.value; });
-    return Object.assign({}, team, { _total: total, players: sortedPlayers });
+    var players = team.players || [];
+    var total      = players.reduce(function (sum, p) { return sum + (p.value      || 0); }, 0);
+    var startTotal = players.reduce(function (sum, p) { return sum + (p.startValue || 0); }, 0);
+    var endTotal   = players.reduce(function (sum, p) { return sum + (p.endValue   || 0); }, 0);
+    var sortedPlayers = players.slice().sort(function (a, b) { return b.value - a.value; });
+    return Object.assign({}, team, { _total: total, _startTotal: startTotal, _endTotal: endTotal, players: sortedPlayers });
   }).sort(function (a, b) { return b._total - a._total; });
 }
 
@@ -348,18 +351,23 @@ function renderLeaderboard(comp, sorted) {
   var tbodyEl = document.getElementById('lb-tbody');
   if (!theadEl || !tbodyEl) return;
 
-  var metricLabel  = getMetricLabel(comp);
   var isTeam       = comp.type === 'team';
+  var isBoss       = comp.category === 'boss';
   // Show per-player skill column only when each participant has a different skill
   var showSkillCol = comp.category === 'skill' && comp.skillScope === 'specific' && !comp.sameSkillForAll;
-  var colCount     = showSkillCol ? 4 : 3;
+  var startLabel   = isBoss ? 'Starting KC'  : 'Starting XP';
+  var currentLabel = isBoss ? 'Current KC'   : 'Current XP';
+  var gainedLabel  = isBoss ? 'KC Gained'    : 'XP Gained';
 
   // ── Table header ──────────────────────────────────────────────────────────
+  var thClass = 'text-right px-4 py-2.5 text-xs font-medium text-slate-400';
   theadEl.innerHTML = '<tr class="border-b border-slate-700 bg-slate-800">'
     + '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400 w-10">#</th>'
     + '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">' + (isTeam ? 'Team / Player' : 'Player') + '</th>'
     + (showSkillCol ? '<th class="text-left px-4 py-2.5 text-xs font-medium text-slate-400">Skill</th>' : '')
-    + '<th class="text-right px-4 py-2.5 text-xs font-medium text-slate-400">' + escHtml(metricLabel) + '</th>'
+    + '<th class="' + thClass + '">' + escHtml(startLabel)   + '</th>'
+    + '<th class="' + thClass + '">' + escHtml(currentLabel) + '</th>'
+    + '<th class="' + thClass + '">' + escHtml(gainedLabel)  + '</th>'
     + '</tr>';
 
   // ── Table body ────────────────────────────────────────────────────────────
@@ -381,6 +389,10 @@ function renderLeaderboard(comp, sorted) {
         + '<span class="collapse-arrow text-slate-500 text-xs mr-2">&#9660;</span>'
         + escHtml(team.name) + '</td>';
       if (showSkillCol) tbodyHtml += '<td></td>';
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-400 font-semibold">'
+        + escHtml(formatMetricValue(team._startTotal || 0, comp)) + '</td>';
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-400 font-semibold">'
+        + escHtml(formatMetricValue(team._endTotal || 0, comp)) + '</td>';
       tbodyHtml += '<td class="px-4 py-3 text-right font-mono font-semibold text-sky-300">'
         + escHtml(formatMetricValue(team._total, comp)) + '</td>';
       tbodyHtml += '</tr>';
@@ -401,6 +413,10 @@ function renderLeaderboard(comp, sorted) {
           tbodyHtml += '</td>';
         }
 
+        tbodyHtml += '<td class="px-4 py-2 text-right font-mono text-slate-500 text-sm">'
+          + escHtml(formatMetricValue(player.startValue || 0, comp)) + '</td>';
+        tbodyHtml += '<td class="px-4 py-2 text-right font-mono text-slate-500 text-sm">'
+          + escHtml(formatMetricValue(player.endValue || 0, comp)) + '</td>';
         tbodyHtml += '<td class="px-4 py-2 text-right font-mono text-slate-400 text-sm">'
           + escHtml(formatMetricValue(player.value, comp)) + '</td>';
         tbodyHtml += '</tr>';
@@ -427,6 +443,10 @@ function renderLeaderboard(comp, sorted) {
         }
         tbodyHtml += '</td>';
       }
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-500">'
+        + escHtml(formatMetricValue(player.startValue || 0, comp)) + '</td>';
+      tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-slate-500">'
+        + escHtml(formatMetricValue(player.endValue || 0, comp)) + '</td>';
       tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-sky-300">'
         + escHtml(formatMetricValue(player.value, comp)) + '</td>';
       tbodyHtml += '</tr>';
@@ -520,22 +540,7 @@ function triggerFinalSnapshot(compId, onDone) {
 function startCountdown(comp) {
   var status = getStatus(comp);
 
-  // For ended competitions: show a Refresh button so scores can be updated on demand.
   if (status === 'ended') {
-    var el = document.getElementById('schedule-content');
-    if (el && !el.querySelector('#refresh-scores-btn')) {
-      var btn = document.createElement('button');
-      btn.id = 'refresh-scores-btn';
-      btn.type = 'button';
-      btn.textContent = 'Refresh Scores';
-      btn.className = 'mt-4 w-full px-3 py-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-medium transition-colors';
-      btn.addEventListener('click', function () {
-        btn.disabled = true;
-        btn.textContent = 'Refreshing\u2026';
-        triggerFinalSnapshot(comp.id, function () { init(); });
-      });
-      el.appendChild(btn);
-    }
     return;
   }
 

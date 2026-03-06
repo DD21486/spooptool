@@ -56,36 +56,33 @@ function bossToKey(displayName) {
     .join('');
 }
 
-// Compute the score delta for a single participant.
+// Compute start value, end value, and delta for a single participant.
 // startData / endData are raw JSONB objects from character_snapshots.data (or null).
 // participantSkill is the per-participant skill name (used when same_skill_for_all = false).
-function computeDelta(startData, endData, comp, participantSkill) {
-  if (!endData) return 0;
-
+function computeValues(startData, endData, comp, participantSkill) {
   if (comp.metric === 'xp') {
     if (comp.skill_scope === 'total') {
-      const end   = xpFromData(endData);
-      const start = startData ? xpFromData(startData) : 0;
-      return Math.max(0, end - start);
+      const endValue   = endData   ? xpFromData(endData)   : 0;
+      const startValue = startData ? xpFromData(startData) : 0;
+      return { startValue, endValue, delta: Math.max(0, endValue - startValue) };
     }
-    // specific skill
     const skillKey = comp.same_skill_for_all
       ? (comp.skill || '').toLowerCase()
       : (participantSkill || '').toLowerCase();
-    const end   = xpForSkill(endData, skillKey);
-    const start = startData ? xpForSkill(startData, skillKey) : 0;
-    return Math.max(0, end - start);
+    const endValue   = endData   ? xpForSkill(endData,   skillKey) : 0;
+    const startValue = startData ? xpForSkill(startData, skillKey) : 0;
+    return { startValue, endValue, delta: Math.max(0, endValue - startValue) };
   }
 
   if (comp.metric === 'kill-count') {
-    const bossKey = bossToKey(comp.boss || '');
-    const end     = kcForBoss(endData, bossKey);
-    const start   = startData ? kcForBoss(startData, bossKey) : 0;
-    return Math.max(0, end - start);
+    const bossKey    = bossToKey(comp.boss || '');
+    const endValue   = endData   ? kcForBoss(endData,   bossKey) : 0;
+    const startValue = startData ? kcForBoss(startData, bossKey) : 0;
+    return { startValue, endValue, delta: Math.max(0, endValue - startValue) };
   }
 
   // ehp / ehb — deferred
-  return 0;
+  return { startValue: 0, endValue: 0, delta: 0 };
 }
 
 // Fetch start + end snapshots for all participants in a solo competition.
@@ -296,13 +293,13 @@ async function getCompetition(req, res, sql, id) {
       : await fetchSnapshotsSolo(sql, comp.id, comp.start_time, effectiveEnd);
 
     result.participants = participants.map(p => {
-      const value = computeDelta(
+      const { startValue, endValue, delta } = computeValues(
         startByChar[p.character_id] || null,
         endByChar[p.character_id]   || null,
         comp,
         p.participant_skill
       );
-      const entry = { name: p.username, value };
+      const entry = { name: p.username, value: delta, startValue, endValue };
       if (comp.skill_scope === 'specific' && !comp.same_skill_for_all) {
         entry.skill = p.participant_skill || '';
       }
@@ -331,13 +328,13 @@ async function getCompetition(req, res, sql, id) {
         teamMap[row.team_id] = { id: row.team_id, name: row.team_name, teamSkill: row.team_skill, players: [] };
       }
       const participantSkill = comp.same_skill_for_all ? comp.skill : row.team_skill;
-      const value = computeDelta(
+      const { startValue, endValue, delta } = computeValues(
         startByChar[row.character_id] || null,
         endByChar[row.character_id]   || null,
         comp,
         participantSkill
       );
-      const playerEntry = { name: row.username, value };
+      const playerEntry = { name: row.username, value: delta, startValue, endValue };
       if (comp.skill_scope === 'specific' && !comp.same_skill_for_all) {
         playerEntry.skill = row.team_skill || '';
       }
