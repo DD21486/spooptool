@@ -1171,6 +1171,70 @@
     return segs.length ? '<span class="inline-flex flex-nowrap items-center gap-0">' + segs.join('') + '</span>' : '<span class="text-slate-500">—</span>';
   }
 
+  /** Parse loot description "Item (1.2M gp) from Vorkath" -> { source: 'Vorkath', gp: 1200000 }. Returns null if not loot or no parse. */
+  function parseLootDescription(description) {
+    if (!description || typeof description !== 'string') return null;
+    const fromMatch = description.match(/\s+from\s+(.+)$/);
+    const source = fromMatch ? fromMatch[1].trim() : null;
+    const gpMatch = description.match(/\(([^)]+)\s*gp\)/);
+    if (!gpMatch) return source != null ? { source, gp: 0 } : null;
+    const gpStr = gpMatch[1].replace(/\s/g, '').toUpperCase();
+    let gp = 0;
+    if (gpStr.endsWith('B')) gp = parseFloat(gpStr, 10) * 1e9;
+    else if (gpStr.endsWith('M')) gp = parseFloat(gpStr, 10) * 1e6;
+    else if (gpStr.endsWith('K')) gp = parseFloat(gpStr, 10) * 1e3;
+    else gp = parseFloat(gpStr, 10) || 0;
+    return { source: source || null, gp: Number.isFinite(gp) ? gp : 0 };
+  }
+
+  /** Group consecutive activity entries: same type (loot), same username, same source (from description). Single entries stay as-is. */
+  function groupConsecutiveLoot(activity) {
+    if (!activity || activity.length === 0) return [];
+    const out = [];
+    let i = 0;
+    while (i < activity.length) {
+      const a = activity[i];
+      if (a.type !== 'loot') {
+        out.push({ ...a, grouped: false });
+        i++;
+        continue;
+      }
+      const parsed = parseLootDescription(a.description);
+      if (!parsed || !parsed.source) {
+        out.push({ ...a, grouped: false });
+        i++;
+        continue;
+      }
+      const group = [a];
+      let totalGp = parsed.gp;
+      let j = i + 1;
+      while (j < activity.length) {
+        const b = activity[j];
+        if (b.type !== 'loot' || (b.username || '').trim() !== (a.username || '').trim()) break;
+        const bParsed = parseLootDescription(b.description);
+        if (!bParsed || bParsed.source !== parsed.source) break;
+        group.push(b);
+        totalGp += bParsed.gp;
+        j++;
+      }
+      if (group.length > 1) {
+        out.push({
+          type: 'loot',
+          username: a.username,
+          at: group[0].at,
+          grouped: true,
+          count: group.length,
+          source: parsed.source,
+          totalGp,
+        });
+      } else {
+        out.push({ ...a, grouped: false });
+      }
+      i = j;
+    }
+    return out;
+  }
+
   function renderActivity(activity) {
     const tbody = document.getElementById('activity-tbody');
     const emptyEl = document.getElementById('activity-empty');
@@ -1181,17 +1245,22 @@
       return;
     }
     if (emptyEl) emptyEl.classList.add('hidden');
+    const grouped = groupConsecutiveLoot(activity);
     const typeLabel = (t) => (t === 'loot' ? 'Loot' : 'XP/KC');
     const typeBadgeClass = (t) => (t === 'loot' ? 'activity-badge activity-badge-loot' : 'activity-badge activity-badge-xpkc');
     const typeIcon = (t) => (t === 'loot'
       ? '<img src="/assets/Coins_4.webp" alt="" width="12" height="12" loading="lazy" />'
       : '<img src="/assets/Skills_icon.png" alt="" width="12" height="12" loading="lazy" />');
     const deletedSuffix = ' — Deleted by user';
-    tbody.innerHTML = activity.map((a) => {
+    const formatGroupGp = (gp) => (gp >= 1e6 ? (gp / 1e6).toFixed(1) + 'M' : (gp >= 1e3 ? Math.round(gp / 1e3) + 'k' : String(Math.round(gp))));
+    tbody.innerHTML = grouped.map((a) => {
       const time = formatActivityTime(a.at);
       const badge = '<span class="' + typeBadgeClass(a.type) + '">' + typeIcon(a.type) + '<span>' + typeLabel(a.type) + '</span></span>';
       let descriptionHtml;
-      if (a.type === 'xp_kc') {
+      if (a.grouped === true && a.type === 'loot') {
+        const text = a.count + ' ' + (a.source || '') + ' kills, bagging ' + formatGroupGp(a.totalGp) + ' gp loot';
+        descriptionHtml = '<span class="text-slate-300">' + (text.replace(/</g, '&lt;')) + '</span>';
+      } else if (a.type === 'xp_kc') {
         descriptionHtml = formatXpKcActivityDescription(a.description);
       } else {
         const desc = (a.description || '').replace(/</g, '&lt;');

@@ -104,7 +104,7 @@ async function handleLootIcon(req, res) {
   return res.status(200).end(TRANSPARENT_1X1_PNG);
 }
 
-const DISCORD_BIG_DROP_THRESHOLD_GP = 300_000;
+const DISCORD_BIG_DROP_THRESHOLD_GP = 312_000;
 
 /**
  * POST to Discord incoming webhook with an embed for a big loot drop.
