@@ -83,7 +83,7 @@
 
     <div id="ge-top-section" class="mb-6 rounded-xl border border-sky-700/60 bg-slate-800/50 overflow-hidden overflow-x-auto hidden">
       <h2 class="text-slate-200 font-semibold px-4 py-2 bg-slate-800/80 border-b border-slate-700">Top opportunities (best quick flips)</h2>
-      <p class="text-slate-500 text-xs px-4 pb-2">Ranked by return (net % after tax) and liquidity (volume in last hour). Only items with net margin &gt; 0, volume ≥ 20 trades/hour, and profit/4h ≥ 100k.</p>
+      <p class="text-slate-500 text-xs px-4 pb-2">Ranked by return (net % after tax) and liquidity (volume in last hour). Shown only if: net margin &gt; 0, profit/4h ≥ 100k, and either volume ≥ 50 trades/hour or margin ≥ 20k gp.</p>
       <table class="w-full text-sm ge-table">
         <thead>
           <tr class="border-b border-slate-700 bg-slate-800/80">
@@ -149,7 +149,7 @@
         </ul>
         <p><strong class="text-slate-200">Columns:</strong> <em>Buy (instant)</em> = OSRS Wiki &quot;high&quot; — price to buy instantly. <em>Sell (instant)</em> = OSRS Wiki &quot;low&quot; — price you get when selling instantly. <em>Volume (1h)</em> = number of trades in the last hour (buy + sell side) from the wiki&#39;s 1h endpoint. Data comes from the wiki&#39;s real-time API (RuneLite); prices can lag or differ from in-game. Margin = sell − buy (often negative for instant both ways). All percentages use 1% GE tax on the sale. Click any column header to sort.</p>
         <p><strong class="text-slate-200">Chart:</strong> Use the Chart button on a row to see hourly high/low and margin over time. Helps spot trends and whether the current margin is typical.</p>
-        <p><strong class="text-slate-200">Top opportunities:</strong> The table above the main list shows up to 20 &quot;best quick flips&quot; — items with positive net margin, at least 20 trades in the last hour, and profit/4h ≥ 100k gp, ranked by a score that combines return (net % after tax) and liquidity (volume).</p>
+        <p><strong class="text-slate-200">Top opportunities:</strong> The table above the main list shows up to 20 &quot;best quick flips&quot; — items with positive net margin, profit/4h ≥ 100k gp, and either volume ≥ 50 trades/hour or margin ≥ 20k gp, ranked by return and liquidity.</p>
         <details class="mt-4 pt-4 border-t border-slate-600">
           <summary class="cursor-pointer text-slate-200 font-medium hover:text-sky-400 focus:outline-none">Filtering &amp; exclusion logic</summary>
           <div class="mt-3 text-slate-400 text-xs space-y-2">
@@ -288,10 +288,11 @@
     }
     const limit = Math.max(1, parseInt(document.getElementById('filter-limit').value, 10) || DEFAULT_DISPLAY_LIMIT);
     var topPicks = [];
-    var minVol = 20;
+    var minVol = 50;
+    var minMarginGp = 20000;
     var minProfit4h = 100000;
     var withScore = rows.filter(function (r) {
-      return r.netPct > 0 && r.volume >= minVol && r.profit4h >= minProfit4h;
+      return r.netPct > 0 && r.profit4h >= minProfit4h && (r.volume >= minVol || r.margin >= minMarginGp);
     }).map(function (r) {
       var logVol = Math.log10(1 + r.volume);
       var score = r.netPct * logVol;
