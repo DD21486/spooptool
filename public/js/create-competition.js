@@ -262,8 +262,8 @@ function showStep(n) {
     if (!valid) return;
 
     state.name      = nameEl.value.trim();
-    state.startTime = startEl.value;
-    state.endTime   = endEl.value;
+    state.startTime = new Date(startEl.value).toISOString();
+    state.endTime   = new Date(endEl.value).toISOString();
 
     showStep(2);
     fetchPlayers();
