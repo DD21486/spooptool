@@ -328,6 +328,13 @@
       }
       var mapData = payload && (payload.mapping ?? (payload.data && payload.data.mapping));
       var latestData = payload && (payload.latest ?? (payload.data && payload.data.latest));
+      if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {
+        var keys = Object.keys(latestData);
+        if (keys.length === 1 && typeof latestData[keys[0]] === 'object' && latestData[keys[0]] !== null && !Array.isArray(latestData[keys[0]])) {
+          var inner = latestData[keys[0]];
+          if (Object.keys(inner).some(function (k) { return /^\d+$/.test(k); })) latestData = inner;
+        }
+      }
       if (Array.isArray(mapData)) {
         mapping = mapData;
       } else if (latestData && typeof latestData === 'object' && !Array.isArray(latestData)) {

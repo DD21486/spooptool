@@ -51,7 +51,17 @@ async function handleGeProxy(req, res, sql) {
       if (!mapData || !latestData || Object.keys(latestData).length === 0) {
         const [wikiMap, wikiLatest] = await Promise.all([fetchFromWiki('mapping', new URLSearchParams()), fetchFromWiki('latest', new URLSearchParams())]);
         mapData = Array.isArray(wikiMap) ? wikiMap : mapData;
-        latestData = wikiLatest && typeof wikiLatest === 'object' && !Array.isArray(wikiLatest) ? wikiLatest : latestData;
+        let rawLatest = wikiLatest && typeof wikiLatest === 'object' && !Array.isArray(wikiLatest) ? wikiLatest : latestData;
+        if (rawLatest && typeof rawLatest === 'object') {
+          const keys = Object.keys(rawLatest);
+          if (keys.length === 1 && typeof rawLatest[keys[0]] === 'object' && rawLatest[keys[0]] !== null && !Array.isArray(rawLatest[keys[0]])) {
+            latestData = rawLatest[keys[0]];
+          } else {
+            latestData = rawLatest;
+          }
+        } else {
+          latestData = latestData || {};
+        }
       }
       res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
       return res.status(200).json({ mapping: mapData || [], latest: latestData || {} });
