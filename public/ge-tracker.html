@@ -75,7 +75,6 @@
       </label>
       <input type="text" id="filter-search" placeholder="Search item…" class="w-48 px-3 py-1.5 rounded-lg bg-slate-700 border border-slate-600 text-slate-200 text-sm placeholder-slate-500" />
       <button type="button" id="sort-margin" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm font-medium">Sort: Margin %</button>
-      <button type="button" id="sort-roi" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm">Sort: ROI</button>
       <button type="button" id="sort-profit4h" class="px-3 py-1.5 rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm">Sort: Profit/4h</button>
       <span id="ge-loading" class="text-slate-500 text-sm">Loading…</span>
       <span id="ge-meta" class="text-slate-500 text-sm hidden"></span>
@@ -92,8 +91,6 @@
             <th class="text-right text-slate-400 font-medium">Sell (instant)</th>
             <th class="text-right text-slate-400 font-medium">Margin</th>
             <th class="text-right text-slate-400 font-medium">Margin %</th>
-            <th class="text-right text-slate-400 font-medium">Net % (after tax)</th>
-            <th class="text-right text-slate-400 font-medium">ROI %</th>
             <th class="text-right text-slate-400 font-medium">Limit/4h</th>
             <th class="text-right text-slate-400 font-medium">Profit/4h</th>
             <th class="text-right text-slate-400 font-medium">Volume (1h)</th>
@@ -113,8 +110,6 @@
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="sell" title="Sort by sell price">Sell (instant) <span class="ge-sort-icon"></span></th>
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="margin" title="Sort by margin">Margin <span class="ge-sort-icon"></span></th>
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="marginPct" title="Sort by margin %">Margin % <span class="ge-sort-icon"></span></th>
-            <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="netPct" title="Sort by net %">Net % (after tax) <span class="ge-sort-icon"></span></th>
-            <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="roi" title="Sort by ROI">ROI % <span class="ge-sort-icon"></span></th>
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="limit" title="Sort by limit">Limit/4h <span class="ge-sort-icon"></span></th>
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="profit4h" title="Sort by profit per 4h">Profit/4h <span class="ge-sort-icon"></span></th>
             <th class="text-right text-slate-400 font-medium ge-th-sort cursor-pointer hover:text-slate-200 select-none" data-sort="volume" title="Sort by volume (trades in last hour)">Volume (1h) <span class="ge-sort-icon"></span></th>
@@ -122,12 +117,12 @@
           </tr>
         </thead>
         <tbody id="ge-tbody">
-          <tr><td colspan="11" class="text-center py-8 text-slate-500">Loading…</td></tr>
+          <tr><td colspan="9" class="text-center py-8 text-slate-500">Loading…</td></tr>
         </tbody>
       </table>
     </div>
 
-    <p class="text-slate-500 text-xs mt-3">Data: OSRS Wiki real-time prices (RuneLite). <strong>Buy (instant)</strong> = wiki &quot;high&quot; (price to buy now). <strong>Sell (instant)</strong> = wiki &quot;low&quot; (price you get when selling now). Net % and ROI use 1% GE tax on the sale. Prices can lag or vary from in-game.</p>
+    <p class="text-slate-500 text-xs mt-3">Data: OSRS Wiki real-time prices (RuneLite). <strong>Buy (instant)</strong> = wiki &quot;high&quot; (price to buy now). <strong>Sell (instant)</strong> = wiki &quot;low&quot; (price you get when selling now). Margin % uses 1% GE tax on the sale. Prices can lag or vary from in-game.</p>
   </div>
 
   <!-- How to use modal -->
@@ -141,13 +136,11 @@
         <p><strong class="text-slate-200">What items are on this page?</strong> We pull every Grand Exchange item that the <a href="https://oldschool.runescape.wiki/w/RuneScape:Real-time_Prices" class="text-sky-400 hover:underline" target="_blank" rel="noopener">OSRS Wiki</a> tracks with real-time prices (sourced from RuneLite). Only items that have both a name/mapping and current instant-buy and instant-sell prices appear. After that, your <strong class="text-slate-200">filters</strong> (min margin %, min/max price, search) narrow the list, and <strong class="text-slate-200">Show top</strong> limits how many rows you see after sorting.</p>
         <p><strong class="text-slate-200">What to look for when flipping:</strong></p>
         <ul class="list-disc list-inside space-y-1 ml-2">
-          <li><strong class="text-slate-200">Margin %</strong> — Spread between buy and sell. Higher can mean more profit per trade.</li>
-          <li><strong class="text-slate-200">Net % (after tax)</strong> — Profit after the 1% GE sell tax. Use this for real returns.</li>
-          <li><strong class="text-slate-200">ROI %</strong> — Return on investment (same as Net % here). Good for comparing items.</li>
+          <li><strong class="text-slate-200">Margin %</strong> — Spread between buy and sell (after 1% GE tax). Higher can mean more profit per trade.</li>
           <li><strong class="text-slate-200">Limit/4h</strong> — How many you can buy every 4 hours. Low limit = less total profit even if margin is high.</li>
           <li><strong class="text-slate-200">Profit/4h</strong> — Estimated profit per 4 hours if you buy and sell at these prices up to the limit. Helps find the best gp/hour flips.</li>
         </ul>
-        <p><strong class="text-slate-200">Columns:</strong> <em>Buy (instant)</em> = OSRS Wiki &quot;high&quot; — price to buy instantly. <em>Sell (instant)</em> = OSRS Wiki &quot;low&quot; — price you get when selling instantly. <em>Volume (1h)</em> = number of trades in the last hour (buy + sell side) from the wiki&#39;s 1h endpoint. Data comes from the wiki&#39;s real-time API (RuneLite); prices can lag or differ from in-game. Margin = sell − buy (often negative for instant both ways). All percentages use 1% GE tax on the sale. Click any column header to sort.</p>
+        <p><strong class="text-slate-200">Columns:</strong> <em>Buy (instant)</em> = OSRS Wiki &quot;high&quot; — price to buy instantly. <em>Sell (instant)</em> = OSRS Wiki &quot;low&quot; — price you get when selling instantly. <em>Volume (1h)</em> = number of trades in the last hour. Prices are shown in full (no abbreviation). Margin % uses 1% GE tax on the sale. Click any column header to sort.</p>
         <p><strong class="text-slate-200">Chart:</strong> Use the Chart button on a row to see hourly high/low and margin over time. Helps spot trends and whether the current margin is typical.</p>
         <p><strong class="text-slate-200">Top opportunities:</strong> The table above the main list shows up to 20 &quot;best quick flips&quot; — items with positive net margin, profit/4h ≥ 100k gp, and either volume ≥ 50 trades/hour or margin ≥ 20k gp, ranked by return and liquidity.</p>
         <details class="mt-4 pt-4 border-t border-slate-600">
@@ -205,6 +198,12 @@
     if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
     if (n >= 1e3) return (n / 1e3).toFixed(1) + 'k';
     return String(Math.round(n));
+  }
+
+  function formatFull(n) {
+    if (n == null || isNaN(n)) return '—';
+    var x = Math.round(Number(n));
+    return x.toLocaleString();
   }
 
   function buildRows() {
@@ -275,10 +274,6 @@
       rows.sort(function (a, b) { return sortAsc ? a.margin - b.margin : b.margin - a.margin; });
     } else if (sortBy === 'marginPct') {
       rows.sort(function (a, b) { return sortAsc ? a.marginPct - b.marginPct : b.marginPct - a.marginPct; });
-    } else if (sortBy === 'netPct') {
-      rows.sort(function (a, b) { return sortAsc ? a.netPct - b.netPct : b.netPct - a.netPct; });
-    } else if (sortBy === 'roi') {
-      rows.sort(function (a, b) { return sortAsc ? a.roi - b.roi : b.roi - a.roi; });
     } else if (sortBy === 'limit') {
       rows.sort(function (a, b) { return sortAsc ? a.limit - b.limit : b.limit - a.limit; });
     } else if (sortBy === 'profit4h') {
@@ -306,15 +301,13 @@
   function rowHtml(r) {
     return '<tr class="border-b border-slate-700/50 hover:bg-slate-800/50">' +
       '<td class="text-slate-200">' + escapeHtml(r.name) + '</td>' +
-      '<td class="text-right font-mono text-slate-300">' + formatGp(r.buy) + '</td>' +
-      '<td class="text-right font-mono text-slate-300">' + formatGp(r.sell) + '</td>' +
-      '<td class="text-right font-mono text-emerald-400">' + formatGp(r.margin) + '</td>' +
+      '<td class="text-right font-mono text-slate-300">' + formatFull(r.buy) + '</td>' +
+      '<td class="text-right font-mono text-slate-300">' + formatFull(r.sell) + '</td>' +
+      '<td class="text-right font-mono text-emerald-400">' + formatFull(r.margin) + '</td>' +
       '<td class="text-right font-mono text-slate-300">' + r.marginPct.toFixed(2) + '%</td>' +
-      '<td class="text-right font-mono text-slate-300">' + r.netPct.toFixed(2) + '%</td>' +
-      '<td class="text-right font-mono text-slate-300">' + r.roi.toFixed(2) + '%</td>' +
-      '<td class="text-right font-mono text-slate-400">' + (r.limit ? formatGp(r.limit) : '—') + '</td>' +
-      '<td class="text-right font-mono text-emerald-400">' + (r.profit4h ? formatGp(r.profit4h) : '—') + '</td>' +
-      '<td class="text-right font-mono text-slate-400">' + (r.volume ? formatGp(r.volume) : '—') + '</td>' +
+      '<td class="text-right font-mono text-slate-400">' + (r.limit ? formatFull(r.limit) : '—') + '</td>' +
+      '<td class="text-right font-mono text-emerald-400">' + (r.profit4h ? formatFull(r.profit4h) : '—') + '</td>' +
+      '<td class="text-right font-mono text-slate-400">' + (r.volume ? formatFull(r.volume) : '—') + '</td>' +
       '<td class="text-center"><button type="button" class="ge-chart-btn px-2 py-1 rounded text-sky-400 hover:bg-slate-700 text-xs" data-id="' + r.id + '" data-name="' + escapeHtml(r.name) + '">Chart</button></td>' +
       '</tr>';
   }
@@ -347,7 +340,7 @@
 
     if (rows.length === 0) {
       var hint = total === 0 && mapping.length === 0 ? ' No item list loaded — check Network tab for /api/aggregate-history?path=ge&route=init.' : '';
-      tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-slate-500">No items match filters.' + hint + '</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-slate-500">No items match filters.' + hint + '</td></tr>';
       updateSortHeaders();
       return;
     }
@@ -449,7 +442,6 @@
   });
 
   document.getElementById('sort-margin').addEventListener('click', function () { sortBy = 'marginPct'; sortAsc = false; renderTable(); });
-  document.getElementById('sort-roi').addEventListener('click', function () { sortBy = 'roi'; sortAsc = false; renderTable(); });
   document.getElementById('sort-profit4h').addEventListener('click', function () { sortBy = 'profit4h'; sortAsc = false; renderTable(); });
   document.getElementById('filter-min-margin').addEventListener('input', renderTable);
   document.getElementById('filter-min-price').addEventListener('input', renderTable);
@@ -495,7 +487,7 @@
 
   function setError(msg) {
     loadingEl.textContent = '';
-    if (tbody) tbody.innerHTML = '<tr><td colspan="11" class="text-center py-8 text-red-400">' + escapeHtml(msg) + '</td></tr>';
+    if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center py-8 text-red-400">' + escapeHtml(msg) + '</td></tr>';
     if (document.getElementById('ge-meta')) { document.getElementById('ge-meta').textContent = ''; document.getElementById('ge-meta').classList.add('hidden'); }
   }
 
