@@ -114,9 +114,21 @@ module.exports = async function handler(req, res) {
     return res.status(400).json({ error: 'Split total must equal 100%' });
   }
 
-  const recipients = [];
-  recipients.push({ username: primaryUsername, percent: primaryPercent });
-  splitPartners.forEach((p) => recipients.push({ username: p.username, percent: p.percent }));
+  // Merge recipients by username so the same person (e.g. primary + partner) gets one row with combined percent
+  const recipientMap = new Map();
+  recipientMap.set(primaryUsername.toLowerCase(), { username: primaryUsername, percent: primaryPercent });
+  splitPartners.forEach((p) => {
+    if (!p.username) return;
+    const key = p.username.toLowerCase();
+    const existing = recipientMap.get(key);
+    const added = p.percent;
+    if (existing) {
+      existing.percent = Math.min(100, existing.percent + added);
+    } else {
+      recipientMap.set(key, { username: p.username, percent: added });
+    }
+  });
+  const recipients = Array.from(recipientMap.values()).filter((r) => r.percent > 0);
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
@@ -132,6 +144,19 @@ module.exports = async function handler(req, res) {
     const knownRecipients = recipients.filter((r) => r.username && usernameToId[(r.username || '').toLowerCase()]);
     if (knownRecipients.length === 0) {
       return res.status(400).json({ error: 'At least one recipient must be a SpoopTool character' });
+    }
+
+    // Avoid double-submit: if we already recorded this exact manual drop for this user in the last 2 minutes, skip
+    const dupCheck = await sql`
+      SELECT 1 FROM loot_drops
+      WHERE LOWER(TRIM(username)) = LOWER(TRIM(${primaryUsername}))
+        AND TRIM(item_name) = TRIM(${itemName})
+        AND TRIM(source) = ${SOURCE_MANUAL}
+        AND at > NOW() - interval '2 minutes'
+      LIMIT 1
+    `;
+    if (dupCheck.length > 0) {
+      return res.status(201).json({ ok: true, inserted: 0, duplicate: true });
     }
 
     for (const r of knownRecipients) {

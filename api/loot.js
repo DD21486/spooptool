@@ -644,72 +644,72 @@ module.exports = async function handler(req, res) {
         grouped = monthParam
           ? (sourceFilter != null
             ? await sql`
-                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                   (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND at >= date_trunc('month', NOW())
                   AND TRIM(source) = TRIM(${sourceFilter})
-                GROUP BY item_id, item_name
+                GROUP BY item_name
                 ORDER BY total_value_gp DESC
                 LIMIT ${limit}
               `
             : await sql`
-                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                   (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND at >= date_trunc('month', NOW())
-                GROUP BY item_id, item_name
+                GROUP BY item_name
                 ORDER BY total_value_gp DESC
                 LIMIT ${limit}
               `)
           : periodFilter != null
             ? (sourceFilter != null
               ? await sql`
-                  SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                     (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                     (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                   FROM loot_drops
                   WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                     AND at >= NOW() - make_interval(hours => ${periodFilter})
                     AND TRIM(source) = TRIM(${sourceFilter})
-                  GROUP BY item_id, item_name
+                  GROUP BY item_name
                   ORDER BY total_value_gp DESC
                   LIMIT ${limit}
                 `
               : await sql`
-                  SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                  SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                     (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                     (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                   FROM loot_drops
                   WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                     AND at >= NOW() - make_interval(hours => ${periodFilter})
-                  GROUP BY item_id, item_name
+                  GROUP BY item_name
                   ORDER BY total_value_gp DESC
                   LIMIT ${limit}
                 `)
             : (sourceFilter != null
             ? await sql`
-                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                   (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
                   AND TRIM(source) = TRIM(${sourceFilter})
-                GROUP BY item_id, item_name
+                GROUP BY item_name
                 ORDER BY total_value_gp DESC
                 LIMIT ${limit}
               `
             : await sql`
-                SELECT item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
+                SELECT MAX(item_id) AS item_id, item_name, SUM(quantity)::int AS quantity, SUM(total_value_gp)::bigint AS total_value_gp,
                   (array_agg(source ORDER BY at DESC NULLS LAST))[1] AS source,
                   (array_agg(luck_delta ORDER BY at DESC NULLS LAST))[1] AS luck_delta
                 FROM loot_drops
                 WHERE LOWER(TRIM(username)) = LOWER(TRIM(${player}))
-                GROUP BY item_id, item_name
+                GROUP BY item_name
                 ORDER BY total_value_gp DESC
                 LIMIT ${limit}
               `);
