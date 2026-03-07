@@ -1009,6 +1009,7 @@
   /** Load home page from latest snapshots only (no Hiscores). */
   async function loadFromSnapshots() {
     showError('');
+    lootTopDropsCache = {};
     leftLoading.classList.remove('hidden');
     rightLoading.classList.remove('hidden');
     if (lootLoading) lootLoading.classList.remove('hidden');
