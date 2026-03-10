@@ -4,6 +4,7 @@
 // Routes:
 //   GET    /api/competitions               → list all competitions (summary)
 //   POST   /api/competitions               → create a new competition
+//   POST   /api/competitions?action=save-rates → upsert EHP or EHB rate table
 //   GET    /api/competitions/:id           → get competition detail with live scores
 //   DELETE /api/competitions/:id           → delete (requires creator_code in body)
 //   POST   /api/competitions/:id/snapshot  → fetch fresh Hiscores for all participants and store snapshots
@@ -56,10 +57,76 @@ function bossToKey(displayName) {
     .join('');
 }
 
+// Convert a display boss name to WOM snake_case for EHB rate table lookup.
+// e.g. "Abyssal Sire" → "abyssal_sire", "K'ril Tsutsaroth" → "kril_tsutsaroth"
+function bossToSnakeCase(displayName) {
+  return String(displayName)
+    .toLowerCase()
+    .replace(/'/g, '')
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_|_$/g, '');
+}
+
+// Compute total EHP from 0 up to `xp` using sorted rate methods.
+// methods = [{ start_exp, rate }, ...] sorted ascending by start_exp.
+function ehpAt(xp, methods) {
+  let total = 0;
+  for (let i = 0; i < methods.length; i++) {
+    const bracketStart = Number(methods[i].start_exp);
+    const bracketEnd = i + 1 < methods.length ? Number(methods[i + 1].start_exp) : 200000000;
+    if (xp <= bracketStart) break;
+    const xpInBracket = Math.min(xp, bracketEnd) - bracketStart;
+    if (xpInBracket > 0 && methods[i].rate > 0) total += xpInBracket / methods[i].rate;
+  }
+  return total;
+}
+
+// Compute total EHB from 0 up to `kc` using sorted rate methods.
+// methods = [{ start_kc, rate }, ...] sorted ascending by start_kc.
+function ehbAt(kc, methods) {
+  let total = 0;
+  for (let i = 0; i < methods.length; i++) {
+    const bracketStart = Number(methods[i].start_kc);
+    const bracketEnd = i + 1 < methods.length ? Number(methods[i + 1].start_kc) : Infinity;
+    if (kc <= bracketStart) break;
+    const kcInBracket = (bracketEnd === Infinity ? kc : Math.min(kc, bracketEnd)) - bracketStart;
+    if (kcInBracket > 0 && methods[i].rate > 0) total += kcInBracket / methods[i].rate;
+  }
+  return total;
+}
+
+// Returns { startValue, endValue, delta } for EHP given raw XP values.
+// rateRows is the flattened array from getCompetition's pre-fetch.
+function computeEHPGained(startXp, endXp, skill, rateRows, gameMode) {
+  const mode = (gameMode || 'main').toLowerCase();
+  const methods = rateRows
+    .filter(r => r.game_mode === mode && r.skill === skill.toLowerCase())
+    .sort((a, b) => Number(a.start_exp) - Number(b.start_exp));
+  if (!methods.length) return { startValue: 0, endValue: 0, delta: 0 };
+  const startEhp = ehpAt(startXp, methods);
+  const endEhp   = ehpAt(endXp,   methods);
+  return { startValue: startEhp, endValue: endEhp, delta: Math.max(0, endEhp - startEhp) };
+}
+
+// Returns { startValue, endValue, delta } for EHB given raw KC values.
+// rateRows is the flattened array from getCompetition's pre-fetch.
+function computeEHBGained(startKc, endKc, boss, rateRows) {
+  const bossKey = bossToSnakeCase(boss);
+  const methods = rateRows
+    .filter(r => r.boss === bossKey)
+    .sort((a, b) => Number(a.start_kc) - Number(b.start_kc));
+  if (!methods.length) return { startValue: 0, endValue: 0, delta: 0 };
+  const startEhb = ehbAt(startKc, methods);
+  const endEhb   = ehbAt(endKc,   methods);
+  return { startValue: startEhb, endValue: endEhb, delta: Math.max(0, endEhb - startEhb) };
+}
+
 // Compute start value, end value, and delta for a single participant.
 // startData / endData are raw JSONB objects from character_snapshots.data (or null).
 // participantSkill is the per-participant skill name (used when same_skill_for_all = false).
-function computeValues(startData, endData, comp, participantSkill) {
+// gameMode is the character's account type ('main', 'ironman', 'hardcore').
+// rates is the pre-fetched flat rate array (only populated for ehp/ehb competitions).
+function computeValues(startData, endData, comp, participantSkill, gameMode, rates) {
   if (comp.metric === 'xp') {
     if (comp.skill_scope === 'total') {
       const endValue   = endData   ? xpFromData(endData)   : 0;
@@ -81,7 +148,22 @@ function computeValues(startData, endData, comp, participantSkill) {
     return { startValue, endValue, delta: Math.max(0, endValue - startValue) };
   }
 
-  // ehp / ehb — deferred
+  if (comp.metric === 'ehp') {
+    const skillKey = comp.same_skill_for_all
+      ? (comp.skill || '').toLowerCase()
+      : (participantSkill || '').toLowerCase();
+    const startXp = startData ? xpForSkill(startData, skillKey) : 0;
+    const endXp   = endData   ? xpForSkill(endData,   skillKey) : 0;
+    return computeEHPGained(startXp, endXp, skillKey, rates || [], gameMode);
+  }
+
+  if (comp.metric === 'ehb') {
+    const bossKey = bossToKey(comp.boss || '');
+    const startKc = startData ? kcForBoss(startData, bossKey) : 0;
+    const endKc   = endData   ? kcForBoss(endData,   bossKey) : 0;
+    return computeEHBGained(startKc, endKc, comp.boss || '', rates || []);
+  }
+
   return { startValue: 0, endValue: 0, delta: 0 };
 }
 
@@ -246,6 +328,44 @@ async function createCompetition(req, res, sql) {
   return res.status(201).json({ id: compId, creatorCode });
 }
 
+// ── SAVE RATES ────────────────────────────────────────────────────────────────
+// Upserts EHP or EHB rate data (raw WOM API array) into the rate tables.
+// Called from sandbox.html "Save to DB" button.
+async function saveRates(req, res, sql) {
+  let body;
+  try {
+    body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body || {};
+  } catch {
+    return res.status(400).json({ error: 'Invalid JSON' });
+  }
+
+  const { metric, gameMode, rates } = body;
+  if (!metric || !Array.isArray(rates)) {
+    return res.status(400).json({ error: 'metric and rates array required' });
+  }
+
+  if (metric === 'ehp') {
+    if (!gameMode) return res.status(400).json({ error: 'gameMode required for EHP rates' });
+    await sql`
+      INSERT INTO ehp_rates (game_mode, rates, updated_at)
+      VALUES (${gameMode}, ${JSON.stringify(rates)}, NOW())
+      ON CONFLICT (game_mode) DO UPDATE SET rates = EXCLUDED.rates, updated_at = NOW()
+    `;
+  } else if (metric === 'ehb') {
+    // Single universal row — upsert by replacing the first row if it exists.
+    const existing = await sql`SELECT id FROM ehb_rates LIMIT 1`;
+    if (existing.length) {
+      await sql`UPDATE ehb_rates SET rates = ${JSON.stringify(rates)}, updated_at = NOW() WHERE id = ${existing[0].id}`;
+    } else {
+      await sql`INSERT INTO ehb_rates (rates) VALUES (${JSON.stringify(rates)})`;
+    }
+  } else {
+    return res.status(400).json({ error: 'metric must be ehp or ehb' });
+  }
+
+  return res.status(200).json({ ok: true });
+}
+
 // ── GET DETAIL ────────────────────────────────────────────────────────────────
 async function getCompetition(req, res, sql, id) {
   const compRows = await sql`
@@ -260,8 +380,6 @@ async function getCompetition(req, res, sql, id) {
   const isUpcoming   = new Date(comp.start_time).getTime() > now;
   // For active competitions: use current time so scores reflect live progress.
   // For ended competitions: use end_time exactly so scores are frozen.
-  // snapshotCompetition stores its snapshot at end_time (not NOW()) so it lands
-  // on the boundary and is captured here.
   const effectiveEnd = now <= endMs
     ? new Date(now).toISOString()
     : comp.end_time;
@@ -280,9 +398,36 @@ async function getCompetition(req, res, sql, id) {
     endTime:          comp.end_time,
   };
 
+  // Pre-fetch efficiency rates for EHP/EHB competitions.
+  // Flatten the stored WOM JSON array into the format expected by computeEHPGained/computeEHBGained.
+  let rates = [];
+  if (comp.metric === 'ehp') {
+    const rateRows = await sql`SELECT game_mode, rates FROM ehp_rates`;
+    for (const row of rateRows) {
+      const skills = Array.isArray(row.rates) ? row.rates : [];
+      for (const entry of skills) {
+        const skill = (entry.skill || '').toLowerCase();
+        for (const m of (entry.methods || [])) {
+          rates.push({ game_mode: row.game_mode, skill, start_exp: Number(m.startExp || 0), rate: Number(m.rate || 0) });
+        }
+      }
+    }
+  } else if (comp.metric === 'ehb') {
+    const rateRows = await sql`SELECT rates FROM ehb_rates LIMIT 1`;
+    if (rateRows.length) {
+      const bosses = Array.isArray(rateRows[0].rates) ? rateRows[0].rates : [];
+      for (const entry of bosses) {
+        const boss = (entry.boss || '').toLowerCase();
+        for (const m of (entry.methods || [])) {
+          rates.push({ boss, start_kc: Number(m.startKc ?? m.startExp ?? 0), rate: Number(m.rate || 0) });
+        }
+      }
+    }
+  }
+
   if (comp.type === 'solo') {
     const participants = await sql`
-      SELECT cp.character_id, cp.skill AS participant_skill, c.username
+      SELECT cp.character_id, cp.skill AS participant_skill, c.username, c.game_mode
       FROM competition_participants cp
       JOIN characters c ON c.id = cp.character_id
       WHERE cp.competition_id = ${comp.id}
@@ -297,7 +442,9 @@ async function getCompetition(req, res, sql, id) {
         startByChar[p.character_id] || null,
         endByChar[p.character_id]   || null,
         comp,
-        p.participant_skill
+        p.participant_skill,
+        p.game_mode,
+        rates
       );
       const entry = { name: p.username, value: delta, startValue, endValue };
       if (comp.skill_scope === 'specific' && !comp.same_skill_for_all) {
@@ -309,7 +456,7 @@ async function getCompetition(req, res, sql, id) {
   } else {
     const rows = await sql`
       SELECT ct.id AS team_id, ct.name AS team_name, ct.skill AS team_skill,
-             ctm.character_id, c.username
+             ctm.character_id, c.username, c.game_mode
       FROM competition_teams ct
       JOIN competition_team_members ctm ON ctm.team_id = ct.id
       JOIN characters c ON c.id = ctm.character_id
@@ -332,7 +479,9 @@ async function getCompetition(req, res, sql, id) {
         startByChar[row.character_id] || null,
         endByChar[row.character_id]   || null,
         comp,
-        participantSkill
+        participantSkill,
+        row.game_mode,
+        rates
       );
       const playerEntry = { name: row.username, value: delta, startValue, endValue };
       if (comp.skill_scope === 'specific' && !comp.same_skill_for_all) {
@@ -442,8 +591,6 @@ async function snapshotCompetition(req, res, sql, id) {
 // ── START SNAPSHOT ────────────────────────────────────────────────────────────
 // Fetches live Hiscores for every participant and writes a snapshot at start_time.
 // Called by the frontend when the start countdown hits 0 (upcoming → active).
-// This gives accurate baselines so XP/KC gained is measured from the exact moment
-// the competition begins rather than the previous hourly cron snapshot.
 async function startSnapshotCompetition(req, res, sql, id) {
   const compRows = await sql`SELECT id, type, start_time FROM competitions WHERE id = ${id}`;
   if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
@@ -494,14 +641,17 @@ module.exports = async function handler(req, res) {
   }
 
   // ID comes from ?compId= query param (path segments not reliable in non-Next.js Vercel).
-  // Action comes from ?action= query param (e.g. 'snapshot').
+  // Action comes from ?action= query param (e.g. 'snapshot', 'save-rates').
   const id     = req.query.compId ? parseInt(req.query.compId, 10) : null;
   const action = req.query.action || null;
 
   try {
     if (!id || isNaN(id)) {
       if (req.method === 'GET')  return await listCompetitions(req, res, sql);
-      if (req.method === 'POST') return await createCompetition(req, res, sql);
+      if (req.method === 'POST') {
+        if (action === 'save-rates') return await saveRates(req, res, sql);
+        return await createCompetition(req, res, sql);
+      }
     } else if (action === 'snapshot') {
       if (req.method === 'POST') return await snapshotCompetition(req, res, sql, id);
     } else if (action === 'start-snapshot') {

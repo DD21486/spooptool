@@ -177,6 +177,7 @@
             <option value="f2p">F2P</option>
             <option value="f2p_ironman">F2P Ironman</option>
           </select>
+          <button id="ehp-save-btn" type="button" class="px-3 py-1 rounded bg-sky-700 hover:bg-sky-600 border border-sky-500 text-sm text-white transition-colors disabled:opacity-50">Save to DB</button>
         </div>
       </div>
       <div id="section-body">
@@ -213,6 +214,138 @@
           body.classList.toggle('hidden', !open);
           arrow.textContent = open ? '▼' : '▶';
         });
+      })();
+    </script>
+
+    <section class="mt-6 rounded-xl border border-slate-700 bg-slate-800/50">
+      <div id="ehb-section-header" class="px-4 py-3 border-b border-slate-700 flex flex-wrap items-center justify-between gap-3 cursor-pointer select-none hover:bg-slate-800/40">
+        <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+          <span id="ehb-section-arrow" class="text-slate-500 text-xs">▼</span>
+          EHB Boss Rates
+        </h2>
+        <div class="flex items-center gap-2" id="ehb-section-controls">
+          <button id="ehb-save-btn" type="button" class="px-3 py-1 rounded bg-sky-700 hover:bg-sky-600 border border-sky-500 text-sm text-white transition-colors disabled:opacity-50">Save to DB</button>
+        </div>
+      </div>
+      <div id="ehb-section-body">
+        <div class="overflow-x-clip">
+          <table class="w-full text-sm">
+            <thead class="sticky top-0 z-10">
+              <tr class="border-b border-slate-700 bg-slate-800">
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Boss</th>
+                <th class="text-left px-4 py-2 text-slate-400 font-medium">Method</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Start KC</th>
+                <th class="text-right px-4 py-2 text-slate-400 font-medium">Rate (KC/hr)</th>
+              </tr>
+            </thead>
+            <tbody id="ehb-tbody"></tbody>
+          </table>
+        </div>
+        <p id="ehb-loading" class="px-4 py-6 text-slate-500 text-center">Loading…</p>
+        <p id="ehb-error" class="px-4 py-6 text-red-400 text-center hidden"></p>
+      </div>
+    </section>
+    <script>
+      (function () {
+        var ehbHeader   = document.getElementById('ehb-section-header');
+        var ehbBody     = document.getElementById('ehb-section-body');
+        var ehbArrow    = document.getElementById('ehb-section-arrow');
+        var ehbControls = document.getElementById('ehb-section-controls');
+        var ehbTbody    = document.getElementById('ehb-tbody');
+        var ehbLoading  = document.getElementById('ehb-loading');
+        var ehbError    = document.getElementById('ehb-error');
+        var ehbSaveBtn  = document.getElementById('ehb-save-btn');
+        var currentEhbRates = null;
+        var ehbOpen = true;
+
+        ehbHeader.addEventListener('click', function (e) {
+          if (ehbControls.contains(e.target)) return;
+          ehbOpen = !ehbOpen;
+          ehbBody.classList.toggle('hidden', !ehbOpen);
+          ehbArrow.textContent = ehbOpen ? '▼' : '▶';
+        });
+
+        function capitalize(str) { return str.charAt(0).toUpperCase() + str.slice(1); }
+        function fmt(n) { return Number(n).toLocaleString(); }
+
+        function renderEhbRates(data) {
+          ehbTbody.innerHTML = '';
+          if (!Array.isArray(data) || !data.length) {
+            ehbLoading.textContent = 'No data returned.';
+            return;
+          }
+          ehbLoading.classList.add('hidden');
+
+          data.forEach(function (entry, idx) {
+            var bossName = capitalize((entry.boss || 'Unknown').replace(/_/g, ' '));
+            var methods = Array.isArray(entry.methods) ? entry.methods : [];
+
+            methods.forEach(function (method, mi) {
+              var tr = document.createElement('tr');
+              tr.className = 'border-b border-slate-700/50 hover:bg-slate-800/40';
+
+              var bossCell = '';
+              if (mi === 0) {
+                bossCell = '<td class="px-4 py-2 font-medium text-slate-200 align-top" rowspan="' + methods.length + '">' + bossName + '</td>';
+              }
+
+              var startKc = method.startKc != null ? method.startKc : (method.startExp != null ? method.startExp : 0);
+              tr.innerHTML = bossCell
+                + '<td class="px-4 py-2 text-slate-300">' + (method.description || '—') + '</td>'
+                + '<td class="px-4 py-2 text-right font-mono text-slate-400">' + fmt(startKc) + '</td>'
+                + '<td class="px-4 py-2 text-right font-mono text-sky-300">' + (method.rate != null ? method.rate.toFixed(2) : '—') + '</td>';
+
+              ehbTbody.appendChild(tr);
+            });
+
+            if (idx < data.length - 1 && methods.length > 0) {
+              var sep = document.createElement('tr');
+              sep.innerHTML = '<td colspan="4" class="p-0"><div class="border-b border-slate-600/60"></div></td>';
+              ehbTbody.appendChild(sep);
+            }
+          });
+        }
+
+        function loadEhbRates() {
+          ehbLoading.classList.remove('hidden');
+          ehbError.classList.add('hidden');
+          ehbTbody.innerHTML = '';
+          ehbLoading.textContent = 'Loading\u2026';
+
+          fetch('https://api.wiseoldman.net/v2/efficiency/rates?metric=ehb')
+            .then(function (res) {
+              if (!res.ok) throw new Error('HTTP ' + res.status);
+              return res.json();
+            })
+            .then(function (data) { currentEhbRates = data; renderEhbRates(data); })
+            .catch(function (err) {
+              ehbLoading.classList.add('hidden');
+              ehbError.classList.remove('hidden');
+              ehbError.textContent = 'Failed to load rates: ' + err.message;
+            });
+        }
+
+        ehbSaveBtn.addEventListener('click', function () {
+          if (!currentEhbRates) return;
+          ehbSaveBtn.disabled = true;
+          ehbSaveBtn.textContent = 'Saving\u2026';
+          fetch('/api/competitions/_?action=save-rates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ metric: 'ehb', rates: currentEhbRates })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+              ehbSaveBtn.textContent = result.ok ? 'Saved!' : 'Error saving';
+              setTimeout(function () { ehbSaveBtn.disabled = false; ehbSaveBtn.textContent = 'Save to DB'; }, 2000);
+            })
+            .catch(function () {
+              ehbSaveBtn.textContent = 'Error';
+              setTimeout(function () { ehbSaveBtn.disabled = false; ehbSaveBtn.textContent = 'Save to DB'; }, 2000);
+            });
+        });
+
+        loadEhbRates();
       })();
     </script>
 
@@ -285,6 +418,8 @@
         var loading = document.getElementById('rates-loading');
         var errorEl = document.getElementById('rates-error');
         var typeSelect = document.getElementById('type-select');
+        var ehpSaveBtn = document.getElementById('ehp-save-btn');
+        var currentEhpRates = null;
 
         // Build XP table (same formula as lib/xpTable.js)
         var xpTable = [0, 0];
@@ -363,7 +498,7 @@
               if (!res.ok) throw new Error('HTTP ' + res.status);
               return res.json();
             })
-            .then(function (data) { renderRates(data); })
+            .then(function (data) { currentEhpRates = data; renderRates(data); })
             .catch(function (err) {
               loading.classList.add('hidden');
               errorEl.classList.remove('hidden');
@@ -371,7 +506,32 @@
             });
         }
 
-        typeSelect.addEventListener('change', loadRates);
+        typeSelect.addEventListener('change', function () {
+          currentEhpRates = null;
+          loadRates();
+        });
+
+        ehpSaveBtn.addEventListener('click', function () {
+          if (!currentEhpRates) return;
+          var gm = typeSelect.value;
+          ehpSaveBtn.disabled = true;
+          ehpSaveBtn.textContent = 'Saving\u2026';
+          fetch('/api/competitions/_?action=save-rates', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ metric: 'ehp', gameMode: gm, rates: currentEhpRates })
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (result) {
+              ehpSaveBtn.textContent = result.ok ? 'Saved!' : 'Error saving';
+              setTimeout(function () { ehpSaveBtn.disabled = false; ehpSaveBtn.textContent = 'Save to DB'; }, 2000);
+            })
+            .catch(function () {
+              ehpSaveBtn.textContent = 'Error';
+              setTimeout(function () { ehpSaveBtn.disabled = false; ehpSaveBtn.textContent = 'Save to DB'; }, 2000);
+            });
+        });
+
         loadRates();
       })();
     </script>

@@ -355,9 +355,9 @@ function renderLeaderboard(comp, sorted) {
   var isBoss       = comp.category === 'boss';
   // Show per-player skill column only when each participant has a different skill
   var showSkillCol = comp.category === 'skill' && comp.skillScope === 'specific' && !comp.sameSkillForAll;
-  var startLabel   = isBoss ? 'Starting KC'  : 'Starting XP';
-  var currentLabel = isBoss ? 'Current KC'   : 'Current XP';
-  var gainedLabel  = isBoss ? 'KC Gained'    : 'XP Gained';
+  var startLabel   = isBoss ? (comp.metric === 'ehb' ? 'Starting EHB' : 'Starting KC')  : (comp.metric === 'ehp' ? 'Starting EHP' : 'Starting XP');
+  var currentLabel = isBoss ? (comp.metric === 'ehb' ? 'Current EHB'  : 'Current KC')   : (comp.metric === 'ehp' ? 'Current EHP'  : 'Current XP');
+  var gainedLabel  = isBoss ? (comp.metric === 'ehb' ? 'EHB Gained'   : 'KC Gained')    : (comp.metric === 'ehp' ? 'EHP Gained'   : 'XP Gained');
 
   // ── Table header ──────────────────────────────────────────────────────────
   var thClass = 'text-right px-4 py-2.5 text-xs font-medium text-slate-400';
