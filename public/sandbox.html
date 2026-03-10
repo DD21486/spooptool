@@ -173,7 +173,7 @@
             <option value="main">Main</option>
             <option value="ironman">Ironman</option>
             <option value="ultimate">Ultimate</option>
-            <option value="hardcore">Hardcore</option>
+
             <option value="f2p">F2P</option>
             <option value="f2p_ironman">F2P Ironman</option>
           </select>
@@ -278,7 +278,10 @@
 
           data.forEach(function (entry, idx) {
             var bossName = capitalize((entry.boss || 'Unknown').replace(/_/g, ' '));
-            var methods = Array.isArray(entry.methods) ? entry.methods : [];
+            // WOM EHB may return a flat { boss, rate } or nested { boss, methods: [...] }
+            var methods = Array.isArray(entry.methods) && entry.methods.length
+              ? entry.methods
+              : (entry.rate != null ? [{ startKc: 0, rate: entry.rate, description: entry.description }] : []);
 
             methods.forEach(function (method, mi) {
               var tr = document.createElement('tr');

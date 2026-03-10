@@ -420,7 +420,10 @@ async function getCompetition(req, res, sql, id) {
       const bosses = Array.isArray(rateRows[0].rates) ? rateRows[0].rates : [];
       for (const entry of bosses) {
         const boss = (entry.boss || '').toLowerCase();
-        for (const m of (entry.methods || [])) {
+        const methods = Array.isArray(entry.methods) && entry.methods.length
+          ? entry.methods
+          : (entry.rate != null ? [{ startKc: 0, rate: entry.rate }] : []);
+        for (const m of methods) {
           rates.push({ boss, start_kc: Number(m.startKc ?? m.startExp ?? 0), rate: Number(m.rate || 0) });
         }
       }
