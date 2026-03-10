@@ -430,6 +430,12 @@ async function getCompetition(req, res, sql, id) {
     }
   }
 
+  // Debug info for EHP/EHB competitions (temporary diagnostic aid).
+  if (comp.metric === 'ehp' || comp.metric === 'ehb') {
+    const skillsInRates = [...new Set(rates.map(r => comp.metric === 'ehp' ? `${r.game_mode}:${r.skill}` : r.boss))];
+    result._debug = { rateRowCount: rates.length, rateKeys: skillsInRates.slice(0, 20) };
+  }
+
   if (comp.type === 'solo') {
     const participants = await sql`
       SELECT cp.character_id, cp.skill AS participant_skill, c.username, c.game_mode
@@ -442,6 +448,10 @@ async function getCompetition(req, res, sql, id) {
       ? { startByChar: {}, endByChar: {} }
       : await fetchSnapshotsSolo(sql, comp.id, comp.start_time, effectiveEnd);
 
+    const startSnapCount = Object.keys(startByChar).length;
+    const endSnapCount = Object.keys(endByChar).length;
+    if (result._debug) result._debug = { ...result._debug, startSnapCount, endSnapCount };
+
     result.participants = participants.map(p => {
       const { startValue, endValue, delta } = computeValues(
         startByChar[p.character_id] || null,
@@ -452,6 +462,7 @@ async function getCompetition(req, res, sql, id) {
         rates
       );
       const entry = { name: p.username, value: delta, startValue, endValue };
+      if (result._debug) entry._debug = { gameMode: p.game_mode, participantSkill: p.participant_skill, hasStart: !!startByChar[p.character_id], hasEnd: !!endByChar[p.character_id] };
       if (comp.skill_scope === 'specific' && !comp.same_skill_for_all) {
         entry.skill = p.participant_skill || '';
       }
