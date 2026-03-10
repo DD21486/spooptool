@@ -99,8 +99,10 @@ function ehbAt(kc, methods) {
 // rateRows is the flattened array from getCompetition's pre-fetch.
 function computeEHPGained(startXp, endXp, skill, rateRows, gameMode) {
   const mode = (gameMode || 'main').toLowerCase();
+  // WOM doesn't have separate hardcore rates — fall back to ironman.
+  const effectiveMode = mode === 'hardcore' ? 'ironman' : mode;
   const methods = rateRows
-    .filter(r => r.game_mode === mode && r.skill === skill.toLowerCase())
+    .filter(r => r.game_mode === effectiveMode && r.skill === skill.toLowerCase())
     .sort((a, b) => Number(a.start_exp) - Number(b.start_exp));
   if (!methods.length) return { startValue: 0, endValue: 0, delta: 0 };
   const startEhp = ehpAt(startXp, methods);

@@ -312,7 +312,7 @@
           ehbTbody.innerHTML = '';
           ehbLoading.textContent = 'Loading\u2026';
 
-          fetch('https://api.wiseoldman.net/v2/efficiency/rates?metric=ehb')
+          fetch('https://api.wiseoldman.net/v2/efficiency/rates?metric=ehb&type=main')
             .then(function (res) {
               if (!res.ok) throw new Error('HTTP ' + res.status);
               return res.json();
