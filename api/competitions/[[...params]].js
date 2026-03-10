@@ -154,6 +154,24 @@ function computeValues(startData, endData, comp, participantSkill, gameMode, rat
     const skillKey = comp.same_skill_for_all
       ? (comp.skill || '').toLowerCase()
       : (participantSkill || '').toLowerCase();
+
+    // Total EHP: no specific skill set — sum EHP across all skills in the rate table.
+    if (!skillKey || comp.skill_scope === 'total') {
+      const mode = (gameMode || 'main').toLowerCase();
+      const effectiveMode = mode === 'hardcore' ? 'ironman' : mode;
+      const uniqueSkills = [...new Set((rates || []).filter(r => r.game_mode === effectiveMode).map(r => r.skill))];
+      let startEhp = 0;
+      let endEhp   = 0;
+      for (const skill of uniqueSkills) {
+        const startXp = startData ? xpForSkill(startData, skill) : 0;
+        const endXp   = endData   ? xpForSkill(endData,   skill) : 0;
+        const r = computeEHPGained(startXp, endXp, skill, rates, gameMode);
+        startEhp += r.startValue;
+        endEhp   += r.endValue;
+      }
+      return { startValue: startEhp, endValue: endEhp, delta: Math.max(0, endEhp - startEhp) };
+    }
+
     const startXp = startData ? xpForSkill(startData, skillKey) : 0;
     const endXp   = endData   ? xpForSkill(endData,   skillKey) : 0;
     return computeEHPGained(startXp, endXp, skillKey, rates || [], gameMode);
