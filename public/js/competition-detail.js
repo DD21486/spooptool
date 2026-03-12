@@ -529,10 +529,10 @@ function renderChart(comp) {
 
       var isEff = comp.metric === 'ehp' || comp.metric === 'ehb';
 
-      // Each player gets {x, y} points only at the timestamps where their own
-      // value changed. Chart.js unions the x values across all datasets so the
-      // axis reflects every meaningful moment, but each line only has dots at
-      // its own change points.
+      // Build per-player change points as {x, y} using the formatted timestamp
+      // as the x value. Collect all unique x labels into a set so we can build
+      // a shared, chronologically-sorted labels array for Chart.js.
+      var usedLabels = new Set();
       var datasets = data.series.map(function (player, i) {
         var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
         var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
@@ -542,7 +542,9 @@ function renderChart(comp) {
           var v = player.values[idx];
           if (v === null) return;
           if (lastValue === null || v !== lastValue) {
-            points.push({ x: formatChartTime(ts), y: v });
+            var label = formatChartTime(ts);
+            points.push({ x: label, y: v });
+            usedLabels.add(label);
             lastValue = v;
           }
         });
@@ -558,9 +560,21 @@ function renderChart(comp) {
         };
       });
 
+      // Build the shared labels array in the original chronological order by
+      // walking data.timestamps (which are ISO strings, already sorted ASC).
+      var seen = new Set();
+      var labels = [];
+      data.timestamps.forEach(function (ts) {
+        var label = formatChartTime(ts);
+        if (usedLabels.has(label) && !seen.has(label)) {
+          labels.push(label);
+          seen.add(label);
+        }
+      });
+
       compProgressChart = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: { datasets: datasets },
+        data: { labels: labels, datasets: datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
