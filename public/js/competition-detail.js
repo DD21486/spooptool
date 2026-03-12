@@ -529,47 +529,47 @@ function renderChart(comp) {
 
       var isEff = comp.metric === 'ehp' || comp.metric === 'ehb';
 
-      // Build per-player change points as {x, y} using the formatted timestamp
-      // as the x value. Collect all unique x labels into a set so we can build
-      // a shared, chronologically-sorted labels array for Chart.js.
-      var usedLabels = new Set();
-      var datasets = data.series.map(function (player, i) {
-        var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
-        var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+      // Collect the union of all timestamps where any player changed, in the
+      // original chronological order from the API. Use these as the shared
+      // x-axis labels. Each dataset uses index-based values (not {x,y}) with
+      // null at positions where that player didn't change. spanGaps:true then
+      // draws a direct line between their actual change points, skipping nulls,
+      // so there are no flat segments and no label-matching issues.
+      var allChangeTs = new Set();
+      var playerChangeMaps = data.series.map(function (player) {
+        var map = {};
         var lastValue = null;
-        var points = [];
         data.timestamps.forEach(function (ts, idx) {
           var v = player.values[idx];
           if (v === null) return;
           if (lastValue === null || v !== lastValue) {
-            var label = formatChartTime(ts);
-            points.push({ x: label, y: v });
-            usedLabels.add(label);
+            map[ts] = v;
+            allChangeTs.add(ts);
             lastValue = v;
           }
         });
+        return map;
+      });
+
+      // Preserve original sort order from data.timestamps
+      var changeTsList = data.timestamps.filter(function (ts) { return allChangeTs.has(ts); });
+      var labels = changeTsList.map(formatChartTime);
+
+      var datasets = data.series.map(function (player, i) {
+        var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
+        var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+        var map = playerChangeMaps[i];
         return {
           label: player.name,
-          data: points,
+          data: changeTsList.map(function (ts) { return map.hasOwnProperty(ts) ? map[ts] : null; }),
           borderColor: color,
           backgroundColor: alpha,
           fill: false,
           tension: 0.2,
           pointRadius: 3,
           pointHoverRadius: 6,
+          spanGaps: true,
         };
-      });
-
-      // Build the shared labels array in the original chronological order by
-      // walking data.timestamps (which are ISO strings, already sorted ASC).
-      var seen = new Set();
-      var labels = [];
-      data.timestamps.forEach(function (ts) {
-        var label = formatChartTime(ts);
-        if (usedLabels.has(label) && !seen.has(label)) {
-          labels.push(label);
-          seen.add(label);
-        }
       });
 
       compProgressChart = new Chart(canvas.getContext('2d'), {
