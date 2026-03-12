@@ -529,44 +529,38 @@ function renderChart(comp) {
 
       var isEff = comp.metric === 'ehp' || comp.metric === 'ehb';
 
-      // Only keep timestamps where at least one player's value changed.
-      // Always keep the first point as the baseline.
-      var lastSeen = data.series.map(function () { return null; });
-      var keep = data.timestamps.reduce(function (acc, _ts, i) {
-        var changed = data.series.some(function (player, pi) {
-          var v = player.values[i];
-          return v !== null && v !== lastSeen[pi];
-        });
-        if (changed || i === 0) {
-          acc.push(i);
-          data.series.forEach(function (player, pi) {
-            if (player.values[i] !== null) lastSeen[pi] = player.values[i];
-          });
-        }
-        return acc;
-      }, []);
-
-      var labels = keep.map(function (i) { return formatChartTime(data.timestamps[i]); });
-
+      // Each player gets {x, y} points only at the timestamps where their own
+      // value changed. Chart.js unions the x values across all datasets so the
+      // axis reflects every meaningful moment, but each line only has dots at
+      // its own change points.
       var datasets = data.series.map(function (player, i) {
         var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
         var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+        var lastValue = null;
+        var points = [];
+        data.timestamps.forEach(function (ts, idx) {
+          var v = player.values[idx];
+          if (v === null) return;
+          if (lastValue === null || v !== lastValue) {
+            points.push({ x: formatChartTime(ts), y: v });
+            lastValue = v;
+          }
+        });
         return {
           label: player.name,
-          data: keep.map(function (idx) { return player.values[idx]; }),
+          data: points,
           borderColor: color,
           backgroundColor: alpha,
           fill: false,
           tension: 0.2,
           pointRadius: 3,
           pointHoverRadius: 6,
-          spanGaps: true,
         };
       });
 
       compProgressChart = new Chart(canvas.getContext('2d'), {
         type: 'line',
-        data: { labels: labels, datasets: datasets },
+        data: { datasets: datasets },
         options: {
           responsive: true,
           maintainAspectRatio: false,
