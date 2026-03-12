@@ -468,6 +468,133 @@ function renderLeaderboard(comp, sorted) {
   });
 }
 
+// ── Progress chart ────────────────────────────────────────────────────────────
+
+var CHART_PLAYER_COLORS = [
+  'rgb(56, 189, 248)',   // sky-400
+  'rgb(74, 222, 128)',   // green-400
+  'rgb(251, 191, 36)',   // amber-400
+  'rgb(248, 113, 113)',  // red-400
+  'rgb(192, 132, 252)',  // purple-400
+  'rgb(251, 146, 60)',   // orange-400
+  'rgb(45, 212, 191)',   // teal-400
+  'rgb(251, 113, 133)',  // rose-400
+  'rgb(129, 140, 248)',  // indigo-400
+  'rgb(163, 230, 53)',   // lime-400
+];
+
+var compProgressChart = null;
+
+function formatChartTime(isoString) {
+  var d = new Date(isoString);
+  var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  var h = d.getHours();
+  var ampm = h >= 12 ? 'pm' : 'am';
+  h = h % 12 || 12;
+  var mins = d.getMinutes();
+  return months[d.getMonth()] + ' ' + d.getDate() + ' ' + h + ':' + (mins < 10 ? '0' : '') + mins + ampm;
+}
+
+function renderChart(comp) {
+  var section  = document.getElementById('comp-chart-section');
+  var canvas   = document.getElementById('comp-progress-chart');
+  var loadEl   = document.getElementById('comp-chart-loading');
+  var emptyEl  = document.getElementById('comp-chart-empty');
+  if (!section || !canvas) return;
+
+  // Hide chart entirely for upcoming competitions
+  if (getStatus(comp) === 'upcoming') {
+    section.classList.add('hidden');
+    return;
+  }
+
+  // Destroy previous instance if re-rendering after refresh
+  if (compProgressChart) {
+    compProgressChart.destroy();
+    compProgressChart = null;
+  }
+
+  loadEl.classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+
+  fetch('/api/competitions/_?compId=' + encodeURIComponent(comp.id) + '&action=chart-history')
+    .then(function (res) { return res.json(); })
+    .then(function (data) {
+      loadEl.classList.add('hidden');
+
+      if (!data.timestamps || !data.timestamps.length) {
+        emptyEl.classList.remove('hidden');
+        return;
+      }
+
+      var isEff = comp.metric === 'ehp' || comp.metric === 'ehb';
+      var labels = data.timestamps.map(formatChartTime);
+
+      var datasets = data.series.map(function (player, i) {
+        var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
+        var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+        return {
+          label: player.name,
+          data: player.values,
+          borderColor: color,
+          backgroundColor: alpha,
+          fill: false,
+          tension: 0.2,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          spanGaps: true,
+        };
+      });
+
+      compProgressChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: labels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 12 },
+            },
+            tooltip: {
+              callbacks: {
+                label: function (ctx) {
+                  var v = ctx.parsed.y;
+                  if (v == null) return null;
+                  return ' ' + ctx.dataset.label + ': ' + (isEff ? v.toFixed(2) : Number(v).toLocaleString());
+                },
+              },
+            },
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
+            },
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(148, 163, 184, 0.2)' },
+              ticks: {
+                color: '#94a3b8',
+                font: { size: 10 },
+                callback: function (v) {
+                  return isEff ? Number(v).toFixed(1) : Number(v).toLocaleString();
+                },
+              },
+            },
+          },
+        },
+      });
+    })
+    .catch(function () {
+      loadEl.classList.add('hidden');
+      emptyEl.textContent = 'Failed to load chart data.';
+      emptyEl.classList.remove('hidden');
+    });
+}
+
 // ── Delete competition ────────────────────────────────────────────────────────
 
 function initDeleteButton(compId) {
@@ -617,6 +744,7 @@ function renderPage(comp) {
   renderScheduleCard(comp);
   renderLeaderCard(comp, sorted);
   renderContributorCard(comp, sorted);
+  renderChart(comp);
   renderLeaderboard(comp, sorted);
   startCountdown(comp);
   initRefreshButton(comp.id, status);

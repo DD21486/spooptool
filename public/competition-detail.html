@@ -37,7 +37,19 @@
     </div>
 
     <!-- Competition header: icon + name + status badges — filled by JS -->
-    <div id="comp-header" class="flex items-center gap-5 mb-8"></div>
+    <div id="comp-header" class="flex items-center gap-5 mb-4"></div>
+
+    <!-- Action bar: Refresh (active only) + Delete -->
+    <div class="flex justify-end gap-2 mb-6">
+      <button type="button" id="refresh-scores-btn"
+        class="hidden px-3 py-1.5 rounded-lg text-xs font-medium text-sky-400 border border-sky-400/30 bg-sky-400/5 hover:bg-sky-400/15 transition-colors">
+        Refresh Scores
+      </button>
+      <button type="button" id="delete-comp-btn"
+        class="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 border border-red-400/30 bg-red-400/5 hover:bg-red-400/15 transition-colors">
+        Delete Competition
+      </button>
+    </div>
 
     <!-- Top info cards: Schedule | Leader | Top Contributor -->
     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
@@ -53,16 +65,18 @@
 
     </div>
 
-    <!-- Action bar: Refresh (active only) + Delete -->
-    <div class="flex justify-end gap-2 mb-4">
-      <button type="button" id="refresh-scores-btn"
-        class="hidden px-3 py-1.5 rounded-lg text-xs font-medium text-sky-400 border border-sky-400/30 bg-sky-400/5 hover:bg-sky-400/15 transition-colors">
-        Refresh Scores
-      </button>
-      <button type="button" id="delete-comp-btn"
-        class="px-3 py-1.5 rounded-lg text-xs font-medium text-red-400 border border-red-400/30 bg-red-400/5 hover:bg-red-400/15 transition-colors">
-        Delete Competition
-      </button>
+    <!-- Progress chart — hidden for upcoming competitions -->
+    <div id="comp-chart-section" class="rounded-xl border border-slate-700 bg-slate-800/50 mb-6">
+      <div class="px-4 py-3 border-b border-slate-700">
+        <h2 class="text-base font-semibold text-slate-100">Progress</h2>
+      </div>
+      <div class="px-4 pt-4 pb-2">
+        <div class="relative" style="height: 280px;">
+          <canvas id="comp-progress-chart"></canvas>
+        </div>
+        <p id="comp-chart-loading" class="text-slate-500 text-sm text-center py-6">Loading chart\u2026</p>
+        <p id="comp-chart-empty" class="hidden text-slate-500 text-sm text-center py-6">No snapshot history yet. Refresh scores to start tracking progress.</p>
+      </div>
     </div>
 
     <!-- Delete confirmation modal -->
@@ -102,6 +116,7 @@
 
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <script src="js/competition-detail.js"></script>
 </body>
 </html>

@@ -386,6 +386,131 @@ async function saveRates(req, res, sql) {
   return res.status(200).json({ ok: true });
 }
 
+// ── CHART HISTORY ─────────────────────────────────────────────────────────────
+// Returns per-player progress over time: { timestamps, series: [{ name, values }] }
+// Each value is the delta gained since competition start at that snapshot time.
+async function getChartHistory(req, res, sql, id) {
+  const compRows = await sql`
+    SELECT id, type, metric, skill_scope, skill, same_skill_for_all, boss, start_time, end_time
+    FROM competitions WHERE id = ${id}
+  `;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+  const comp = compRows[0];
+
+  // Load participants (solo: one row per player; team: one row per player across all teams)
+  const participants = comp.type === 'solo'
+    ? await sql`
+        SELECT c.id AS character_id, c.username, c.game_mode, cp.skill AS participant_skill
+        FROM competition_participants cp
+        JOIN characters c ON c.id = cp.character_id
+        WHERE cp.competition_id = ${id}
+      `
+    : await sql`
+        SELECT c.id AS character_id, c.username, c.game_mode, ct.skill AS participant_skill
+        FROM competition_teams ct
+        JOIN competition_team_members ctm ON ctm.team_id = ct.id
+        JOIN characters c ON c.id = ctm.character_id
+        WHERE ct.competition_id = ${id}
+      `;
+
+  if (!participants.length) return res.status(200).json({ timestamps: [], series: [] });
+
+  // Load all snapshots for these participants, sorted by time
+  const allSnaps = comp.type === 'solo'
+    ? await sql`
+        SELECT cs.character_id, cs.at, cs.data
+        FROM character_snapshots cs
+        JOIN competition_participants cp ON cp.character_id = cs.character_id
+        WHERE cp.competition_id = ${id}
+        ORDER BY cs.character_id, cs.at ASC
+      `
+    : await sql`
+        SELECT DISTINCT ON (cs.character_id, cs.at) cs.character_id, cs.at, cs.data
+        FROM character_snapshots cs
+        JOIN competition_team_members ctm ON ctm.character_id = cs.character_id
+        JOIN competition_teams ct ON ct.id = ctm.team_id
+        WHERE ct.competition_id = ${id}
+        ORDER BY cs.character_id, cs.at ASC
+      `;
+
+  // Pre-fetch efficiency rates (mirrors getCompetition logic)
+  let rates = [];
+  if (comp.metric === 'ehp') {
+    const rateRows = await sql`SELECT game_mode, rates FROM ehp_rates`;
+    for (const row of rateRows) {
+      for (const entry of (Array.isArray(row.rates) ? row.rates : [])) {
+        const skill = (entry.skill || '').toLowerCase();
+        for (const m of (entry.methods || [])) {
+          rates.push({ game_mode: row.game_mode, skill, start_exp: Number(m.startExp || 0), rate: Number(m.rate || 0) });
+        }
+      }
+    }
+  } else if (comp.metric === 'ehb') {
+    const rateRows = await sql`SELECT rates FROM ehb_rates LIMIT 1`;
+    if (rateRows.length) {
+      for (const entry of (Array.isArray(rateRows[0].rates) ? rateRows[0].rates : [])) {
+        const boss = (entry.boss || '').toLowerCase();
+        const methods = Array.isArray(entry.methods) && entry.methods.length
+          ? entry.methods
+          : (entry.rate != null ? [{ startKc: 0, rate: entry.rate }] : []);
+        for (const m of methods) {
+          rates.push({ boss, start_kc: Number(m.startKc ?? m.startExp ?? 0), rate: Number(m.rate || 0) });
+        }
+      }
+    }
+  }
+
+  // Group snapshots by character (already sorted ASC)
+  const snapsByChar = {};
+  for (const snap of allSnaps) {
+    if (!snapsByChar[snap.character_id]) snapsByChar[snap.character_id] = [];
+    snapsByChar[snap.character_id].push(snap);
+  }
+
+  const startTimeMs = new Date(comp.start_time).getTime();
+
+  // Start snapshot per player: most recent at or before start_time
+  const startDataByChar = {};
+  for (const p of participants) {
+    const snaps = snapsByChar[p.character_id] || [];
+    let startSnap = null;
+    for (const s of snaps) {
+      if (new Date(s.at).getTime() <= startTimeMs) startSnap = s;
+      else break;
+    }
+    startDataByChar[p.character_id] = startSnap ? startSnap.data : null;
+  }
+
+  // Collect unique chart timestamps (at or after start_time), sorted
+  const tsSet = new Set();
+  for (const snap of allSnaps) {
+    if (new Date(snap.at).getTime() >= startTimeMs) tsSet.add(new Date(snap.at).toISOString());
+  }
+  const timestamps = [...tsSet].sort();
+  if (!timestamps.length) return res.status(200).json({ timestamps: [], series: [] });
+
+  // Build one series per player
+  const series = participants.map(p => {
+    const snaps = snapsByChar[p.character_id] || [];
+    const startData = startDataByChar[p.character_id];
+    const values = timestamps.map(ts => {
+      const tsMs = new Date(ts).getTime();
+      // Most recent snapshot at or before this timestamp
+      let snap = null;
+      for (const s of snaps) {
+        if (new Date(s.at).getTime() <= tsMs) snap = s;
+        else break;
+      }
+      if (!snap) return null;
+      const { delta } = computeValues(startData, snap.data, comp, p.participant_skill, p.game_mode, rates);
+      return delta;
+    });
+    return { name: p.username, values };
+  });
+
+  return res.status(200).json({ timestamps, series });
+}
+
 // ── GET DETAIL ────────────────────────────────────────────────────────────────
 async function getCompetition(req, res, sql, id) {
   const compRows = await sql`
@@ -681,6 +806,8 @@ module.exports = async function handler(req, res) {
       if (req.method === 'POST') return await startSnapshotCompetition(req, res, sql, id);
     } else if (action === 'refresh') {
       if (req.method === 'POST') return await refreshSnapshotCompetition(req, res, sql, id);
+    } else if (action === 'chart-history') {
+      if (req.method === 'GET') return await getChartHistory(req, res, sql, id);
     } else {
       if (req.method === 'GET')    return await getCompetition(req, res, sql, id);
       if (req.method === 'DELETE') return await deleteCompetition(req, res, sql, id);
