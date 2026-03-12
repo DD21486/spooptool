@@ -468,6 +468,8 @@ async function getChartHistory(req, res, sql, id) {
   }
 
   const startTimeMs = new Date(comp.start_time).getTime();
+  // Cap chart data at end_time so ended competitions don't show post-competition snapshots.
+  const effectiveEndMs = Math.min(Date.now(), new Date(comp.end_time).getTime());
 
   // Start snapshot per player: most recent at or before start_time
   const startDataByChar = {};
@@ -481,10 +483,11 @@ async function getChartHistory(req, res, sql, id) {
     startDataByChar[p.character_id] = startSnap ? startSnap.data : null;
   }
 
-  // Collect unique chart timestamps (at or after start_time), sorted
+  // Collect unique chart timestamps within the competition window, sorted
   const tsSet = new Set();
   for (const snap of allSnaps) {
-    if (new Date(snap.at).getTime() >= startTimeMs) tsSet.add(new Date(snap.at).toISOString());
+    const snapMs = new Date(snap.at).getTime();
+    if (snapMs >= startTimeMs && snapMs <= effectiveEndMs) tsSet.add(new Date(snap.at).toISOString());
   }
   const timestamps = [...tsSet].sort();
   if (!timestamps.length) return res.status(200).json({ timestamps: [], series: [] });
