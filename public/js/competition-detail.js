@@ -565,7 +565,7 @@ function renderChart(comp) {
           borderColor: color,
           backgroundColor: alpha,
           fill: false,
-          tension: 0.2,
+          tension: 0,
           pointRadius: 3,
           pointHoverRadius: 6,
           spanGaps: true,
