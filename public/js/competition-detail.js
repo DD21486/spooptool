@@ -578,7 +578,7 @@ function renderChart(comp) {
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          interaction: { mode: 'index', intersect: false },
+          interaction: { mode: 'point', intersect: true },
           plugins: {
             legend: {
               position: 'bottom',
