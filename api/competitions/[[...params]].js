@@ -651,6 +651,70 @@ async function getCompetition(req, res, sql, id) {
   return res.status(200).json(result);
 }
 
+// ── SKILL BREAKDOWN ───────────────────────────────────────────────────────────
+// Returns per-skill XP or EHP gained for one player in a total competition.
+async function getSkillBreakdown(req, res, sql, id) {
+  const characterName = (req.query.characterName || '').trim();
+  if (!characterName) return res.status(400).json({ error: 'characterName required' });
+
+  const compRows = await sql`
+    SELECT metric, skill_scope, start_time, end_time
+    FROM competitions WHERE id = ${id}
+  `;
+  if (!compRows.length) return res.status(404).json({ error: 'Competition not found' });
+  const comp = compRows[0];
+
+  if (comp.skill_scope !== 'total') return res.status(200).json({ skills: [] });
+
+  const now = Date.now();
+  const endMs = new Date(comp.end_time).getTime();
+  const effectiveEnd = now <= endMs ? new Date(now).toISOString() : comp.end_time;
+
+  const charRows = await sql`
+    SELECT id, game_mode FROM characters WHERE LOWER(username) = LOWER(${characterName}) LIMIT 1
+  `;
+  if (!charRows.length) return res.status(404).json({ error: 'Character not found' });
+  const char = charRows[0];
+
+  const [startSnaps, endSnaps] = await Promise.all([
+    sql`SELECT data FROM character_snapshots WHERE character_id = ${char.id} AND at <= ${comp.start_time} ORDER BY at DESC LIMIT 1`,
+    sql`SELECT data FROM character_snapshots WHERE character_id = ${char.id} AND at <= ${effectiveEnd} ORDER BY at DESC LIMIT 1`,
+  ]);
+  const startData = startSnaps.length ? startSnaps[0].data : null;
+  const endData   = endSnaps.length   ? endSnaps[0].data   : null;
+
+  const skillDeltas = [];
+
+  if (comp.metric === 'xp') {
+    const skillKeys = endData ? Object.keys(endData.skills || {}).filter(k => k !== 'overall') : [];
+    for (const skillKey of skillKeys) {
+      const delta = Math.max(0, xpForSkill(endData, skillKey) - xpForSkill(startData, skillKey));
+      if (delta > 0) skillDeltas.push({ skill: skillKey, delta });
+    }
+  } else if (comp.metric === 'ehp') {
+    const rateRows = await sql`SELECT game_mode, rates FROM ehp_rates`;
+    const rates = [];
+    for (const row of rateRows) {
+      for (const entry of (Array.isArray(row.rates) ? row.rates : [])) {
+        const skill = (entry.skill || '').toLowerCase();
+        for (const m of (entry.methods || [])) {
+          rates.push({ game_mode: row.game_mode, skill, start_exp: Number(m.startExp || 0), rate: Number(m.rate || 0) });
+        }
+      }
+    }
+    const mode = (char.game_mode || 'main').toLowerCase();
+    const effectiveMode = mode === 'hardcore' ? 'ironman' : mode;
+    const uniqueSkills = [...new Set(rates.filter(r => r.game_mode === effectiveMode).map(r => r.skill))];
+    for (const skill of uniqueSkills) {
+      const r = computeEHPGained(xpForSkill(startData, skill), xpForSkill(endData, skill), skill, rates, char.game_mode);
+      if (r.delta > 0) skillDeltas.push({ skill, delta: r.delta });
+    }
+  }
+
+  skillDeltas.sort((a, b) => b.delta - a.delta);
+  return res.status(200).json({ skills: skillDeltas });
+}
+
 // ── SNAPSHOT HELPERS ──────────────────────────────────────────────────────────
 
 function buildSnapshotData(player) {
@@ -811,6 +875,8 @@ module.exports = async function handler(req, res) {
       if (req.method === 'POST') return await refreshSnapshotCompetition(req, res, sql, id);
     } else if (action === 'chart-history') {
       if (req.method === 'GET') return await getChartHistory(req, res, sql, id);
+    } else if (action === 'skill-breakdown') {
+      if (req.method === 'GET') return await getSkillBreakdown(req, res, sql, id);
     } else {
       if (req.method === 'GET')    return await getCompetition(req, res, sql, id);
       if (req.method === 'DELETE') return await deleteCompetition(req, res, sql, id);

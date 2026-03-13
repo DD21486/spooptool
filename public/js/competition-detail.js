@@ -353,11 +353,13 @@ function renderLeaderboard(comp, sorted) {
 
   var isTeam       = comp.type === 'team';
   var isBoss       = comp.category === 'boss';
+  var isTotal      = comp.skill_scope === 'total' || comp.skillScope === 'total';
   // Show per-player skill column only when each participant has a different skill
   var showSkillCol = comp.category === 'skill' && comp.skillScope === 'specific' && !comp.sameSkillForAll;
   var startLabel   = isBoss ? (comp.metric === 'ehb' ? 'Starting EHB' : 'Starting KC')  : (comp.metric === 'ehp' ? 'Starting EHP' : 'Starting XP');
   var currentLabel = isBoss ? (comp.metric === 'ehb' ? 'Current EHB'  : 'Current KC')   : (comp.metric === 'ehp' ? 'Current EHP'  : 'Current XP');
   var gainedLabel  = isBoss ? (comp.metric === 'ehb' ? 'EHB Gained'   : 'KC Gained')    : (comp.metric === 'ehp' ? 'EHP Gained'   : 'XP Gained');
+  var colCount     = 5 + (showSkillCol ? 1 : 0);
 
   // ── Table header ──────────────────────────────────────────────────────────
   var thClass = 'text-right px-4 py-2.5 text-xs font-medium text-slate-400';
@@ -398,10 +400,21 @@ function renderLeaderboard(comp, sorted) {
       tbodyHtml += '</tr>';
 
       // Player sub-rows (open by default)
-      team.players.forEach(function (player) {
-        tbodyHtml += '<tr class="player-row border-b border-slate-700/40 bg-slate-800/10" data-team-member="' + teamId + '">';
+      team.players.forEach(function (player, pIdx) {
+        var playerIdx    = teamId + '-p' + pIdx;
+        var playerRowClass = 'player-row border-b border-slate-700/40 bg-slate-800/10';
+        var nameContent;
+        if (isTotal) {
+          playerRowClass += ' expandable-player-row cursor-pointer select-none hover:bg-slate-800/30';
+          nameContent = '<span class="breakdown-arrow text-slate-500 text-xs mr-2">&#9654;</span>' + escHtml(player.name);
+        } else {
+          nameContent = escHtml(player.name);
+        }
+
+        tbodyHtml += '<tr class="' + playerRowClass + '" data-team-member="' + teamId + '"'
+          + (isTotal ? ' data-player-idx="' + escAttr(playerIdx) + '" data-player-name="' + escAttr(player.name) + '"' : '') + '>';
         tbodyHtml += '<td class="px-4 py-2"></td>';
-        tbodyHtml += '<td class="px-4 py-2 text-slate-300 text-sm pl-10">' + escHtml(player.name) + '</td>';
+        tbodyHtml += '<td class="px-4 py-2 text-slate-300 text-sm pl-10">' + nameContent + '</td>';
 
         if (showSkillCol) {
           tbodyHtml += '<td class="px-4 py-2 text-slate-400 text-sm">';
@@ -420,6 +433,15 @@ function renderLeaderboard(comp, sorted) {
         tbodyHtml += '<td class="px-4 py-2 text-right font-mono text-slate-400 text-sm">'
           + escHtml(formatMetricValue(player.value, comp)) + '</td>';
         tbodyHtml += '</tr>';
+
+        if (isTotal) {
+          // breakdown-team attr (not data-team-member) so team collapse doesn't auto-show it
+          tbodyHtml += '<tr class="breakdown-row hidden" data-breakdown-team="' + teamId + '" data-player-idx="' + escAttr(playerIdx) + '" data-player-name="' + escAttr(player.name) + '">';
+          tbodyHtml += '<td colspan="' + colCount + '" class="px-8 py-3 bg-slate-900/30 border-b border-slate-700/50">';
+          tbodyHtml += '<p class="breakdown-loading text-slate-500 text-sm">Loading breakdown\u2026</p>';
+          tbodyHtml += '<div class="breakdown-content hidden"></div>';
+          tbodyHtml += '</td></tr>';
+        }
       });
     });
   } else {
@@ -431,9 +453,19 @@ function renderLeaderboard(comp, sorted) {
                     : rank === 3 ? '<span class="text-amber-700">&#129353;</span>'
                     : rank;
 
-      tbodyHtml += '<tr class="border-b border-slate-700/50 hover:bg-slate-800/40">';
+      var rowClass = 'border-b border-slate-700/50 hover:bg-slate-800/40';
+      var nameContent;
+      if (isTotal) {
+        rowClass += ' expandable-player-row cursor-pointer select-none';
+        nameContent = '<span class="breakdown-arrow text-slate-500 text-xs mr-2">&#9654;</span>' + escHtml(player.name);
+      } else {
+        nameContent = escHtml(player.name);
+      }
+
+      tbodyHtml += '<tr class="' + rowClass + '"'
+        + (isTotal ? ' data-player-idx="' + idx + '" data-player-name="' + escAttr(player.name) + '"' : '') + '>';
       tbodyHtml += '<td class="px-4 py-3 text-sm font-medium text-slate-300">' + rankBadge + '</td>';
-      tbodyHtml += '<td class="px-4 py-3 font-medium text-slate-100">' + escHtml(player.name) + '</td>';
+      tbodyHtml += '<td class="px-4 py-3 font-medium text-slate-100">' + nameContent + '</td>';
       if (showSkillCol) {
         tbodyHtml += '<td class="px-4 py-3 text-slate-400 text-sm">';
         if (player.skill) {
@@ -450,6 +482,14 @@ function renderLeaderboard(comp, sorted) {
       tbodyHtml += '<td class="px-4 py-3 text-right font-mono text-green-400">'
         + escHtml(formatMetricValue(player.value, comp)) + '</td>';
       tbodyHtml += '</tr>';
+
+      if (isTotal) {
+        tbodyHtml += '<tr class="breakdown-row hidden" data-player-idx="' + idx + '" data-player-name="' + escAttr(player.name) + '">';
+        tbodyHtml += '<td colspan="' + colCount + '" class="px-8 py-3 bg-slate-900/30 border-b border-slate-700/50">';
+        tbodyHtml += '<p class="breakdown-loading text-slate-500 text-sm">Loading breakdown\u2026</p>';
+        tbodyHtml += '<div class="breakdown-content hidden"></div>';
+        tbodyHtml += '</td></tr>';
+      }
     });
   }
 
@@ -463,7 +503,80 @@ function renderLeaderboard(comp, sorted) {
       var arrow    = row.querySelector('.collapse-arrow');
       var willHide = members.length > 0 && !members[0].classList.contains('hidden');
       members.forEach(function (m) { m.classList.toggle('hidden', willHide); });
+      // Also hide any open breakdown rows when collapsing the team
+      if (willHide) {
+        tbodyEl.querySelectorAll('[data-breakdown-team="' + teamId + '"]').forEach(function (m) {
+          m.classList.add('hidden');
+        });
+      }
       if (arrow) arrow.innerHTML = willHide ? '&#9654;' : '&#9660;'; // ▶ or ▼
+    });
+  });
+
+  if (isTotal) initBreakdownRows(comp, tbodyEl);
+}
+
+function initBreakdownRows(comp, tbodyEl) {
+  var isEff = comp.metric === 'ehp';
+  breakdownCache = {};
+
+  tbodyEl.querySelectorAll('.expandable-player-row').forEach(function (row) {
+    var playerName = row.dataset.playerName;
+    var playerIdx  = row.dataset.playerIdx;
+
+    row.addEventListener('click', function () {
+      var breakdownRow = tbodyEl.querySelector('.breakdown-row[data-player-idx="' + playerIdx + '"]');
+      if (!breakdownRow) return;
+
+      var isHidden  = breakdownRow.classList.contains('hidden');
+      var arrow     = row.querySelector('.breakdown-arrow');
+
+      if (!isHidden) {
+        breakdownRow.classList.add('hidden');
+        if (arrow) arrow.innerHTML = '&#9654;';
+        return;
+      }
+
+      breakdownRow.classList.remove('hidden');
+      if (arrow) arrow.innerHTML = '&#9660;';
+
+      if (breakdownCache[playerName] !== undefined) return; // already fetched
+
+      var loadEl    = breakdownRow.querySelector('.breakdown-loading');
+      var contentEl = breakdownRow.querySelector('.breakdown-content');
+
+      fetch('/api/competitions/_?compId=' + encodeURIComponent(comp.id)
+        + '&action=skill-breakdown&characterName=' + encodeURIComponent(playerName))
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+          var skills = data.skills || [];
+          breakdownCache[playerName] = skills;
+          if (loadEl) loadEl.classList.add('hidden');
+          if (!contentEl) return;
+
+          if (!skills.length) {
+            contentEl.innerHTML = '<p class="text-slate-500 text-sm text-center py-1">No gains recorded.</p>';
+          } else {
+            var html = '<div class="grid gap-x-6 gap-y-1.5 py-1" style="grid-template-columns: repeat(3, minmax(0, 1fr));">';
+            skills.forEach(function (s) {
+              var displayName = s.skill.charAt(0).toUpperCase() + s.skill.slice(1);
+              var valueStr    = isEff ? Number(s.delta).toFixed(2) : Number(s.delta).toLocaleString();
+              html += '<div class="flex items-center justify-between gap-2">';
+              html += '<span class="flex items-center gap-1.5">';
+              html += '<img src="' + escAttr(getSkillIconSrc(displayName)) + '" class="w-4 h-4 object-contain" alt="" />';
+              html += '<span class="text-slate-300 text-sm">' + escHtml(displayName) + '</span>';
+              html += '</span>';
+              html += '<span class="font-mono text-green-400 text-sm">' + escHtml(valueStr) + '</span>';
+              html += '</div>';
+            });
+            html += '</div>';
+            contentEl.innerHTML = html;
+          }
+          contentEl.classList.remove('hidden');
+        })
+        .catch(function () {
+          if (loadEl) loadEl.textContent = 'Failed to load breakdown.';
+        });
     });
   });
 }
@@ -484,6 +597,7 @@ var CHART_PLAYER_COLORS = [
 ];
 
 var compProgressChart = null;
+var breakdownCache = {};
 
 function formatChartTime(isoString) {
   var d = new Date(isoString);
