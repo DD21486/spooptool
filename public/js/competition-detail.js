@@ -609,11 +609,99 @@ function formatChartTime(isoString) {
   return months[d.getMonth()] + ' ' + d.getDate() + ' ' + h + ':' + (mins < 10 ? '0' : '') + mins + ampm;
 }
 
+// Builds { labels, datasets } for individual player lines.
+function buildIndividualChartState(data) {
+  var allChangeTs = new Set();
+  var playerChangeMaps = data.series.map(function (player) {
+    var map = {};
+    var lastValue = null;
+    data.timestamps.forEach(function (ts, idx) {
+      var v = player.values[idx];
+      if (v === null) return;
+      if (lastValue === null || v !== lastValue) {
+        map[ts] = v;
+        allChangeTs.add(ts);
+        lastValue = v;
+      }
+    });
+    return map;
+  });
+  var changeTsList = data.timestamps.filter(function (ts) { return allChangeTs.has(ts); });
+  var datasets = data.series.map(function (player, i) {
+    var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
+    var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+    var map = playerChangeMaps[i];
+    return {
+      label: player.name,
+      data: changeTsList.map(function (ts) { return map.hasOwnProperty(ts) ? map[ts] : null; }),
+      borderColor: color, backgroundColor: alpha,
+      fill: false, tension: 0, pointRadius: 3, pointHoverRadius: 6, spanGaps: true,
+    };
+  });
+  return { labels: changeTsList.map(formatChartTime), datasets: datasets };
+}
+
+// Builds { labels, datasets } with one line per team (sum of all member gains).
+function buildTeamChartState(data, comp) {
+  if (!comp.teams || !comp.teams.length) return null;
+
+  var playerTeamMap = {};
+  comp.teams.forEach(function (team) {
+    (team.players || []).forEach(function (p) { playerTeamMap[p.name] = team.name; });
+  });
+
+  var teamNames = [];
+  comp.teams.forEach(function (team) {
+    if (teamNames.indexOf(team.name) === -1) teamNames.push(team.name);
+  });
+
+  // Compute each team's cumulative total at every timestamp (null members contribute 0)
+  var teamSeries = teamNames.map(function (teamName) {
+    var members = data.series.filter(function (s) { return playerTeamMap[s.name] === teamName; });
+    var values = data.timestamps.map(function (ts, idx) {
+      var total = 0;
+      members.forEach(function (m) { if (m.values[idx] !== null) total += m.values[idx]; });
+      return total;
+    });
+    return { name: teamName, values: values };
+  });
+
+  var allChangeTs = new Set();
+  var teamChangeMaps = teamSeries.map(function (team) {
+    var map = {};
+    var lastValue = null;
+    data.timestamps.forEach(function (ts, idx) {
+      var v = team.values[idx];
+      if (lastValue === null || v !== lastValue) {
+        map[ts] = v;
+        allChangeTs.add(ts);
+        lastValue = v;
+      }
+    });
+    return map;
+  });
+
+  var changeTsList = data.timestamps.filter(function (ts) { return allChangeTs.has(ts); });
+  var datasets = teamSeries.map(function (team, i) {
+    var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
+    var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
+    var map = teamChangeMaps[i];
+    return {
+      label: team.name,
+      data: changeTsList.map(function (ts) { return map.hasOwnProperty(ts) ? map[ts] : null; }),
+      borderColor: color, backgroundColor: alpha,
+      fill: false, tension: 0, pointRadius: 3, pointHoverRadius: 6, spanGaps: true,
+    };
+  });
+  return { labels: changeTsList.map(formatChartTime), datasets: datasets };
+}
+
 function renderChart(comp) {
-  var section  = document.getElementById('comp-chart-section');
-  var canvas   = document.getElementById('comp-progress-chart');
-  var loadEl   = document.getElementById('comp-chart-loading');
-  var emptyEl  = document.getElementById('comp-chart-empty');
+  var section   = document.getElementById('comp-chart-section');
+  var canvas    = document.getElementById('comp-progress-chart');
+  var loadEl    = document.getElementById('comp-chart-loading');
+  var emptyEl   = document.getElementById('comp-chart-empty');
+  var toggleEl  = document.getElementById('chart-view-toggle');
   if (!section || !canvas) return;
 
   // Hide chart entirely for upcoming competitions
@@ -628,6 +716,7 @@ function renderChart(comp) {
     compProgressChart = null;
   }
 
+  if (toggleEl) toggleEl.classList.add('hidden');
   loadEl.classList.remove('hidden');
   emptyEl.classList.add('hidden');
 
@@ -641,92 +730,85 @@ function renderChart(comp) {
         return;
       }
 
-      var isEff = comp.metric === 'ehp' || comp.metric === 'ehb';
+      var isEff             = comp.metric === 'ehp' || comp.metric === 'ehb';
+      var individualState   = buildIndividualChartState(data);
+      var teamState         = comp.type === 'team' ? buildTeamChartState(data, comp) : null;
+      var initialState      = teamState || individualState;
 
-      // Collect the union of all timestamps where any player changed, in the
-      // original chronological order from the API. Use these as the shared
-      // x-axis labels. Each dataset uses index-based values (not {x,y}) with
-      // null at positions where that player didn't change. spanGaps:true then
-      // draws a direct line between their actual change points, skipping nulls,
-      // so there are no flat segments and no label-matching issues.
-      var allChangeTs = new Set();
-      var playerChangeMaps = data.series.map(function (player) {
-        var map = {};
-        var lastValue = null;
-        data.timestamps.forEach(function (ts, idx) {
-          var v = player.values[idx];
-          if (v === null) return;
-          if (lastValue === null || v !== lastValue) {
-            map[ts] = v;
-            allChangeTs.add(ts);
-            lastValue = v;
-          }
-        });
-        return map;
-      });
-
-      // Preserve original sort order from data.timestamps
-      var changeTsList = data.timestamps.filter(function (ts) { return allChangeTs.has(ts); });
-      var labels = changeTsList.map(formatChartTime);
-
-      var datasets = data.series.map(function (player, i) {
-        var color = CHART_PLAYER_COLORS[i % CHART_PLAYER_COLORS.length];
-        var alpha = color.replace('rgb(', 'rgba(').replace(')', ', 0.08)');
-        var map = playerChangeMaps[i];
-        return {
-          label: player.name,
-          data: changeTsList.map(function (ts) { return map.hasOwnProperty(ts) ? map[ts] : null; }),
-          borderColor: color,
-          backgroundColor: alpha,
-          fill: false,
-          tension: 0,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          spanGaps: true,
-        };
-      });
-
-      compProgressChart = new Chart(canvas.getContext('2d'), {
-        type: 'line',
-        data: { labels: labels, datasets: datasets },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          interaction: { mode: 'point', intersect: true },
-          plugins: {
-            legend: {
-              position: 'bottom',
-              labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 12 },
-            },
-            tooltip: {
-              callbacks: {
-                label: function (ctx) {
-                  var v = ctx.parsed.y;
-                  if (v == null) return null;
-                  return ' ' + ctx.dataset.label + ': ' + (isEff ? v.toFixed(2) : Number(v).toLocaleString());
-                },
-              },
-            },
+      var chartOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        interaction: { mode: 'point', intersect: true },
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { color: '#94a3b8', font: { size: 11 }, boxWidth: 12, padding: 12 },
           },
-          scales: {
-            x: {
-              grid: { color: 'rgba(148, 163, 184, 0.2)' },
-              ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
-            },
-            y: {
-              beginAtZero: true,
-              grid: { color: 'rgba(148, 163, 184, 0.2)' },
-              ticks: {
-                color: '#94a3b8',
-                font: { size: 10 },
-                callback: function (v) {
-                  return isEff ? Number(v).toFixed(1) : Number(v).toLocaleString();
-                },
+          tooltip: {
+            callbacks: {
+              label: function (ctx) {
+                var v = ctx.parsed.y;
+                if (v == null) return null;
+                return ' ' + ctx.dataset.label + ': ' + (isEff ? v.toFixed(2) : Number(v).toLocaleString());
               },
             },
           },
         },
+        scales: {
+          x: {
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { size: 10 } },
+          },
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(148, 163, 184, 0.2)' },
+            ticks: {
+              color: '#94a3b8',
+              font: { size: 10 },
+              callback: function (v) {
+                return isEff ? Number(v).toFixed(1) : Number(v).toLocaleString();
+              },
+            },
+          },
+        },
+      };
+
+      compProgressChart = new Chart(canvas.getContext('2d'), {
+        type: 'line',
+        data: { labels: initialState.labels, datasets: initialState.datasets },
+        options: chartOptions,
       });
+
+      // Wire up Teams / Players toggle for team competitions
+      if (teamState && toggleEl) {
+        var btnClass      = 'px-3 py-1 text-xs transition-colors';
+        var activeClass   = btnClass + ' bg-slate-600 text-slate-100';
+        var inactiveClass = btnClass + ' bg-transparent text-slate-400 hover:text-slate-200';
+
+        toggleEl.innerHTML = '<div class="flex rounded-md overflow-hidden border border-slate-600">'
+          + '<button id="chart-btn-teams" class="' + activeClass + '">Teams</button>'
+          + '<button id="chart-btn-players" class="' + inactiveClass + '">Players</button>'
+          + '</div>';
+        toggleEl.classList.remove('hidden');
+
+        var btnTeams   = document.getElementById('chart-btn-teams');
+        var btnPlayers = document.getElementById('chart-btn-players');
+
+        function applyState(state, activeBtn, inactiveBtn) {
+          compProgressChart.data.labels   = state.labels;
+          compProgressChart.data.datasets = state.datasets;
+          compProgressChart.update();
+          activeBtn.className   = activeClass;
+          inactiveBtn.className = inactiveClass;
+        }
+
+        btnTeams.addEventListener('click', function () {
+          applyState(teamState, btnTeams, btnPlayers);
+        });
+        btnPlayers.addEventListener('click', function () {
+          applyState(individualState, btnPlayers, btnTeams);
+        });
+      }
     })
     .catch(function () {
       loadEl.classList.add('hidden');
