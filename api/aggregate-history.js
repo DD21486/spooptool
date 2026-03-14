@@ -200,29 +200,27 @@ const WEEKLY_WINNERS_WEEKS = 52;
 
 async function handleWeeklyWinners(sql, res) {
   const weeksParam = WEEKLY_WINNERS_WEEKS;
-  const weekEndRow = await sql`
-    SELECT (date_trunc('week', NOW() + interval '1 day') - interval '1 day') AS week_end
-  `;
-  const weekEnd = weekEndRow.length && weekEndRow[0].week_end ? new Date(weekEndRow[0].week_end) : new Date();
+  const daysBack = weeksParam * 7;
   const chars = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
   const idToUsername = {};
   chars.forEach((c) => { idToUsername[c.id] = c.username; });
 
-  const daysBack = weeksParam * 7;
   const snapshotRows = await sql`
     SELECT character_id, at, data
     FROM character_snapshots
-    WHERE at >= ${weekEnd} - (${daysBack} * interval '1 day')
-      AND at < ${weekEnd}
+    WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - make_interval(days => ${daysBack})
+      AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
     ORDER BY at ASC
   `;
   const lootRows = await sql`
     SELECT LOWER(TRIM(username)) AS key_username, MAX(TRIM(username)) AS username, at, total_value_gp
     FROM loot_drops
-    WHERE at >= ${weekEnd} - (${daysBack} * interval '1 day')
-      AND at < ${weekEnd}
+    WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - make_interval(days => ${daysBack})
+      AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
   `;
 
+  const weekEndRow = await sql`SELECT (date_trunc('week', NOW() + interval '1 day') - interval '1 day') AS week_end`;
+  const weekEnd = weekEndRow.length && weekEndRow[0].week_end ? new Date(weekEndRow[0].week_end) : new Date();
   const msPerWeek = 7 * 24 * 60 * 60 * 1000;
   const xpWinners = [];
   const bossWinners = [];
@@ -275,11 +273,15 @@ async function handleWeeklyWinners(sql, res) {
     lootWinners.push(lootSorted[0] ? lootSorted[0].username : null);
   }
 
+  const firstNonNull = (arr) => (arr && Array.isArray(arr) ? arr.find((x) => x != null && String(x).trim() !== '') : null) ?? null;
   res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
   return res.status(200).json({
     xp: xpWinners,
     boss: bossWinners,
     loot: lootWinners,
+    xpLatest: firstNonNull(xpWinners),
+    bossLatest: firstNonNull(bossWinners),
+    lootLatest: firstNonNull(lootWinners),
   });
 }
 

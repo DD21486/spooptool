@@ -999,13 +999,17 @@
   function renderAwards(winners) {
     const norm = (s) => (s || '').toString().trim().toLowerCase();
     const current = norm(name);
-    const countWins = (arr) => {
-      if (Array.isArray(arr)) return arr.filter((u) => norm(u) === current).length;
-      return arr && norm(arr) === current ? 1 : 0;
+    const countWins = (arr, legacySingle) => {
+      if (Array.isArray(arr)) {
+        const n = arr.filter((u) => norm(u) === current).length;
+        if (n > 0) return n;
+        return legacySingle != null && norm(legacySingle) === current ? 1 : 0;
+      }
+      return arr != null && arr !== '' && norm(arr) === current ? 1 : 0;
     };
-    const xpCount = countWins(winners.xp);
-    const bossCount = countWins(winners.boss);
-    const lootCount = countWins(winners.loot);
+    const xpCount = countWins(winners.xp, winners.xpLatest);
+    const bossCount = countWins(winners.boss, winners.bossLatest);
+    const lootCount = countWins(winners.loot, winners.lootLatest);
     const medalHtml = '<img src="/assets/SpoopMedal.png" class="award-medal" alt="" width="28" height="28" />';
     const awardsXp = document.getElementById('awards-xp');
     const awardsBoss = document.getElementById('awards-boss');
