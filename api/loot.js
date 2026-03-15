@@ -856,16 +856,17 @@ module.exports = async function handler(req, res) {
 
       const eventTotalGp = items.reduce((s, i) => s + (Math.max(1, parseInt(i.quantity, 10) || 1) * (parseInt(i.priceEach, 10) || 0)), 0);
 
-      // Deduplicate: Dink sometimes sends the same raid loot twice (e.g. kill 19 and kill 20). Skip if we already have this exact drop in the last 2 minutes.
+      // Deduplicate: Dink sometimes sends the same raid loot twice (e.g. kill 23 and 24). Group by minute so
+      // multiple rows from one webhook (inserted in the same minute) are treated as one batch.
       if (items.length > 0 && source) {
         const dupCheck = await sql`
           SELECT 1 FROM (
-            SELECT at, SUM(total_value_gp) AS event_total, COUNT(*) AS item_count
+            SELECT date_trunc('minute', at) AS bucket, SUM(total_value_gp) AS event_total, COUNT(*) AS item_count
             FROM loot_drops
             WHERE LOWER(TRIM(username)) = LOWER(TRIM(${username}))
               AND TRIM(source) = TRIM(${source})
               AND at > NOW() - interval '2 minutes'
-            GROUP BY at
+            GROUP BY date_trunc('minute', at)
             HAVING SUM(total_value_gp) = ${eventTotalGp}
               AND COUNT(*) = ${items.length}
             LIMIT 1

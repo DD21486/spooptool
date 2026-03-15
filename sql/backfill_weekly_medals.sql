@@ -7,4 +7,4 @@
 
 UPDATE characters SET weekly_xp_wins = 2, weekly_boss_wins = 3, weekly_loot_wins = 0 WHERE LOWER(TRIM(username)) = LOWER(TRIM('VDBL'));
 UPDATE characters SET weekly_xp_wins = 0, weekly_boss_wins = 0, weekly_loot_wins = 3 WHERE LOWER(TRIM(username)) = LOWER(TRIM('NewLineChar'));
-UPDATE characters SET weekly_xp_wins = 1, weekly_boss_wins = 0, weekly_loot_wins = 0 WHERE LOWER(TRIM(username)) = LOWER(TRIM('Legolad'));
+UPDATE characters SET weekly_xp_wins = 1, weekly_boss_wins = 0, weekly_loot_wins = 0 WHERE LOWER(TRIM(username)) = LOWER(TRIM('Legolad52'));
