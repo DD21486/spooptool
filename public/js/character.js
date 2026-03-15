@@ -1003,21 +1003,11 @@
       .catch(() => paintSpoopScore7DayChart([], currentSpoopScore));
   }
 
-  const norm = (s) => (s || '').toString().trim().toLowerCase();
-
-  function renderAwards(winners) {
-    const current = norm(name);
-    const countWins = (arr, legacySingle) => {
-      if (Array.isArray(arr)) {
-        const n = arr.filter((u) => norm(u) === current).length;
-        if (n > 0) return n;
-        return legacySingle != null && norm(legacySingle) === current ? 1 : 0;
-      }
-      return arr != null && arr !== '' && norm(arr) === current ? 1 : 0;
-    };
-    const xpCount = countWins(winners.xp, winners.xpLatest);
-    const bossCount = countWins(winners.boss, winners.bossLatest);
-    const lootCount = countWins(winners.loot, winners.lootLatest);
+  /** Renders medal counts from the character profile (weeklyXpWins, weeklyBossWins, weeklyLootWins). */
+  function renderAwards(counts) {
+    const xpCount = Math.max(0, parseInt(counts.weeklyXpWins, 10) || 0);
+    const bossCount = Math.max(0, parseInt(counts.weeklyBossWins, 10) || 0);
+    const lootCount = Math.max(0, parseInt(counts.weeklyLootWins, 10) || 0);
     const medalHtml = '<img src="/assets/SpoopMedal.png" class="award-medal" alt="" width="28" height="28" />';
     const awardsXp = document.getElementById('awards-xp');
     const awardsBoss = document.getElementById('awards-boss');
@@ -1025,37 +1015,6 @@
     if (awardsXp) awardsXp.innerHTML = Array(xpCount).fill(medalHtml).join('');
     if (awardsBoss) awardsBoss.innerHTML = Array(bossCount).fill(medalHtml).join('');
     if (awardsLoot) awardsLoot.innerHTML = Array(lootCount).fill(medalHtml).join('');
-  }
-
-  function loadAwards() {
-    if (!name) return;
-    Promise.all([
-      fetch(API + '/characters-deltas?lastWeek=1').then((r) => (r.ok ? r.json() : { deltas: [] })),
-      fetch(API + '/loot?leaderboard=1&lastWeek=1').then((r) => (r.ok ? r.json() : { players: [] })),
-      fetch(API + '/weekly-winners').then((r) => (r.ok ? r.json() : {})),
-    ])
-      .then(([deltasData, lootData, weeklyData]) => {
-        const deltas = Array.isArray(deltasData.deltas) ? deltasData.deltas : [];
-        const players = Array.isArray(lootData.players) ? lootData.players : [];
-        const xpWinner = deltas.filter((d) => (d.xpDelta || 0) > 0).sort((a, b) => (b.xpDelta || 0) - (a.xpDelta || 0))[0];
-        const bossWinner = deltas.filter((d) => (d.bossKcDelta || 0) > 0).sort((a, b) => (b.bossKcDelta || 0) - (a.bossKcDelta || 0))[0];
-        const lootWinner = players[0];
-        const lastWeekFromDeltas = {
-          xpLatest: xpWinner ? xpWinner.username : null,
-          bossLatest: bossWinner ? bossWinner.username : null,
-          lootLatest: lootWinner && lootWinner.username ? lootWinner.username : null,
-        };
-        const merged = {
-          xp: weeklyData.xp,
-          boss: weeklyData.boss,
-          loot: weeklyData.loot,
-          xpLatest: lastWeekFromDeltas.xpLatest || weeklyData.xpLatest,
-          bossLatest: lastWeekFromDeltas.bossLatest || weeklyData.bossLatest,
-          lootLatest: lastWeekFromDeltas.lootLatest || weeklyData.lootLatest,
-        };
-        renderAwards(merged);
-      })
-      .catch(() => renderAwards({}));
   }
 
   async function load() {
@@ -1092,7 +1051,7 @@
       }
       render(data);
       fetchLoot();
-      loadAwards();
+      renderAwards(data);
     } catch (e) {
       loadingEl.textContent = 'Failed to load';
       showError(e.message || 'Failed to load character');

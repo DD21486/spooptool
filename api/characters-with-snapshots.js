@@ -19,7 +19,12 @@ async function handleSingleSnapshot(req, res, sql) {
   let rows;
   try {
     rows = await sql`
-      SELECT c.username, c.game_mode, COALESCE(c.luck_score, 0) AS luck_score, cs.data
+      SELECT c.username, c.game_mode,
+        COALESCE(c.luck_score, 0) AS luck_score,
+        COALESCE(c.weekly_xp_wins, 0) AS weekly_xp_wins,
+        COALESCE(c.weekly_boss_wins, 0) AS weekly_boss_wins,
+        COALESCE(c.weekly_loot_wins, 0) AS weekly_loot_wins,
+        cs.data
       FROM characters c
       LEFT JOIN LATERAL (
         SELECT data FROM character_snapshots
@@ -31,7 +36,8 @@ async function handleSingleSnapshot(req, res, sql) {
       LIMIT 1
     `;
   } catch (colErr) {
-    if (colErr && (colErr.message || '').includes('luck_score')) {
+    const msg = colErr && colErr.message ? colErr.message : '';
+    if (msg.includes('luck_score') || msg.includes('weekly_xp_wins') || msg.includes('weekly_boss_wins') || msg.includes('weekly_loot_wins')) {
       rows = await sql`
         SELECT c.username, c.game_mode, cs.data
         FROM characters c
@@ -44,7 +50,12 @@ async function handleSingleSnapshot(req, res, sql) {
         WHERE LOWER(TRIM(c.username)) = LOWER(TRIM(${name}))
         LIMIT 1
       `;
-      if (rows.length) rows[0].luck_score = 0;
+      if (rows.length) {
+        rows[0].luck_score = 0;
+        rows[0].weekly_xp_wins = 0;
+        rows[0].weekly_boss_wins = 0;
+        rows[0].weekly_loot_wins = 0;
+      }
     } else {
       throw colErr;
     }
@@ -56,11 +67,14 @@ async function handleSingleSnapshot(req, res, sql) {
   const data = r.data || {};
   res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
   return res.status(200).json({
-    name:      r.username,
-    mode:      r.game_mode || 'main',
-    skills:    data.skills || {},
-    bosses:    data.bosses || {},
-    luckScore: Number(r.luck_score) || 0,
+    name:            r.username,
+    mode:            r.game_mode || 'main',
+    skills:          data.skills || {},
+    bosses:          data.bosses || {},
+    luckScore:       Number(r.luck_score) || 0,
+    weeklyXpWins:    Math.max(0, parseInt(r.weekly_xp_wins, 10) || 0),
+    weeklyBossWins:  Math.max(0, parseInt(r.weekly_boss_wins, 10) || 0),
+    weeklyLootWins:  Math.max(0, parseInt(r.weekly_loot_wins, 10) || 0),
   });
 }
 
