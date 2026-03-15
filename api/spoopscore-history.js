@@ -43,13 +43,22 @@ module.exports = async function handler(req, res) {
     const characterId = charRows[0].id;
     const username = charRows[0].username || name;
 
-    const rows = await sql`
-      SELECT at_slot, spoop_score, boss_score, skill_score, pet_points
-      FROM spoopscore_snapshots
-      WHERE character_id = ${characterId}
-        AND at_slot >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '8 days'
-      ORDER BY at_slot ASC
-    `;
+    let rows = [];
+    try {
+      rows = await sql`
+        SELECT at_slot, spoop_score, boss_score, skill_score, pet_points
+        FROM spoopscore_snapshots
+        WHERE character_id = ${characterId}
+          AND at_slot >= (NOW() AT TIME ZONE 'UTC') - INTERVAL '8 days'
+        ORDER BY at_slot ASC
+      `;
+    } catch (tableErr) {
+      if (tableErr && tableErr.code === '42P01') {
+        rows = [];
+      } else {
+        throw tableErr;
+      }
+    }
 
     const bySlot = new Map();
     for (const r of rows || []) {
