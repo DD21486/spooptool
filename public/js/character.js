@@ -50,6 +50,13 @@
     if (!key) return '';
     return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
   }
+  /** Boss display name for legend/tables; gauntlet (hiscores) = Crystalline Hunllef. */
+  function bossDisplayName(key) {
+    if (!key) return '';
+    const k = String(key).toLowerCase().trim().replace(/\s+/g, '_');
+    if (k === 'gauntlet' || k === 'crystalline_hunllef') return 'Crystalline Hunllef';
+    return skillLabel(key);
+  }
   /** Map API boss key to /assets/bosses/ filename (exact casing); overrides for names that don't match. */
   function bossImageSrc(bossKey) {
     if (!bossKey) return '';
@@ -333,9 +340,9 @@
     brutus: 0.5,
     wintertodt: 1, kraken: 1,
     tempoross: 2, bryophyta: 2, giant_mole: 2, giantmole: 2, hespori: 2, obor: 2, scurrius: 2, shellbane_gryphon: 2, shellbanegryphon: 2,
-    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, lunar_chests: 3, lunarchests: 3, theatre_of_blood_entry_mode: 3, tombs_of_amascut_entry_mode: 3, the_hueycoatl: 3, hueycoatl: 3, the_royal_titans: 3, royal_titans: 3, royaltitans: 3,
+    amoxliatl: 3, barrows: 3, crazy_archaeologist: 3, crazyarchaeologist: 3, deranged_archaeologist: 3, derangedarchaeologist: 3, grotesque_guardians: 3, grotesqueguardians: 3, king_black_dragon: 3, kingblackdragon: 3, lunar_chests: 3, lunarchests: 3, tombs_of_amascut_entry_mode: 3, the_hueycoatl: 3, hueycoatl: 3, the_royal_titans: 3, royal_titans: 3, royaltitans: 3,
     dagannoth_prime: 4, dagannothprime: 4, dagannoth_rex: 4, dagannothrex: 4, dagannoth_supreme: 4, dagannothsupreme: 4, callisto: 4, chaos_fanatic: 4, chaosfanatic: 4, moons_of_peril: 4, skotizo: 4, sarachnis: 4,
-    crystalline_hunllef: 5, abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, krilsutsaroth: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, tombs_of_amascut: 5, tombsofamascut: 5, venenatis: 5, vorkath: 5, zalcano: 5, zulrah: 5, chaos_elemental: 5, chaoselemental: 5, scorpia: 5,
+    crystalline_hunllef: 5, gauntlet: 5, abyssal_sire: 5, abyssalsire: 5, araxxor: 5, cerberus: 5, chambers_of_xeric: 5, chambersofxeric: 5, commander_zilyana: 5, commanderzilyana: 5, duke_sucellus: 5, dukesucellus: 5, general_graardor: 5, generalgraardor: 5, krilsutsaroth: 5, kril_tsutsaroth: 5, kriltsutsaroth: 5, the_nightmare: 5, nightmare: 5, tombs_of_amascut: 5, tombsofamascut: 5, venenatis: 5, vorkath: 5, zalcano: 5, zulrah: 5, chaos_elemental: 5, chaoselemental: 5, scorpia: 5,
     kalphite_queen: 6, kalphitequeen: 6, kreearra: 6, corporeal_beast: 6, corporealbeast: 6, phantom_muspah: 6, phantommuspah: 6, thermonuclear_smoke_devil: 6, thermonuclearsmokedevil: 6, tztok_jad: 6, tztokjad: 6, vetion: 6, tombs_of_amascut_expert_mode: 6, tombsofamascutexpertmode: 6, alchemical_hydra: 6, alchemicalhydra: 6,
     corrupted_hunllef: 7, corruptedhunllef: 7, the_leviathan: 7, leviathan: 7, the_whisperer: 7, whisperer: 7, the_mimic: 7, mimic: 7, chambers_of_xeric_challenge_mode: 7, chambersofxericchallengemode: 7, vardorvis: 7, yama: 7,
     theatre_of_blood: 8, theatreofblood: 8, phosanis_nightmare: 8, phosanisnightmare: 8, nex: 8,
@@ -486,7 +493,7 @@
         const count = b.count != null ? b.count : (b.kc != null ? b.kc : 0);
         const pts = BOSS_POINTS[normalizeBossKeyForPoints(bossKey)] || 0;
         const total = count * pts + (count >= 1 ? FIRST_KILL_BONUS : 0);
-        return { name: skillLabel(bossKey), count, pts, total };
+        return { name: bossDisplayName(bossKey), count, pts, total };
       })
       .filter((r) => r.total > 0)
       .sort((a, b) => b.total - a.total)
@@ -616,7 +623,7 @@
       const bossImgSrc = bossImageSrc(bossKey);
       const bossIconHtml = bossImgSrc ? '<img src="' + escapeHtml(bossImgSrc) + '" alt="" width="20" height="20" class="w-5 h-5 object-contain shrink-0 rounded-sm" loading="lazy" onerror="this.style.display=\'none\'">' : '';
       return `<tr class="border-b border-slate-700/70 hover:bg-slate-700/30">
-        <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${skillLabel(bossKey)}</span></div></td>
+        <td class="px-4 py-2"><div class="flex items-center gap-2">${bossIconHtml}<span>${bossDisplayName(bossKey)}</span></div></td>
         <td class="px-4 py-2 text-right font-mono">${formatNum(kc)}</td>
         <td class="pl-2 pr-4 py-2 text-right">${last24Boss}</td>
         <td class="px-4 py-2 text-right font-mono text-slate-300">${formatNum(bossScore)}</td>
@@ -996,8 +1003,9 @@
       .catch(() => paintSpoopScore7DayChart([], currentSpoopScore));
   }
 
+  const norm = (s) => (s || '').toString().trim().toLowerCase();
+
   function renderAwards(winners) {
-    const norm = (s) => (s || '').toString().trim().toLowerCase();
     const current = norm(name);
     const countWins = (arr, legacySingle) => {
       if (Array.isArray(arr)) {
@@ -1021,9 +1029,32 @@
 
   function loadAwards() {
     if (!name) return;
-    fetch(API + '/weekly-winners')
-      .then((res) => res.ok ? res.json() : {})
-      .then((data) => renderAwards(data || {}))
+    Promise.all([
+      fetch(API + '/characters-deltas?lastWeek=1').then((r) => (r.ok ? r.json() : { deltas: [] })),
+      fetch(API + '/loot?leaderboard=1&lastWeek=1').then((r) => (r.ok ? r.json() : { players: [] })),
+      fetch(API + '/weekly-winners').then((r) => (r.ok ? r.json() : {})),
+    ])
+      .then(([deltasData, lootData, weeklyData]) => {
+        const deltas = Array.isArray(deltasData.deltas) ? deltasData.deltas : [];
+        const players = Array.isArray(lootData.players) ? lootData.players : [];
+        const xpWinner = deltas.filter((d) => (d.xpDelta || 0) > 0).sort((a, b) => (b.xpDelta || 0) - (a.xpDelta || 0))[0];
+        const bossWinner = deltas.filter((d) => (d.bossKcDelta || 0) > 0).sort((a, b) => (b.bossKcDelta || 0) - (a.bossKcDelta || 0))[0];
+        const lootWinner = players[0];
+        const lastWeekFromDeltas = {
+          xpLatest: xpWinner ? xpWinner.username : null,
+          bossLatest: bossWinner ? bossWinner.username : null,
+          lootLatest: lootWinner && lootWinner.username ? lootWinner.username : null,
+        };
+        const merged = {
+          xp: weeklyData.xp,
+          boss: weeklyData.boss,
+          loot: weeklyData.loot,
+          xpLatest: lastWeekFromDeltas.xpLatest || weeklyData.xpLatest,
+          bossLatest: lastWeekFromDeltas.bossLatest || weeklyData.bossLatest,
+          lootLatest: lastWeekFromDeltas.lootLatest || weeklyData.lootLatest,
+        };
+        renderAwards(merged);
+      })
       .catch(() => renderAwards({}));
   }
 
@@ -1204,7 +1235,7 @@
   }
 
   function openChartForBoss(bossKey) {
-    openChartModal({ boss: bossKey, seriesLabel: skillLabel(bossKey) + ' KC' });
+    openChartModal({ boss: bossKey, seriesLabel: bossDisplayName(bossKey) + ' KC' });
   }
 
   function closeChartModal() {
@@ -1227,7 +1258,7 @@
       if (!byPts[pts]) return;
       const seen = new Set();
       const names = byPts[pts]
-        .map((k) => ({ raw: k, display: skillLabel(k), norm: skillLabel(k).toLowerCase().replace(/\s+/g, '') }))
+        .map((k) => ({ raw: k, display: bossDisplayName(k), norm: bossDisplayName(k).toLowerCase().replace(/\s+/g, '') }))
         .filter(({ norm }) => {
           if (seen.has(norm)) return false;
           seen.add(norm);
