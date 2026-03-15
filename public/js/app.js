@@ -803,7 +803,7 @@
         : (showScore ? formatNum(r.bossPoints) : formatNum(r.kc));
       let pointsSuffix = (bossKey && typeof r.bossPoints === 'number') ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)} pts)</span>` : '';
       if (showScore && r.rawKc != null && (isDelta ? r.rawKc > 0 : true)) {
-        pointsSuffix += ` <span class="text-slate-400 font-mono">(${formatNum(r.rawKc)} kills)</span>`;
+        pointsSuffix += ` <span class="text-slate-400 font-mono">(${formatNum(r.rawKc)} KC)</span>`;
       }
       const displayValue = kcDisplay + pointsSuffix;
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
