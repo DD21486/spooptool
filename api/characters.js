@@ -1,4 +1,5 @@
 const { neon } = require('@neondatabase/serverless');
+const { computeBossScore } = require('../lib/spoopscore');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -72,7 +73,7 @@ async function handleCharactersDeltas(req, res) {
     const deltas = chars.map((c) => {
       const first = firstByChar[c.id];
       const last = lastByChar[c.id];
-      if (!first || !last) return { username: c.username, xpDelta: 0, bossKcDelta: 0, skillDeltas: {}, bossDeltas: {} };
+      if (!first || !last) return { username: c.username, xpDelta: 0, bossKcDelta: 0, bossScoreDelta: 0, skillDeltas: {}, bossDeltas: {} };
       const firstData = first.data || {};
       const lastData = last.data || {};
       const skillKeys = new Set([...Object.keys(firstData.skills || {}), ...Object.keys(lastData.skills || {})]);
@@ -81,10 +82,14 @@ async function handleCharactersDeltas(req, res) {
       const bossKeys = new Set([...Object.keys(firstData.bosses || {}), ...Object.keys(lastData.bosses || {})]);
       const bossDeltas = {};
       for (const key of bossKeys) bossDeltas[key] = Math.max(0, kcForBoss(lastData, key) - kcForBoss(firstData, key));
+      const firstBossScore = computeBossScore(firstData.bosses || {});
+      const lastBossScore = computeBossScore(lastData.bosses || {});
+      const bossScoreDelta = Math.max(0, lastBossScore - firstBossScore);
       return {
         username: c.username,
         xpDelta: Math.max(0, xpFromData(lastData) - xpFromData(firstData)),
         bossKcDelta: Math.max(0, totalBossKcFromData(lastData) - totalBossKcFromData(firstData)),
+        bossScoreDelta,
         skillDeltas,
         bossDeltas,
       };

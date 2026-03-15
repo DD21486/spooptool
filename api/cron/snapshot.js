@@ -15,7 +15,7 @@
 const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
-const { computeSpoopScore } = require('../../lib/spoopscore');
+const { computeSpoopScore, computeBossScore } = require('../../lib/spoopscore');
 
 function xpFromData(data) {
   if (!data || !data.skills || !data.skills.overall) return 0;
@@ -62,18 +62,22 @@ async function runWeeklyAwards(sql, res) {
   const deltas = chars.map((c) => {
     const first = firstByChar[c.id];
     const last = lastByChar[c.id];
-    if (!first || !last) return { character_id: c.id, username: c.username, xpDelta: 0, bossKcDelta: 0 };
+    if (!first || !last) return { character_id: c.id, username: c.username, xpDelta: 0, bossKcDelta: 0, bossScoreDelta: 0 };
     const firstData = first.data || {};
     const lastData = last.data || {};
+    const firstBossScore = computeBossScore(firstData.bosses || {});
+    const lastBossScore = computeBossScore(lastData.bosses || {});
+    const bossScoreDelta = Math.max(0, lastBossScore - firstBossScore);
     return {
       character_id: c.id,
       username: c.username,
       xpDelta: Math.max(0, xpFromData(lastData) - xpFromData(firstData)),
       bossKcDelta: Math.max(0, totalBossKcFromData(lastData) - totalBossKcFromData(firstData)),
+      bossScoreDelta,
     };
   });
   const xpWinner = deltas.filter((d) => d.xpDelta > 0).sort((a, b) => b.xpDelta - a.xpDelta)[0];
-  const bossWinner = deltas.filter((d) => d.bossKcDelta > 0).sort((a, b) => b.bossKcDelta - a.bossKcDelta)[0];
+  const bossWinner = deltas.filter((d) => d.bossScoreDelta > 0).sort((a, b) => b.bossScoreDelta - a.bossScoreDelta)[0];
 
   const lootRows = await sql`
     SELECT LOWER(TRIM(username)) AS key_username, MAX(TRIM(username)) AS username, at, total_value_gp

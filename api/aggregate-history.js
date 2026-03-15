@@ -6,6 +6,7 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
+const { computeBossScore } = require('../lib/spoopscore');
 
 const GE_PRICES_BASE = 'https://prices.runescape.wiki/api/v1/osrs';
 const GE_USER_AGENT = 'SpoopTool GE Tracker - https://github.com/spooptool';
@@ -244,17 +245,21 @@ async function handleWeeklyWinners(sql, res) {
     const deltas = chars.map((c) => {
       const first = firstByChar[c.id];
       const last = lastByChar[c.id];
-      if (!first || !last) return { username: c.username, xpDelta: 0, bossKcDelta: 0 };
+      if (!first || !last) return { username: c.username, xpDelta: 0, bossKcDelta: 0, bossScoreDelta: 0 };
       const firstData = first.data || {};
       const lastData = last.data || {};
+      const firstBossScore = computeBossScore(firstData.bosses || {});
+      const lastBossScore = computeBossScore(lastData.bosses || {});
+      const bossScoreDelta = Math.max(0, lastBossScore - firstBossScore);
       return {
         username: c.username,
         xpDelta: Math.max(0, xpFromData(lastData) - xpFromData(firstData)),
         bossKcDelta: Math.max(0, totalBossKcFromData(lastData) - totalBossKcFromData(firstData)),
+        bossScoreDelta,
       };
     });
     const xpWinner = deltas.filter((d) => d.xpDelta > 0).sort((a, b) => b.xpDelta - a.xpDelta)[0];
-    const bossWinner = deltas.filter((d) => d.bossKcDelta > 0).sort((a, b) => b.bossKcDelta - a.bossKcDelta)[0];
+    const bossWinner = deltas.filter((d) => d.bossScoreDelta > 0).sort((a, b) => b.bossScoreDelta - a.bossScoreDelta)[0];
     xpWinners.push(xpWinner ? xpWinner.username : null);
     bossWinners.push(bossWinner ? bossWinner.username : null);
 

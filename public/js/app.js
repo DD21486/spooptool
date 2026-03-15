@@ -745,9 +745,9 @@
       .filter((r) => r.xpDelta > 0)
       .sort((a, b) => b.xpDelta - a.xpDelta)[0];
     const bossWinner = characterList
-      .map((u) => ({ username: u, bossKcDelta: (lastWeekDeltas[u] && lastWeekDeltas[u].bossKcDelta) || 0 }))
-      .filter((r) => r.bossKcDelta > 0)
-      .sort((a, b) => b.bossKcDelta - a.bossKcDelta)[0];
+      .map((u) => ({ username: u, bossScoreDelta: (lastWeekDeltas[u] && lastWeekDeltas[u].bossScoreDelta) != null ? lastWeekDeltas[u].bossScoreDelta : (lastWeekDeltas[u] && lastWeekDeltas[u].bossKcDelta) || 0 }))
+      .filter((r) => r.bossScoreDelta > 0)
+      .sort((a, b) => b.bossScoreDelta - a.bossScoreDelta)[0];
     const lootWinner = lastWeekLootLeaderboard[0];
     if (xpEl) xpEl.textContent = xpWinner ? xpWinner.username : '—';
     if (bossEl) bossEl.textContent = bossWinner ? bossWinner.username : '—';
@@ -760,7 +760,7 @@
     const bossKey = (filterRightBoss && filterRightBoss.value) || '';
     const isDelta = homeViewMode === 'last24' || homeViewMode === 'today' || homeViewMode === 'week' || homeViewMode === 'month';
     const deltaSource = homeViewMode === 'today' ? todayDeltas : (homeViewMode === 'week' ? weekDeltas : (homeViewMode === 'month' ? monthDeltas : last24hDeltas));
-    if (rightTitle) rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss KC';
+    if (rightTitle) rightTitle.textContent = bossKey ? formatBossKey(bossKey) : 'Boss score';
     if (rightValueTh) {
       rightValueTh.textContent = homeViewMode === 'today'
         ? (bossKey ? formatBossKey(bossKey) + ' (today)' : 'Today')
@@ -770,15 +770,16 @@
             ? (bossKey ? formatBossKey(bossKey) + ' (this month)' : 'This Month')
             : (homeViewMode === 'last24'
               ? (bossKey ? formatBossKey(bossKey) + ' (24h)' : 'Last 24 Hr')
-              : (bossKey ? formatBossKey(bossKey) : 'Total KC'));
+              : (bossKey ? formatBossKey(bossKey) : 'Total score'));
     }
     const rows = getDisplayCharacterList().map(username => {
       const d = deltaSource[username];
       const player = playerData[username];
-      const kcDelta = isDelta && d
-        ? (bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : d.bossKcDelta)
-        : 0;
-      const bossPoints = isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player);
+      const bossScoreDelta = (d && d.bossScoreDelta != null) ? d.bossScoreDelta : 0;
+      const kcDelta = isDelta && d && bossKey && d.bossDeltas && bossKey in d.bossDeltas ? d.bossDeltas[bossKey] : (bossKey ? null : bossScoreDelta);
+      const bossPoints = bossKey
+        ? (isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player))
+        : (isDelta ? bossScoreDelta : computeBossPointsForPeriod(null, player));
       return {
         username,
         kc: getRightBossKc(player, bossKey),
@@ -787,17 +788,18 @@
       };
     });
     if (isDelta) {
-      rows.sort((a, b) => (b.kcDelta - a.kcDelta));
+      rows.sort((a, b) => (bossKey ? (b.kcDelta - a.kcDelta) : (b.bossPoints - a.bossPoints)));
     } else {
-      rows.sort((a, b) => (b.kc - a.kc));
+      rows.sort((a, b) => (bossKey ? (b.kc - a.kc) : (b.bossPoints - a.bossPoints)));
     }
     rows.forEach((r, i) => {
       const tr = document.createElement('tr');
       tr.className = 'border-b border-slate-700/70 hover:bg-slate-700/30';
+      const showScore = !bossKey;
       const kcDisplay = isDelta
-        ? (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—')
-        : formatNum(r.kc);
-      const pointsSuffix = typeof r.bossPoints === 'number' ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)})</span>` : '';
+        ? (showScore ? (r.bossPoints != null && r.bossPoints > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.bossPoints)}</span>` : '—') : (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—'))
+        : (showScore ? formatNum(r.bossPoints) : formatNum(r.kc));
+      const pointsSuffix = (bossKey && typeof r.bossPoints === 'number') ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)} pts)</span>` : '';
       const displayValue = kcDisplay + pointsSuffix;
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
@@ -1046,6 +1048,7 @@
         last24hDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
+          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
           skillDeltas: d.skillDeltas || {},
           bossDeltas: d.bossDeltas || {},
         };
@@ -1055,6 +1058,7 @@
         todayDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
+          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
           skillDeltas: d.skillDeltas || {},
           bossDeltas: d.bossDeltas || {},
         };
@@ -1064,6 +1068,7 @@
         weekDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
+          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
           skillDeltas: d.skillDeltas || {},
           bossDeltas: d.bossDeltas || {},
         };
@@ -1073,6 +1078,7 @@
         monthDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
+          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
           skillDeltas: d.skillDeltas || {},
           bossDeltas: d.bossDeltas || {},
         };
@@ -1082,6 +1088,7 @@
         lastWeekDeltas[d.username] = {
           xpDelta: d.xpDelta,
           bossKcDelta: d.bossKcDelta,
+          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
           skillDeltas: d.skillDeltas || {},
           bossDeltas: d.bossDeltas || {},
         };
@@ -1313,6 +1320,7 @@
           last24hDeltas[d.username] = {
             xpDelta: d.xpDelta,
             bossKcDelta: d.bossKcDelta,
+            bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
             skillDeltas: d.skillDeltas || {},
             bossDeltas: d.bossDeltas || {},
           };
@@ -1360,7 +1368,7 @@
     const bossLabelEl = document.getElementById('home-chart-boss-label');
     const lootLabelEl = document.getElementById('home-chart-loot-label');
     if (xpLabelEl) xpLabelEl.textContent = isDelta ? 'Total XP' : 'Total XP (all characters)';
-    if (bossLabelEl) bossLabelEl.textContent = isDelta ? 'Boss KC' : 'Boss KC (all characters)';
+    if (bossLabelEl) bossLabelEl.textContent = isDelta ? 'Boss score' : 'Boss score (all characters)';
     if (lootLabelEl) lootLabelEl.textContent = isDelta ? 'Loot value' : 'Loot value (all characters)';
   }
 
@@ -1474,31 +1482,31 @@
 
     if (isToday) {
       const sumXp = Object.entries(todayDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.entries(todayDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumBoss = Object.entries(todayDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossScoreDelta != null ? d.bossScoreDelta : d.bossKcDelta) || 0), 0);
       const sumLoot = lootLeaderboardToday.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (today)';
-      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (today)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' pts (today)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (today)';
     } else if (isWeek) {
       const sumXp = Object.entries(weekDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.entries(weekDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumBoss = Object.entries(weekDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossScoreDelta != null ? d.bossScoreDelta : d.bossKcDelta) || 0), 0);
       const sumLoot = lootLeaderboardWeek.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (this week)';
-      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (this week)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' pts (this week)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (this week)';
     } else if (isMonth) {
       const sumXp = Object.entries(monthDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.entries(monthDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumBoss = Object.entries(monthDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossScoreDelta != null ? d.bossScoreDelta : d.bossKcDelta) || 0), 0);
       const sumLoot = lootLeaderboardMonth.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (this month)';
-      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (this month)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' pts (this month)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (this month)';
     } else if (isLast24) {
       const sumXp = Object.entries(last24hDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.xpDelta) || 0), 0);
-      const sumBoss = Object.entries(last24hDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossKcDelta) || 0), 0);
+      const sumBoss = Object.entries(last24hDeltas).filter(([u]) => !noChudsEnabled || u.toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, [, d]) => s + (Number(d.bossScoreDelta != null ? d.bossScoreDelta : d.bossKcDelta) || 0), 0);
       const sumLoot = lootLeaderboard24.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
       if (xpTotalEl) xpTotalEl.textContent = Math.round(sumXp).toLocaleString() + ' XP (24h)';
-      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' kills (24h)';
+      if (bossTotalEl) bossTotalEl.textContent = Math.round(sumBoss).toLocaleString() + ' pts (24h)';
       if (lootTotalEl) lootTotalEl.textContent = (sumLoot >= 1e6 ? (sumLoot / 1e6).toFixed(2) + 'M' : formatNum(sumLoot)) + ' gp (24h)';
     } else {
       const sumLoot = lootLeaderboardTotal.filter((p) => !noChudsEnabled || (p.username || '').toLowerCase() !== NO_CHUDS_USERNAME).reduce((s, p) => s + (Number(p.totalValueGp) || 0), 0);
