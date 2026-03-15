@@ -780,11 +780,13 @@
       const bossPoints = bossKey
         ? (isDelta ? computeBossPointsForPeriod(d, null) : computeBossPointsForPeriod(null, player))
         : (isDelta ? bossScoreDelta : computeBossPointsForPeriod(null, player));
+      const rawKc = !bossKey ? (isDelta ? (d && (d.bossKcDelta != null ? d.bossKcDelta : 0) || 0) : (player ? totalBossKc(player) : 0)) : 0;
       return {
         username,
         kc: getRightBossKc(player, bossKey),
         kcDelta: kcDelta != null ? kcDelta : 0,
         bossPoints,
+        rawKc,
       };
     });
     if (isDelta) {
@@ -799,7 +801,10 @@
       const kcDisplay = isDelta
         ? (showScore ? (r.bossPoints != null && r.bossPoints > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.bossPoints)}</span>` : '—') : (r.kcDelta != null && r.kcDelta > 0 ? `<span class="text-green-400 font-mono">+${formatNum(r.kcDelta)}</span>` : '—'))
         : (showScore ? formatNum(r.bossPoints) : formatNum(r.kc));
-      const pointsSuffix = (bossKey && typeof r.bossPoints === 'number') ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)} pts)</span>` : '';
+      let pointsSuffix = (bossKey && typeof r.bossPoints === 'number') ? ` <span class="text-slate-400 font-mono">(${formatNum(r.bossPoints)} pts)</span>` : '';
+      if (showScore && r.rawKc != null && (isDelta ? r.rawKc > 0 : true)) {
+        pointsSuffix += ` <span class="text-slate-400 font-mono">(${formatNum(r.rawKc)} kills)</span>`;
+      }
       const displayValue = kcDisplay + pointsSuffix;
       const valueCell = `<span class="home-value-cell cursor-help" data-table="boss" data-username="${escapeHtml(r.username)}" title="">${displayValue}</span>`;
       tr.innerHTML = `<td class="px-4 py-2 text-slate-400">${i + 1}</td><td class="px-4 py-2"><a href="/character.html?name=${encodeURIComponent(r.username)}" class="text-sky-400 hover:underline">${escapeHtml(r.username)}</a></td><td class="px-4 py-2 text-right font-mono">${valueCell}</td>`;
@@ -900,17 +905,22 @@
     let entries = [];
     if ((isLast24 || isToday || isWeek || isMonth) && deltas && deltas.bossDeltas) {
       entries = Object.entries(deltas.bossDeltas)
-        .map(([k, v]) => ({ key: k, delta: Number(v) || 0 }))
+        .map(([k, v]) => {
+          const delta = Number(v) || 0;
+          const pts = BOSS_POINTS[normalizeBossKeyForPoints(k)] || 0;
+          const pointsGain = delta * pts + (delta >= 1 ? FIRST_KILL_BONUS : 0);
+          return { key: k, delta, pointsGain };
+        })
         .filter((e) => e.delta > 0)
-        .sort((a, b) => b.delta - a.delta)
+        .sort((a, b) => b.pointsGain - a.pointsGain)
         .slice(0, 3);
       if (entries.length === 0) return '<div class="text-slate-400">No boss kills ' + (isToday ? 'today' : (isWeek ? 'this week' : (isMonth ? 'this month' : 'in last 24h'))) + '</div>';
       const header = '<div class="font-semibold text-slate-300 mb-1.5">Top 3 bosses (' + periodLabel + ')</div>';
       return header + entries.map((e) => {
         const icon = bossImageSrc(e.key);
         const name = escapeHtml(formatBossKey(e.key));
-        const val = '+' + formatNum(e.delta) + ' KC';
-        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain rounded-sm" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums text-green-400/90">' + escapeHtml(val) + '</span></div>';
+        const val = '+' + formatNum(e.pointsGain) + ' pts <span class="text-slate-400">(+' + formatNum(e.delta) + ' KC)</span>';
+        return '<div class="flex items-center gap-2 py-0.5"><img src="' + escapeHtml(icon) + '" alt="" class="w-4 h-4 shrink-0 object-contain rounded-sm" width="16" height="16" loading="lazy" onerror="this.style.display=\'none\'"><span class="flex-1 text-left">' + name + '</span><span class="text-right tabular-nums text-green-400/90">' + val + '</span></div>';
       }).join('');
     }
     if (player && player.bosses) {
