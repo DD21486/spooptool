@@ -842,7 +842,7 @@
     const dataMin = values.length ? Math.min(...values) : 0;
     const dataMax = values.length ? Math.max(...values) : 1;
     const range = dataMax - dataMin;
-    const pad = range > 0 ? range * 0.05 : Math.max(1, dataMax * 0.05);
+    const pad = range > 0 ? range * 0.01 : Math.max(1, dataMax * 0.01);
     const yMin = Math.max(0, dataMin - pad);
     const yMax = dataMax + pad;
     if (typeof Chart !== 'undefined') {
@@ -948,8 +948,8 @@
     const firstKnown = knownValues[0];
     const lastKnown = knownValues.length ? knownValues[knownValues.length - 1] : currentSpoopScore;
     const sevenDaysAgo = firstKnown;
-    const yMin = sevenDaysAgo != null && sevenDaysAgo > 0 ? Math.min(sevenDaysAgo, currentSpoopScore) * 0.99 : Math.max(0, currentSpoopScore - Math.max(1, currentSpoopScore * 0.1));
-    const yMax = (knownValues.length ? Math.max(...knownValues, currentSpoopScore) : currentSpoopScore) * 1.05;
+    const yMin = sevenDaysAgo != null && sevenDaysAgo > 0 ? Math.min(sevenDaysAgo, currentSpoopScore) * 0.99 : Math.max(0, currentSpoopScore - Math.max(1, currentSpoopScore * 0.01));
+    const yMax = (knownValues.length ? Math.max(...knownValues, currentSpoopScore) : currentSpoopScore) * 1.01;
     if (sevenDaysAgo != null && sevenDaysAgo > 0) {
       const pct = ((currentSpoopScore - sevenDaysAgo) / sevenDaysAgo) * 100;
       const sign = pct >= 0 ? '+' : '';
