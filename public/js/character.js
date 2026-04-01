@@ -263,7 +263,7 @@
     spoopspooply: ['Vorki'],
     legolad52: ['Vorki', 'Beef'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
-    newlinechar: ['Heron'],
+    newlinechar: ['Heron', 'Pet smoke devil'],
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
     norgentgorge: ['Phoenix'],
   };
