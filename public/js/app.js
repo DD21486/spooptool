@@ -553,6 +553,7 @@
     newlinechar: ['Heron', 'Pet smoke devil'],
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
     norgentgorge: ['Phoenix'],
+    muddyewgoo: ['Rift guardian', 'Tiny tempor', 'Phoenix'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
