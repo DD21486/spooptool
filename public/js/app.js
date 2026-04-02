@@ -63,9 +63,9 @@
   let bossKeys = [];
   let skillKeys = ['overall'];
 
-  /** When "No Chuds" is on, exclude VDBL from leaderboards and SpoopScore. Default off = everyone included. */
+  /** Legacy: exclude VDBL when true. Toggle removed from UI; always show everyone. */
   const NO_CHUDS_USERNAME = 'vdbl';
-  let noChudsEnabled = false;
+  const noChudsEnabled = false;
   function getDisplayCharacterList() {
     if (!noChudsEnabled) return characterList;
     return characterList.filter((u) => (u || '').toLowerCase() !== NO_CHUDS_USERNAME);
@@ -1928,30 +1928,6 @@
   });
   filterSkill.addEventListener('change', () => renderLeft());
   if (filterRightBoss) filterRightBoss.addEventListener('change', () => renderRight());
-
-  const noChudsToggle = document.getElementById('no-chuds-toggle');
-  if (noChudsToggle) {
-    noChudsToggle.addEventListener('change', function () {
-      noChudsEnabled = noChudsToggle.checked;
-      noChudsToggle.setAttribute('aria-checked', String(noChudsEnabled));
-      renderLeft();
-      renderRight();
-      renderLoot();
-      paintSpoopScoreChart();
-      render99CountLeaderboard();
-      renderBossDiversityLeaderboard();
-      renderWeeklyWinners();
-      if (homeViewMode === 'today' && cachedHomeHistoryToday != null) {
-        paintHomeCharts(cachedHomeHistoryToday, 'today', cachedLootHistoryToday);
-      } else if (homeViewMode === 'week' && cachedHomeHistoryWeek != null) {
-        paintHomeCharts(cachedHomeHistoryWeek, 'week', cachedLootHistoryWeek);
-      } else if (homeViewMode === 'month' && cachedHomeHistoryMonth != null) {
-        paintHomeCharts(cachedHomeHistoryMonth, 'month', cachedLootHistoryMonth);
-      } else if (cachedHomeHistory) {
-        paintHomeCharts(cachedHomeHistory, homeViewMode, cachedLootHistory);
-      }
-    });
-  }
 
   if (tabMonth) tabMonth.addEventListener('click', () => setHomeViewMode('month'));
   if (tabWeek) tabWeek.addEventListener('click', () => setHomeViewMode('week'));

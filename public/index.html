@@ -108,16 +108,12 @@
   </style>
 </head>
 <body class="min-h-screen bg-slate-900 text-slate-200 antialiased">
-  <!-- Cron status orb + No Chuds toggle -->
-  <div class="fixed top-3 left-4 z-30 flex items-center gap-4" role="group">
+  <!-- Cron status orb -->
+  <div class="fixed top-3 left-4 z-30 flex items-center" role="group">
     <div id="cron-status-orb-wrap" class="flex items-start gap-1 relative" role="status" aria-label="Cron status">
       <div id="cron-status-orb" class="w-2 h-2 rounded-full bg-slate-500 animate-pulse shrink-0 mt-0.5" title=""></div>
       <div id="cron-status-orb-tooltip" class="hidden absolute left-0 top-full mt-1.5 px-2.5 py-1.5 rounded-lg border border-slate-600 bg-slate-800 text-slate-200 text-xs font-normal whitespace-pre-line shadow-xl pointer-events-none min-w-[10rem]"></div>
     </div>
-    <label class="flex items-center gap-2 cursor-pointer select-none text-sm text-slate-300 hover:text-slate-200" for="no-chuds-toggle" title="Exclude VDBL from leaderboards and SpoopScore">
-      <input type="checkbox" id="no-chuds-toggle" class="w-4 h-4 rounded border-slate-500 bg-slate-700 text-sky-600 focus:ring-sky-500 focus:ring-offset-0 focus:ring-2" aria-checked="false" />
-      <span>No Chuds</span>
-    </label>
   </div>
   <div class="max-w-7xl mx-auto px-4 pt-14 sm:pt-3 pb-6 relative">
     <header class="absolute top-3 right-4 z-20 flex justify-end">
