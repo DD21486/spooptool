@@ -554,6 +554,7 @@
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
     norgentgorge: ['Phoenix'],
     muddyewgoo: ['Rift guardian', 'Tiny tempor', 'Phoenix'],
+    kycats12: ['Beaver', 'Nid', 'Rocky'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];

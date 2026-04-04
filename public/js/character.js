@@ -268,6 +268,7 @@
     norgentgorge: ['Phoenix'],
     /** Rift guardian = RC pet, Tiny tempor = Tempoross, Phoenix = Wintertodt */
     muddyewgoo: ['Rift guardian', 'Tiny tempor', 'Phoenix'],
+    kycats12: ['Beaver', 'Nid', 'Rocky'],
   };
   function getPetsForCharacter(username) {
     if (!username) return [];
