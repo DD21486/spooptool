@@ -261,7 +261,7 @@
   const CHARACTER_PETS = {
     b7hund3r: ['Giant squirrel'],
     spoopspooply: ['Vorki'],
-    legolad52: ['Vorki', 'Beef'],
+    legolad52: ['Vorki', 'Beef', 'Abyssal protector'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
     newlinechar: ['Heron', 'Pet smoke devil'],
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
