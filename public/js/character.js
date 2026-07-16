@@ -261,9 +261,9 @@
   const CHARACTER_PETS = {
     b7hund3r: ['Giant squirrel'],
     spoopspooply: ['Vorki'],
-    legolad52: ['Vorki', 'Beef', 'Abyssal protector'],
+    legolad52: ['Vorki', 'Beef', 'Abyssal protector', 'Gull', 'Pet kraken', 'Beaver'],
     'roby pls': ['Chompy chick', 'Ikkle hydra', 'Nid', 'Rock golem', 'Skotos', 'Tzrek-jad'],
-    newlinechar: ['Heron', 'Pet smoke devil'],
+    newlinechar: ['Heron', 'Pet smoke devil', "Tumeken's guardian"],
     player1817: ['Beef', 'Chompy chick', 'Giant squirrel', 'Herbi', 'Rocky', 'Tangleroot'],
     norgentgorge: ['Phoenix'],
     /** Rift guardian = RC pet, Tiny tempor = Tempoross, Phoenix = Wintertodt */
