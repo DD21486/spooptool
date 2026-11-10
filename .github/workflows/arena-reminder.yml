@@ -1,0 +1,17 @@
+# Every minute so the 5-minute Spoopfight ping still lands before 9:00 PM ET.
+name: Arena reminders
+
+on:
+  schedule:
+    - cron: '* * * * *'
+  workflow_dispatch:
+
+jobs:
+  remind:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send due Spoopfight reminders
+        run: |
+          curl --fail-with-body -sS \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            "https://spooptool.vercel.app/api/cron/snapshot?arena_reminder=1"

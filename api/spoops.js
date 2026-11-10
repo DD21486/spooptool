@@ -1,6 +1,7 @@
 const { load, save } = require('../lib/spoop/store');
 const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
 const { postSpoopUpdates } = require('../lib/spoop/discord');
+const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -48,6 +49,11 @@ function happenedLines(events) {
 }
 
 async function syncWorld(debug) {
+  try {
+    await sendDueArenaReminders(new Date());
+  } catch (err) {
+    console.error('arena reminder', err && err.message ? err.message : err);
+  }
   const state = await load();
   const expected = state.clock;
   let events = [];

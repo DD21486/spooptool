@@ -16,6 +16,7 @@ const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
 const { computeSpoopScore, computeBossScore } = require('../../lib/spoopscore');
+const { sendDueArenaReminders } = require('../../lib/spoop/arena-reminders');
 
 function xpFromData(data) {
   if (!data || !data.skills || !data.skills.overall) return 0;
@@ -199,6 +200,16 @@ module.exports = async function handler(req, res) {
   const auth = authorize(req);
   if (!auth.ok) {
     return res.status(401).json({ error: 'Unauthorized', detail: auth.reason });
+  }
+
+  if (req.query.arena_reminder === '1' || req.query.arena_reminder === 'true') {
+    try {
+      const result = await sendDueArenaReminders(new Date());
+      return res.status(200).json({ ok: true, ...result });
+    } catch (err) {
+      console.error('arena reminder', err);
+      return res.status(500).json({ error: err.message || String(err) });
+    }
   }
 
   if (!process.env.DATABASE_URL || process.env.DATABASE_URL.trim() === '') {
