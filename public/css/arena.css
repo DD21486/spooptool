@@ -138,14 +138,6 @@
   min-width: 11rem;
 }
 
-.practice-controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 0.6rem;
-}
-.practice-controls[hidden] { display: none; }
-
 .results {
   display: flex;
   flex-wrap: wrap;

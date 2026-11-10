@@ -11,11 +11,6 @@
   const waitEl = document.getElementById('arena-wait');
   const waitClock = document.getElementById('arena-wait-clock');
   const waitWhen = document.getElementById('arena-wait-when');
-  const practiceBtn = document.getElementById('arena-practice');
-  const practiceBox = document.getElementById('practice-controls');
-  const countInput = document.getElementById('arena-count');
-  const fightBtn = document.getElementById('arena-fight');
-  const form = document.getElementById('arena-controls');
 
   const PACE = 0.55;
 
@@ -27,9 +22,7 @@
   let playFrom = 0;
   let shownHit = 0;
   let shownDeath = 0;
-  let nightPlay = false;
   let nightDone = null;
-  let showMode = true;
   let clockOffset = 0;
   let worldNowMs = 0;
   let simMode = false;
@@ -261,9 +254,7 @@
     }
     if (linesEl) linesEl.innerHTML = '';
     statusEl.textContent = winner ? winner.name + ' wins.' : 'The pit is empty.';
-    fightBtn.disabled = false;
     const done = nightDone;
-    nightPlay = false;
     nightDone = null;
     if (done) done();
   }
@@ -293,12 +284,10 @@
       shownDeath += 1;
     }
     drawAims();
-    const left = standingCount(t);
-    if (t < bout.duration && left > 1) {
-      statusEl.textContent = nightPlay ? 'Spoopfight' : left + ' still standing';
+    if (t < bout.duration && standingCount(t) > 1) {
+      statusEl.textContent = 'Spoopfight';
       raf = requestAnimationFrame(frame);
     } else {
-      if (!nightPlay) statusEl.textContent = left + ' still standing';
       finish();
     }
   }
@@ -311,25 +300,7 @@
     shownDeath = 0;
     renderRoster(fight);
     mountActors(fight);
-    fightBtn.disabled = false;
-    const names = fight.fighters.map((f) => f.name + ' (cb ' + f.combat + ')').slice(0, 3).join(', ');
-    statusEl.textContent = nightPlay
-      ? 'Spoopfight'
-      : fight.fighters.length + ' spoops ready. ' + names + (fight.fighters.length > 3 ? '…' : '');
-  }
-
-  async function roll(count) {
-    fightBtn.disabled = true;
-    statusEl.textContent = 'Rolling levels and gear…';
-    banner.hidden = true;
-    const res = await fetch('/api/arena', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ count }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || 'Could not roll the arena');
-    arm(data);
+    statusEl.textContent = 'Spoopfight';
   }
 
   function start() {
@@ -340,11 +311,8 @@
     playOrigin = performance.now();
     playing = true;
     banner.hidden = true;
-    fightBtn.disabled = true;
-    if (nightPlay) {
-      resultsEl.hidden = true;
-      waitEl.hidden = true;
-    }
+    resultsEl.hidden = true;
+    waitEl.hidden = true;
     bout.fighters.forEach((f) => {
       const view = actors.get(f.id);
       if (!view) return;
@@ -357,22 +325,9 @@
       view.y = startPos.y;
       place(view.el, startPos.x, startPos.y, bout.width, bout.height);
     });
-    statusEl.textContent = nightPlay ? 'Spoopfight' : bout.fighters.length + ' still standing';
+    statusEl.textContent = 'Spoopfight';
     raf = requestAnimationFrame(frame);
   }
-
-  form.addEventListener('submit', (ev) => {
-    ev.preventDefault();
-    if (showMode) return;
-    const count = Math.max(2, Math.min(20, parseInt(countInput.value, 10) || 8));
-    countInput.value = String(count);
-    roll(count).catch((err) => {
-      statusEl.textContent = err.message;
-      fightBtn.disabled = !bout;
-    });
-  });
-
-  fightBtn.addEventListener('click', start);
 
   document.querySelectorAll('[data-speed]').forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -437,7 +392,7 @@
   }
 
   function tickCountdown() {
-    if (playing && nightPlay) {
+    if (playing) {
       countdownEl.textContent = 'Spoopfight';
       return;
     }
@@ -452,7 +407,7 @@
     countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next Spoopfight ' + text;
     waitClock.textContent = text;
     waitWhen.textContent = nextLabel || '';
-    if (!simMode && remain <= 0 && showMode && !playing && !fetchingNight && Date.now() >= retryAt) {
+    if (!simMode && remain <= 0 && !playing && !fetchingNight && Date.now() >= retryAt) {
       retryAt = Date.now() + 20000;
       loadNight();
     }
@@ -479,11 +434,9 @@
       nextLabel = data.nextLabel || '';
       const last = data.last;
       const unseen = !!(last && last.bout && seenAt() !== last.at);
-      if (!showMode) return;
       if (unseen) {
         resultsEl.hidden = true;
         waitEl.hidden = true;
-        nightPlay = true;
         nightDone = function () {
           markSeen(last.at);
           banner.hidden = true;
@@ -508,26 +461,6 @@
       fetchingNight = false;
     }
   }
-
-  practiceBtn.addEventListener('click', () => {
-    showMode = !showMode;
-    nightPlay = false;
-    nightDone = null;
-    cancelAnimationFrame(raf);
-    playing = false;
-    if (showMode) {
-      practiceBtn.textContent = 'Practice';
-      practiceBox.hidden = true;
-      loadNight();
-      return;
-    }
-    practiceBtn.textContent = 'Spoopfight';
-    practiceBox.hidden = false;
-    resultsEl.hidden = true;
-    waitEl.hidden = true;
-    banner.hidden = true;
-    statusEl.textContent = 'Practice pit. Randomize a crowd.';
-  });
 
   window.setInterval(tickCountdown, 250);
   loadNight();

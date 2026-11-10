@@ -1,5 +1,5 @@
 const { load, save } = require('../lib/spoop/store');
-const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, buildArenaTest, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
+const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
 const { liveHeatFor } = require('../lib/spoop/liveHeat');
 const { postSpoopUpdates } = require('../lib/spoop/discord');
 
@@ -183,20 +183,14 @@ async function worldNow() {
   };
 }
 
-/** GET/POST /api/arena (rewrite → ?path=arena). Same function as /api/spoops. */
+/** GET /api/arena (rewrite → ?path=arena). Same function as /api/spoops. */
 async function handleArena(req, res) {
   try {
-    if (req.method === 'GET') {
-      return res.status(200).json(await worldNow());
-    }
-    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
-    const body = await readBody(req);
-    const count = Math.max(2, Math.min(20, parseInt(body.count, 10) || 8));
-    const seed = (Math.random() * 4294967296) >>> 0;
-    return res.status(200).json(buildArenaTest(count, seed));
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(200).json(await worldNow());
   } catch (err) {
     console.error('arena', err);
-    return res.status(500).json({ error: 'Could not build the arena', detail: err.message || String(err) });
+    return res.status(500).json({ error: 'Could not load the Spoopfight', detail: err.message || String(err) });
   }
 }
 
