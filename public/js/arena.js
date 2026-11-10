@@ -13,9 +13,9 @@
   const waitWhen = document.getElementById('arena-wait-when');
 
   const PACE = 0.55;
+  const SPEED = 1.5;
 
   let bout = null;
-  let speed = 1;
   let playing = false;
   let raf = 0;
   let playOrigin = 0;
@@ -261,7 +261,7 @@
 
   function frame(now) {
     if (!playing || !bout) return;
-    const t = playFrom + ((now - playOrigin) / 1000) * speed * PACE;
+    const t = playFrom + ((now - playOrigin) / 1000) * SPEED * PACE;
     for (const f of bout.fighters) {
       const view = actors.get(f.id);
       if (!view || view.dead) continue;
@@ -328,19 +328,6 @@
     statusEl.textContent = 'Spoopfight';
     raf = requestAnimationFrame(frame);
   }
-
-  document.querySelectorAll('[data-speed]').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      const next = Number(btn.getAttribute('data-speed')) || 1;
-      if (playing) {
-        const now = performance.now();
-        playFrom += ((now - playOrigin) / 1000) * speed * PACE;
-        playOrigin = now;
-      }
-      speed = next;
-      document.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('is-on', b === btn));
-    });
-  });
 
   function placeWord(n) {
     const num = Number(n) || 0;

@@ -675,6 +675,9 @@
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
           '</dl>' +
           '<p class="spoop-act">' + escapeHtml(spoop.activity.name) + '</p>' +
+          (spoop.gearGate && spoop.gearGate.idle
+            ? '<p class="spoop-next">' + escapeHtml(spoop.gearGate.place) + ' · ' + spoop.gearGate.hoursLeft + 'h of ' + escapeHtml(spoop.gearGate.lootName) + ' drops</p>'
+            : '') +
           nextActionHtml(spoop, state) +
         '</a>'
       );
@@ -683,6 +686,20 @@
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
     paint(state);
+  }
+
+  function questStatus(activity) {
+    if (!activity || !activity.quest) {
+      const skill = activity && activity.skill ? activity.skill : '';
+      return activity && activity.idle ? 'Idle ground · training ' + skill : 'Training ' + skill;
+    }
+    const left = activity.hoursLeft || 0;
+    const total = activity.hours || 1;
+    if (left > 0 && left === total - 1) return 'Started this hour.';
+    if (left > 1) return 'Still on it. ' + left + ' hours left.';
+    if (left === 1) return 'Still on it. One hour left.';
+    if (total <= 1) return 'Started and finished this hour.';
+    return 'Finished this hour.';
   }
 
   function activityLog(spoop) {
@@ -816,9 +833,11 @@
     }).join('');
     const statsHtml = renderCombatStats(spoop.combatStats);
     const gate = spoop.gearGate || { progress: 0, nextName: null, nextCombat: null };
-    const gateLabel = gate.nextName
-      ? 'Next gear at ' + gate.nextCombat + ' (' + gate.nextName + ')'
-      : 'Top gear tier';
+    const gateLabel = gate.idle
+      ? gate.place + ' · ' + gate.lootName + ' drops · ' + gate.hoursLeft + (gate.hoursLeft === 1 ? ' hour left' : ' hours left')
+      : gate.nextName
+        ? 'Next gear at ' + gate.nextCombat + ' (' + gate.nextName + ')'
+        : 'Top gear tier';
     const goal = spoop.goldGoal || { progress: 0, name: 'Bronze crate', cost: 100 };
     const grid = EQUIP_GRID.map((row) => row.map((slot) => gearCell(slot, slot ? spoop.equipped[slot] : null, spoop)).join('')).join('');
     const bankSlots = state.bankSlots || 48;
@@ -858,7 +877,7 @@
           '<p class="text-xs uppercase tracking-wide text-slate-500">Right now</p>' +
           '<h2 class="text-xl text-amber-200 mt-1">' + escapeHtml(spoop.activity.name) + '</h2>' +
           '<p class="text-slate-300 mt-1">' + escapeHtml(spoop.activity.detail) + '</p>' +
-          '<p class="text-xs text-slate-500 mt-2">' + (spoop.activity.quest ? 'Quest reward this hour' : 'Training ' + escapeHtml(spoop.activity.skill)) + '</p>' +
+          '<p class="text-xs text-slate-500 mt-2">' + escapeHtml(questStatus(spoop.activity)) + '</p>' +
           (spoop.activity.money ? '<p class="text-xs text-amber-200/80 mt-1">Slow training. The gold is the point.</p>' : '') +
           nextActionHtml(spoop, state, true) +
           '<div class="flex gap-1 mt-3 justify-end">' + pip(heat.xp, 'XP') + pip(heat.boss, 'Boss') + pip(heat.loot, 'Drop') + '</div>' +

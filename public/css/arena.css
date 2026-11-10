@@ -351,14 +351,6 @@
 
 .arena-banner strong { display: block; font-size: 1.25rem; color: #fff; }
 
-.speed-btn {
-  padding: 0.35rem 0.55rem;
-  border-radius: 0.4rem;
-  background: #1e293b;
-  color: #cbd5e1;
-}
-.speed-btn.is-on { background: #f0d878; color: #1c140c; font-weight: 700; }
-
 @keyframes hitsplat-pop {
   0% { transform: translate(-50%, -50%) scale(0.55); opacity: 0; }
   14% { transform: translate(-50%, -58%) scale(1); opacity: 1; }
