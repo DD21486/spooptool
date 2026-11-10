@@ -1,0 +1,176 @@
+const { load, save } = require('../lib/spoop/store');
+const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32 } = require('../lib/spoop/engine');
+const { liveHeatFor } = require('../lib/spoop/liveHeat');
+
+function cors(res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+}
+
+function debugAllowed(req) {
+  const host = String(req.headers.host || '');
+  const name = host.split(':')[0];
+  return name === 'localhost' || name === '127.0.0.1' || name === '::1';
+}
+
+let chain = Promise.resolve();
+function locked(fn) {
+  const run = chain.then(fn, fn);
+  chain = run.then(() => {}, () => {});
+  return run;
+}
+
+function spoopOf(state, name) {
+  if (name && state.spoops[name]) return state.spoops[name];
+  if (name) {
+    const wanted = String(name).toLowerCase();
+    const found = Object.values(state.spoops).find((spoop) =>
+      String(spoop.name || '').toLowerCase() === wanted ||
+      String(spoop.owner || '').toLowerCase() === wanted
+    );
+    if (found) return found;
+  }
+  return state.spoops[STARTER_NAME];
+}
+
+async function readBody(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  if (!raw) return {};
+  return JSON.parse(raw);
+}
+
+async function withWorld(debug) {
+  const state = load();
+  let happened = [];
+  for (const spoop of Object.values(state.spoops)) {
+    happened = happened.concat(applyWearRules(spoop, new Date(state.clock)));
+  }
+  const changedGear = happened.length > 0;
+  let live = null;
+  if (!state.useSim) {
+    live = await liveHeatFor(STARTER_NAME);
+    happened = happened.concat(advance(state, new Date(), live));
+    save(state);
+  } else if (changedGear) {
+    save(state);
+  }
+  return presentWorld(state, debug, happened);
+}
+
+async function handlePost(req) {
+  const body = await readBody(req);
+  const action = body.action;
+  const state = load();
+  const debug = debugAllowed(req);
+  const spoop = spoopOf(state, body.name || STARTER_NAME);
+  if (!spoop) return { status: 404, payload: { error: 'No spoop by that name' } };
+  const wearNotes = applyWearRules(spoop, new Date(state.clock));
+  if (wearNotes.length) save(state);
+
+  if (action === 'spend') {
+    const now = new Date(state.clock);
+    const rng = mulberry32(hashString(`${spoop.name}|crate|${now.toISOString()}|${spoop.gold}|${body.crate}|${Math.random()}`));
+    const result = openCrate(spoop, body.crate, now, rng);
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    save(state);
+    const payload = presentWorld(state, debug, [result.text]);
+    payload.roll = result.roll;
+    return { status: 200, payload };
+  }
+
+  if (action === 'debug') {
+    if (!debug) return { status: 403, payload: { error: 'Debug is only available on localhost' } };
+    let happened = [];
+    if (body.op === 'reset') {
+      const fresh = createWorld(new Date());
+      save(fresh);
+      return { status: 200, payload: presentWorld(fresh, true, ['Reset SpoopSpooply.']) };
+    }
+    if (body.op === 'heat') {
+      spoop.heat = {
+        xp: !!body.xp,
+        boss: !!body.boss,
+        loot: !!body.loot,
+      };
+      state.useSim = true;
+      save(state);
+      return { status: 200, payload: presentWorld(state, true, []) };
+    }
+    if (body.op === 'real') {
+      state.useSim = false;
+      const live = await liveHeatFor(STARTER_NAME);
+      happened = advance(state, new Date(), live);
+      save(state);
+      return { status: 200, payload: presentWorld(state, true, happened) };
+    }
+    state.useSim = true;
+    const from = new Date(state.clock);
+    let target = null;
+    if (body.op === 'next') {
+      const ev = nextEventAfter(from);
+      if (!ev) return { status: 400, payload: { error: 'No upcoming event' } };
+      target = ev.when;
+    } else if (body.op === 'hours') {
+      const hours = Math.max(1, Math.min(48, parseInt(body.hours, 10) || 4));
+      target = new Date(from.getTime() + hours * 3600 * 1000);
+    } else if (body.op === 'days') {
+      const days = Math.max(1, Math.min(60, parseInt(body.days, 10) || 1));
+      target = new Date(from.getTime() + days * 24 * 3600 * 1000);
+    } else {
+      return { status: 400, payload: { error: 'Unknown debug op' } };
+    }
+    happened = advance(state, target, null);
+    save(state);
+    return { status: 200, payload: presentWorld(state, true, happened) };
+  }
+
+  return { status: 400, payload: { error: 'Unknown action' } };
+}
+
+const SPRITE_URLS = [
+  (id) => 'https://chisel.weirdgloop.org/static/img/osrs-sprite/' + id + '.png',
+];
+
+async function proxySprite(req, res) {
+  const id = req.query.id != null ? parseInt(req.query.id, 10) : NaN;
+  if (Number.isNaN(id) || id < 0) return res.status(400).end();
+  for (const urlFn of SPRITE_URLS) {
+    try {
+      const resp = await fetch(urlFn(id), { headers: { Accept: 'image/png, image/*' } });
+      if (!resp.ok) continue;
+      const buf = Buffer.from(await resp.arrayBuffer());
+      res.setHeader('Content-Type', 'image/png');
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.status(200).end(buf);
+    } catch (_) {
+      continue;
+    }
+  }
+  return res.status(404).end();
+}
+
+module.exports = async function handler(req, res) {
+  cors(res);
+  if (req.method === 'OPTIONS') return res.status(204).end();
+  try {
+    if (req.method === 'GET' && (req.query.icon === '1' || req.query.icon === 'true')) {
+      return proxySprite(req, res);
+    }
+    if (req.method === 'GET') {
+      const payload = await locked(() => withWorld(debugAllowed(req)));
+      return res.status(200).json(payload);
+    }
+    if (req.method === 'POST') {
+      const result = await locked(() => handlePost(req));
+      return res.status(result.status).json(result.payload);
+    }
+    return res.status(405).json({ error: 'Method not allowed' });
+  } catch (err) {
+    console.error('spoops', err);
+    return res.status(500).json({ error: 'Server error', detail: err.message || String(err) });
+  }
+};

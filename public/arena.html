@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arena – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <link rel="stylesheet" href="/css/arena.css" />
+</head>
+<body class="arena-page">
+  <form id="arena-controls" class="arena-bar">
+    <a href="/spoops.html" class="text-xs text-sky-400 hover:text-sky-300">Spoops</a>
+    <p id="arena-countdown" class="countdown">Next Spoopfight</p>
+    <div id="practice-controls" class="practice-controls" hidden>
+      <label class="text-xs text-slate-400 flex items-center gap-2">
+        Count
+        <input id="arena-count" type="number" min="2" max="20" value="8" aria-label="How many spoops" class="w-16 rounded border border-slate-600 bg-slate-800 px-2 py-1 text-slate-100">
+      </label>
+      <button id="arena-roll" type="submit" class="px-3 py-1 rounded bg-amber-500 text-slate-900 text-sm font-semibold hover:bg-amber-400">Randomize</button>
+      <button id="arena-fight" type="button" class="px-3 py-1 rounded bg-rose-600 text-white text-sm font-semibold hover:bg-rose-500 disabled:opacity-40" disabled>Start fight</button>
+    </div>
+    <button id="arena-practice" type="button" class="text-xs text-slate-400 hover:text-slate-200">Practice</button>
+    <div class="flex items-center gap-1 text-xs" role="group" aria-label="Playback speed">
+      <button type="button" data-speed="1" class="speed-btn is-on">1×</button>
+      <button type="button" data-speed="2" class="speed-btn">2×</button>
+      <button type="button" data-speed="3" class="speed-btn">3×</button>
+    </div>
+    <p id="arena-status" class="text-xs text-slate-400">Loading the Spoopfight…</p>
+  </form>
+
+  <section id="arena-results" class="results" hidden></section>
+
+  <ul id="arena-roster" class="roster"></ul>
+
+  <div id="arena-pit" class="pit" aria-label="Arena">
+    <div class="pit-post pit-post-nw"></div>
+    <div class="pit-post pit-post-ne"></div>
+    <div class="pit-post pit-post-sw"></div>
+    <div class="pit-post pit-post-se"></div>
+    <svg id="arena-lines" class="aim-lines" viewBox="0 0 100 72" preserveAspectRatio="none"></svg>
+    <div id="arena-actors"></div>
+    <div id="arena-fx"></div>
+    <div id="arena-banner" class="arena-banner" hidden></div>
+    <div id="arena-wait" class="wait-card" hidden>
+      <p class="wait-kicker">Next Spoopfight</p>
+      <p id="arena-wait-clock" class="wait-time">--:--:--</p>
+      <p id="arena-wait-when" class="wait-when"></p>
+    </div>
+  </div>
+
+  <script src="/js/spoop.js"></script>
+  <script src="/js/arena.js"></script>
+</body>
+</html>

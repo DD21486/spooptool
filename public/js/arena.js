@@ -1,0 +1,534 @@
+(function () {
+  const pit = document.getElementById('arena-pit');
+  const actorsEl = document.getElementById('arena-actors');
+  const linesEl = document.getElementById('arena-lines');
+  const fxEl = document.getElementById('arena-fx');
+  const rosterEl = document.getElementById('arena-roster');
+  const banner = document.getElementById('arena-banner');
+  const statusEl = document.getElementById('arena-status');
+  const countdownEl = document.getElementById('arena-countdown');
+  const resultsEl = document.getElementById('arena-results');
+  const waitEl = document.getElementById('arena-wait');
+  const waitClock = document.getElementById('arena-wait-clock');
+  const waitWhen = document.getElementById('arena-wait-when');
+  const practiceBtn = document.getElementById('arena-practice');
+  const practiceBox = document.getElementById('practice-controls');
+  const countInput = document.getElementById('arena-count');
+  const fightBtn = document.getElementById('arena-fight');
+  const form = document.getElementById('arena-controls');
+
+  const PACE = 0.55;
+
+  let bout = null;
+  let speed = 1;
+  let playing = false;
+  let raf = 0;
+  let playOrigin = 0;
+  let playFrom = 0;
+  let shownHit = 0;
+  let shownDeath = 0;
+  let nightPlay = false;
+  let nightDone = null;
+  let showMode = true;
+  let clockOffset = 0;
+  let worldNowMs = 0;
+  let simMode = false;
+  let nextAtMs = 0;
+  let nextLabel = '';
+  let fetchingNight = false;
+  let retryAt = 0;
+  const SEEN = 'spoop-arena-seen';
+  const actors = new Map();
+
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function place(el, x, y, width, height) {
+    el.style.left = (x / width) * 100 + '%';
+    el.style.top = (y / height) * 100 + '%';
+  }
+
+  function aimOf(pt) {
+    return pt && pt[3] ? pt[3] : null;
+  }
+
+  function sampleTrack(pts, t) {
+    if (!pts.length) return { x: 50, y: 36, moving: false, target: null };
+    if (t <= pts[0][0]) return { x: pts[0][1], y: pts[0][2], moving: false, target: aimOf(pts[0]) };
+    const last = pts[pts.length - 1];
+    if (t >= last[0]) return { x: last[1], y: last[2], moving: false, target: aimOf(last) };
+    let lo = 0;
+    let hi = pts.length - 1;
+    while (lo < hi - 1) {
+      const mid = (lo + hi) >> 1;
+      if (pts[mid][0] <= t) lo = mid;
+      else hi = mid;
+    }
+    const a = pts[lo];
+    const b = pts[hi];
+    const span = b[0] - a[0] || 1;
+    const u = (t - a[0]) / span;
+    return {
+      x: a[1] + (b[1] - a[1]) * u,
+      y: a[2] + (b[2] - a[2]) * u,
+      moving: Math.hypot(b[1] - a[1], b[2] - a[2]) > 0.15,
+      faceLeft: b[1] < a[1] - 0.05,
+      target: aimOf(a),
+    };
+  }
+
+  function drawAims() {
+    if (!linesEl || !bout) return;
+    let markup = '';
+    for (const f of bout.fighters) {
+      const view = actors.get(f.id);
+      if (!view || view.dead || !view.target) continue;
+      const other = actors.get(view.target);
+      if (!other || other.dead) continue;
+      markup += '<line x1="' + view.x.toFixed(2) + '" y1="' + (view.y - 2.4).toFixed(2) +
+        '" x2="' + other.x.toFixed(2) + '" y2="' + (other.y - 2.4).toFixed(2) + '"/>';
+    }
+    linesEl.innerHTML = markup;
+  }
+
+  function hpColor(pct) {
+    const hue = Math.round(120 * Math.max(0, Math.min(1, pct)));
+    return 'hsl(' + hue + ' 72% 42%)';
+  }
+
+  function setHp(fighter, hp) {
+    const pct = fighter.maxHp ? hp / fighter.maxHp : 0;
+    const view = actors.get(fighter.id);
+    if (!view) return;
+    view.hp = hp;
+    view.bar.style.width = Math.max(0, pct * 100) + '%';
+    view.bar.style.background = hpColor(pct);
+    if (view.cardBar) {
+      view.cardBar.style.width = Math.max(0, pct * 100) + '%';
+      view.cardBar.style.background = hpColor(pct);
+    }
+  }
+
+  function renderRoster(fight) {
+    rosterEl.innerHTML = fight.fighters.map((f) => {
+      return '<li class="tile" data-id="' + f.id + '">' +
+        '<div class="tile-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
+        '<canvas width="16" height="24" data-spoop="' + escapeHtml(f.name) + '"></canvas>' +
+        '<div class="tile-hp"><span></span></div>' +
+      '</li>';
+    }).join('');
+    if (!window.SpoopArt) return;
+    fight.fighters.forEach((f) => {
+      const canvas = rosterEl.querySelector('[data-id="' + f.id + '"] canvas');
+      window.SpoopArt.drawSpoop(canvas, { name: f.name, equipped: f.equipped }, { clear: true });
+    });
+  }
+
+  function mountActors(fight) {
+    actors.clear();
+    actorsEl.innerHTML = '';
+    fxEl.innerHTML = '';
+    if (linesEl) linesEl.innerHTML = '';
+    banner.hidden = true;
+    const tracks = {};
+    (fight.tracks || []).forEach((tr) => { tracks[tr.id] = tr.pts || []; });
+    fight.fighters.forEach((f) => {
+      const el = document.createElement('div');
+      el.className = 'actor';
+      el.innerHTML =
+        '<div class="hud">' +
+          '<div class="hud-name">' + escapeHtml(f.name) + '</div>' +
+          '<div class="hud-cb">Cb ' + f.combat + '</div>' +
+          '<div class="hp-track"><span></span></div>' +
+        '</div>' +
+        '<div class="sprite-wrap"><canvas width="16" height="24"></canvas></div>';
+      el.querySelector('.hud').style.transform = 'translateY(' + ((f.id.charCodeAt(f.id.length - 1) % 3) - 1) * 7 + 'px)';
+      actorsEl.appendChild(el);
+      const canvas = el.querySelector('canvas');
+      if (window.SpoopArt) window.SpoopArt.drawSpoop(canvas, { name: f.name, equipped: f.equipped }, { clear: true });
+      const card = rosterEl.querySelector('[data-id="' + f.id + '"]');
+      const view = {
+        el,
+        wrap: el.querySelector('.sprite-wrap'),
+        bar: el.querySelector('.hp-track > span'),
+        card,
+        cardBar: card ? card.querySelector('.tile-hp > span') : null,
+        pts: tracks[f.id] || [],
+        hp: f.maxHp,
+        dead: false,
+        x: 0,
+        y: 0,
+      };
+      actors.set(f.id, view);
+      const start = sampleTrack(view.pts, 0);
+      view.x = start.x;
+      view.y = start.y;
+      place(el, start.x, start.y, fight.width, fight.height);
+      setHp(f, f.maxHp);
+    });
+  }
+
+  function floater(x, y, amount, miss) {
+    const el = document.createElement('div');
+    el.className = 'hitsplat' + (miss ? ' is-zero' : '');
+    const num = document.createElement('span');
+    num.textContent = miss ? '0' : String(amount);
+    el.appendChild(num);
+    const jx = Math.round(Math.random() * 8 - 4);
+    const jy = Math.round(Math.random() * 6 - 3);
+    el.style.left = 'calc(' + (x / bout.width * 100).toFixed(2) + '% + ' + jx + 'px)';
+    el.style.top = 'calc(' + ((y - 4.2) / bout.height * 100).toFixed(2) + '% + ' + jy + 'px)';
+    fxEl.appendChild(el);
+    window.setTimeout(() => el.remove(), 1200);
+  }
+
+  function shot(from, to, style) {
+    const el = document.createElement('div');
+    el.className = 'shot';
+    el.style.background = style === 'magic' ? '#60a5fa' : '#bbf7d0';
+    el.style.boxShadow = style === 'magic' ? '0 0 8px #60a5fa' : '0 0 6px #86efac';
+    const x0 = (from.x / bout.width) * 100;
+    const y0 = ((from.y - 4) / bout.height) * 100;
+    const x1 = (to.x / bout.width) * 100;
+    const y1 = ((to.y - 5) / bout.height) * 100;
+    el.style.left = x0 + '%';
+    el.style.top = y0 + '%';
+    fxEl.appendChild(el);
+    const t0 = performance.now();
+    function step(now) {
+      const u = Math.min(1, (now - t0) / 480);
+      el.style.left = (x0 + (x1 - x0) * u) + '%';
+      el.style.top = (y0 + (y1 - y0) * u) + '%';
+      if (u < 1) requestAnimationFrame(step);
+      else el.remove();
+    }
+    requestAnimationFrame(step);
+  }
+
+  function applyEvent(hit) {
+    const attacker = bout.fighters.find((f) => f.id === hit.from);
+    const victim = bout.fighters.find((f) => f.id === hit.to);
+    const from = actors.get(hit.from);
+    const to = actors.get(hit.to);
+    if (!attacker || !victim || !to) return;
+    setHp(victim, hit.hp);
+    if (hit.miss) floater(to.x, to.y, 0, true);
+    else floater(to.x, to.y, hit.amount, false);
+    if (from && hit.style === 'melee') {
+      from.el.classList.remove('is-lunge');
+      void from.el.offsetWidth;
+      from.el.classList.add('is-lunge');
+    } else if (from && to) {
+      shot(from, to, hit.style);
+    }
+  }
+
+  function applyDeath(death) {
+    const view = actors.get(death.id);
+    if (view) {
+      view.dead = true;
+      view.el.classList.add('is-dead');
+      view.el.classList.remove('is-lunge');
+      if (view.card) view.card.classList.add('is-dead');
+    }
+  }
+
+  function standingCount(t) {
+    let n = bout.fighters.length;
+    for (const d of bout.deaths) if (d.t <= t) n -= 1;
+    return Math.max(1, n);
+  }
+
+  function finish() {
+    playing = false;
+    cancelAnimationFrame(raf);
+    const winner = bout.fighters.find((f) => f.id === bout.winnerId);
+    if (winner) {
+      const view = actors.get(winner.id);
+      if (view) {
+        view.el.classList.add('is-winner');
+        if (view.card) view.card.classList.add('is-winner');
+      }
+      banner.hidden = false;
+      banner.innerHTML = '<span class="text-xs uppercase tracking-wide">Winner</span><strong>' +
+        escapeHtml(winner.name) + '</strong><span class="text-sm text-slate-300">Combat ' + winner.combat +
+        (bout.called ? ' · time called' : '') + '</span>';
+    }
+    if (linesEl) linesEl.innerHTML = '';
+    statusEl.textContent = winner ? winner.name + ' wins.' : 'The pit is empty.';
+    fightBtn.disabled = false;
+    const done = nightDone;
+    nightPlay = false;
+    nightDone = null;
+    if (done) done();
+  }
+
+  function frame(now) {
+    if (!playing || !bout) return;
+    const t = playFrom + ((now - playOrigin) / 1000) * speed * PACE;
+    for (const f of bout.fighters) {
+      const view = actors.get(f.id);
+      if (!view || view.dead) continue;
+      const pos = sampleTrack(view.pts, t);
+      const prevX = view.x;
+      view.x = pos.x;
+      view.y = pos.y;
+      view.target = pos.target;
+      place(view.el, pos.x, pos.y, bout.width, bout.height);
+      const faceLeft = pos.faceLeft != null ? pos.faceLeft : pos.x < prevX - 0.02;
+      view.wrap.classList.toggle('is-left', !!faceLeft && pos.moving);
+      view.wrap.classList.toggle('is-walk', !!pos.moving);
+    }
+    while (shownHit < bout.hits.length && bout.hits[shownHit].t <= t) {
+      applyEvent(bout.hits[shownHit]);
+      shownHit += 1;
+    }
+    while (shownDeath < bout.deaths.length && bout.deaths[shownDeath].t <= t) {
+      applyDeath(bout.deaths[shownDeath]);
+      shownDeath += 1;
+    }
+    drawAims();
+    const left = standingCount(t);
+    if (t < bout.duration && left > 1) {
+      statusEl.textContent = nightPlay ? 'Spoopfight' : left + ' still standing';
+      raf = requestAnimationFrame(frame);
+    } else {
+      if (!nightPlay) statusEl.textContent = left + ' still standing';
+      finish();
+    }
+  }
+
+  function arm(fight) {
+    cancelAnimationFrame(raf);
+    playing = false;
+    bout = fight;
+    shownHit = 0;
+    shownDeath = 0;
+    renderRoster(fight);
+    mountActors(fight);
+    fightBtn.disabled = false;
+    const names = fight.fighters.map((f) => f.name + ' (cb ' + f.combat + ')').slice(0, 3).join(', ');
+    statusEl.textContent = nightPlay
+      ? 'Spoopfight'
+      : fight.fighters.length + ' spoops ready. ' + names + (fight.fighters.length > 3 ? '…' : '');
+  }
+
+  async function roll(count) {
+    fightBtn.disabled = true;
+    statusEl.textContent = 'Rolling levels and gear…';
+    banner.hidden = true;
+    const res = await fetch('/api/arena', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ count }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'Could not roll the arena');
+    arm(data);
+  }
+
+  function start() {
+    if (!bout || playing) return;
+    shownHit = 0;
+    shownDeath = 0;
+    playFrom = 0;
+    playOrigin = performance.now();
+    playing = true;
+    banner.hidden = true;
+    fightBtn.disabled = true;
+    if (nightPlay) {
+      resultsEl.hidden = true;
+      waitEl.hidden = true;
+    }
+    bout.fighters.forEach((f) => {
+      const view = actors.get(f.id);
+      if (!view) return;
+      view.dead = false;
+      view.el.classList.remove('is-dead', 'is-winner', 'is-lunge');
+      if (view.card) view.card.classList.remove('is-dead', 'is-winner');
+      setHp(f, f.maxHp);
+      const startPos = sampleTrack(view.pts, 0);
+      view.x = startPos.x;
+      view.y = startPos.y;
+      place(view.el, startPos.x, startPos.y, bout.width, bout.height);
+    });
+    statusEl.textContent = nightPlay ? 'Spoopfight' : bout.fighters.length + ' still standing';
+    raf = requestAnimationFrame(frame);
+  }
+
+  form.addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    if (showMode) return;
+    const count = Math.max(2, Math.min(20, parseInt(countInput.value, 10) || 8));
+    countInput.value = String(count);
+    roll(count).catch((err) => {
+      statusEl.textContent = err.message;
+      fightBtn.disabled = !bout;
+    });
+  });
+
+  fightBtn.addEventListener('click', start);
+
+  document.querySelectorAll('[data-speed]').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const next = Number(btn.getAttribute('data-speed')) || 1;
+      if (playing) {
+        const now = performance.now();
+        playFrom += ((now - playOrigin) / 1000) * speed * PACE;
+        playOrigin = now;
+      }
+      speed = next;
+      document.querySelectorAll('[data-speed]').forEach((b) => b.classList.toggle('is-on', b === btn));
+    });
+  });
+
+  function placeWord(n) {
+    const num = Number(n) || 0;
+    const mod = num % 100;
+    if (mod >= 11 && mod <= 13) return num + 'th';
+    const last = num % 10;
+    if (last === 1) return num + 'st';
+    if (last === 2) return num + 'nd';
+    if (last === 3) return num + 'rd';
+    return num + 'th';
+  }
+
+  function formatRemain(ms) {
+    const safe = Math.max(0, ms);
+    const total = Math.floor(safe / 1000);
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    const pad = (n) => String(n).padStart(2, '0');
+    return pad(h) + ':' + pad(m) + ':' + pad(s);
+  }
+
+  function goldChange(n) {
+    const value = Math.round(Number(n) || 0);
+    const body = Math.abs(value).toLocaleString() + ' gold';
+    if (value > 0) return '+' + body;
+    if (value < 0) return '\u2212' + body;
+    return body;
+  }
+
+  function renderResults(last) {
+    if (!last || !last.results || !last.results.length) {
+      resultsEl.hidden = true;
+      resultsEl.innerHTML = '';
+      return;
+    }
+    const cards = last.results.map((row) => {
+      const note = row.opponent ? ' vs ' + row.opponent : '';
+      return '<article class="result-card' + (row.won ? ' is-first' : '') + '">' +
+        '<div class="place">' + placeWord(row.place) + '</div>' +
+        '<strong>' + escapeHtml(row.name) + '</strong>' +
+        '<div class="meta">' + goldChange(row.gold) + escapeHtml(note) + '</div>' +
+      '</article>';
+    }).join('');
+    const potBit = last.pot == null ? '' : ' · ' + Number(last.pot).toLocaleString() + ' gold pot';
+    const levelBit = last.avgLevel ? ' · avg combat ' + last.avgLevel : '';
+    resultsEl.hidden = false;
+    resultsEl.innerHTML = '<h2>Last Spoopfight' + (last.label ? ' · ' + escapeHtml(last.label) : '') + potBit + levelBit + '</h2>' + cards;
+  }
+
+  function tickCountdown() {
+    if (playing && nightPlay) {
+      countdownEl.textContent = 'Spoopfight';
+      return;
+    }
+    if (!nextAtMs) {
+      countdownEl.textContent = 'Next Spoopfight';
+      waitClock.textContent = '--:--:--';
+      return;
+    }
+    const nowMs = simMode ? worldNowMs : Date.now() + clockOffset;
+    const remain = nextAtMs - nowMs;
+    const text = formatRemain(remain);
+    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next Spoopfight ' + text;
+    waitClock.textContent = text;
+    waitWhen.textContent = nextLabel || '';
+    if (!simMode && remain <= 0 && showMode && !playing && !fetchingNight && Date.now() >= retryAt) {
+      retryAt = Date.now() + 20000;
+      loadNight();
+    }
+  }
+
+  function seenAt() {
+    try { return localStorage.getItem(SEEN); } catch (err) { return null; }
+  }
+
+  function markSeen(at) {
+    try { localStorage.setItem(SEEN, at); } catch (err) { /* private mode */ }
+  }
+
+  async function loadNight() {
+    fetchingNight = true;
+    try {
+      const res = await fetch('/api/arena');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Could not load the Spoopfight');
+      worldNowMs = Date.parse(data.now);
+      simMode = !!data.useSim;
+      clockOffset = worldNowMs - Date.now();
+      nextAtMs = data.nextAt ? Date.parse(data.nextAt) : 0;
+      nextLabel = data.nextLabel || '';
+      const last = data.last;
+      const unseen = !!(last && last.bout && seenAt() !== last.at);
+      if (!showMode) return;
+      if (unseen) {
+        resultsEl.hidden = true;
+        waitEl.hidden = true;
+        nightPlay = true;
+        nightDone = function () {
+          markSeen(last.at);
+          banner.hidden = true;
+          renderResults(last);
+          waitEl.hidden = false;
+          tickCountdown();
+        };
+        arm(last.bout);
+        start();
+      } else {
+        cancelAnimationFrame(raf);
+        playing = false;
+        renderResults(last);
+        waitEl.hidden = false;
+        if (!last || !last.bout) rosterEl.innerHTML = '';
+        statusEl.textContent = last && last.winner ? last.winner + ' won the last Spoopfight.' : 'Waiting for 9:00pm ET.';
+        tickCountdown();
+      }
+    } catch (err) {
+      statusEl.textContent = err.message;
+    } finally {
+      fetchingNight = false;
+    }
+  }
+
+  practiceBtn.addEventListener('click', () => {
+    showMode = !showMode;
+    nightPlay = false;
+    nightDone = null;
+    cancelAnimationFrame(raf);
+    playing = false;
+    if (showMode) {
+      practiceBtn.textContent = 'Practice';
+      practiceBox.hidden = true;
+      loadNight();
+      return;
+    }
+    practiceBtn.textContent = 'Spoopfight';
+    practiceBox.hidden = false;
+    resultsEl.hidden = true;
+    waitEl.hidden = true;
+    banner.hidden = true;
+    statusEl.textContent = 'Practice pit. Randomize a crowd.';
+  });
+
+  window.setInterval(tickCountdown, 250);
+  loadNight();
+})();

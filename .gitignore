@@ -1,5 +1,6 @@
 .env
 node_modules
+data/spoop-state.json
 .vercel
 *.log
 .DS_Store

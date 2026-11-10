@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spoop – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <style>
+    body { background-color: #0f172a; }
+    .spoop-sprite {
+      width: 128px;
+      height: 192px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      background: #c4a574;
+      border: 4px solid #1e293b;
+      border-radius: 8px;
+    }
+    .spoop-slot {
+      width: 52px;
+      height: 52px;
+      background: #1c140c;
+      border: 2px solid #3f2e1c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    .spoop-slot:has(.spoop-tip):hover,
+    .spoop-slot:has(.spoop-tip):focus-visible {
+      z-index: 30;
+      outline: none;
+      box-shadow: 0 0 0 1px #f0d878;
+    }
+    .spoop-tip {
+      display: none;
+      position: absolute;
+      right: calc(100% + 8px);
+      top: 50%;
+      transform: translateY(-50%);
+      width: 168px;
+      padding: 8px 10px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #e2e8f0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+      pointer-events: none;
+    }
+    .spoop-slot:hover .spoop-tip,
+    .spoop-slot:focus-visible .spoop-tip {
+      display: block;
+    }
+    .spoop-slot img {
+      width: 36px;
+      height: 36px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .spoop-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 52px);
+      gap: 4px;
+      justify-content: center;
+    }
+    .spoop-bar {
+      height: 10px;
+      background: #020617;
+      border: 1px solid #334155;
+      overflow: hidden;
+    }
+    .spoop-bar > span {
+      display: block;
+      height: 100%;
+      background: linear-gradient(90deg, #a16207, #eab308 55%, #84cc16);
+    }
+    .roll-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 60;
+      background: rgba(2, 6, 23, 0.78);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .roll-modal {
+      width: min(640px, 100%);
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 1rem 1rem 1.1rem;
+    }
+    .roll-window {
+      position: relative;
+      overflow: hidden;
+      height: 132px;
+      background: #1c140c;
+      border: 1px solid #3f2e1c;
+      border-radius: 8px;
+    }
+    .roll-marker {
+      position: absolute;
+      left: 50%;
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background: #f0d878;
+      z-index: 2;
+      transform: translateX(-1px);
+      pointer-events: none;
+    }
+    .roll-strip {
+      display: flex;
+      height: 100%;
+      will-change: transform;
+    }
+    .roll-card {
+      flex: 0 0 104px;
+      width: 104px;
+      margin-right: 8px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+    .roll-card img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      image-rendering: pixelated;
+    }
+    .roll-card span {
+      font-size: 10px;
+      line-height: 1.2;
+      color: #e2e8f0;
+      max-width: 96px;
+    }
+    .roll-card.is-win img {
+      filter: drop-shadow(0 0 6px #f0d878);
+    }
+    .roll-result {
+      margin-top: 0.75rem;
+      color: #fde68a;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-900 text-slate-200 antialiased pb-40" data-page="detail">
+  <div class="max-w-3xl mx-auto px-4 py-8">
+    <p id="spoop-clock" class="text-xs text-slate-500 mb-2"></p>
+    <div id="spoop-root"></div>
+  </div>
+  <script src="/js/spoop.js"></script>
+</body>
+</html>
