@@ -1,6 +1,7 @@
 const { load, save } = require('../lib/spoop/store');
 const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, buildArenaTest, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
 const { liveHeatFor } = require('../lib/spoop/liveHeat');
+const { postSpoopUpdates } = require('../lib/spoop/discord');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -43,40 +44,50 @@ async function readBody(req) {
   return JSON.parse(raw);
 }
 
-async function withWorld(debug) {
-  const state = load();
-  let happened = [];
+function happenedLines(events) {
+  return (events || []).map((event) => (event && event.name ? event.name + ': ' + event.text : String(event || '')));
+}
+
+async function syncWorld(debug) {
+  const state = await load();
+  const expected = state.clock;
+  let events = [];
   for (const spoop of Object.values(state.spoops)) {
-    happened = happened.concat(applyWearRules(spoop, new Date(state.clock)));
+    for (const text of applyWearRules(spoop, new Date(state.clock))) {
+      events.push({ name: spoop.name, text });
+    }
   }
-  const changedGear = happened.length > 0;
-  let live = null;
+  const changedGear = events.length > 0;
   if (!state.useSim) {
-    live = await liveHeatFor(STARTER_NAME);
-    happened = happened.concat(advance(state, new Date(), live));
-    save(state);
+    const live = await liveHeatFor(STARTER_NAME);
+    events = events.concat(advance(state, new Date(), live));
+    const saved = await save(state, expected);
+    if (!saved) return presentWorld(await load(), debug, []);
+    await postSpoopUpdates(events);
   } else if (changedGear) {
-    save(state);
+    await save(state, expected);
   }
-  return presentWorld(state, debug, happened);
+  return presentWorld(state, debug, happenedLines(events));
 }
 
 async function handlePost(req) {
   const body = await readBody(req);
   const action = body.action;
-  const state = load();
+  const state = await load();
+  const expected = state.clock;
   const debug = debugAllowed(req);
   const spoop = spoopOf(state, body.name || STARTER_NAME);
   if (!spoop) return { status: 404, payload: { error: 'No spoop by that name' } };
   const wearNotes = applyWearRules(spoop, new Date(state.clock));
-  if (wearNotes.length) save(state);
+  if (wearNotes.length) await save(state, expected);
 
   if (action === 'spend') {
     const now = new Date(state.clock);
     const rng = mulberry32(hashString(`${spoop.name}|crate|${now.toISOString()}|${spoop.gold}|${body.crate}|${Math.random()}`));
     const result = openCrate(spoop, body.crate, now, rng);
     if (!result.ok) return { status: 400, payload: { error: result.error } };
-    save(state);
+    const saved = await save(state, state.clock);
+    if (saved) await postSpoopUpdates([{ name: spoop.name, text: result.text }]);
     const payload = presentWorld(state, debug, [result.text]);
     payload.roll = result.roll;
     return { status: 200, payload };
@@ -87,7 +98,7 @@ async function handlePost(req) {
     let happened = [];
     if (body.op === 'reset') {
       const fresh = createWorld(new Date());
-      save(fresh);
+      await save(fresh);
       return { status: 200, payload: presentWorld(fresh, true, ['Reset SpoopSpooply.']) };
     }
     if (body.op === 'heat') {
@@ -97,18 +108,21 @@ async function handlePost(req) {
         loot: !!body.loot,
       };
       state.useSim = true;
-      save(state);
+      await save(state);
       return { status: 200, payload: presentWorld(state, true, []) };
     }
     if (body.op === 'real') {
       state.useSim = false;
+      const fromClock = state.clock;
       const live = await liveHeatFor(STARTER_NAME);
       happened = advance(state, new Date(), live);
-      save(state);
-      return { status: 200, payload: presentWorld(state, true, happened) };
+      const saved = await save(state, fromClock);
+      if (saved) await postSpoopUpdates(happened);
+      return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
     }
     state.useSim = true;
-    const from = new Date(state.clock);
+    const fromClock = state.clock;
+    const from = new Date(fromClock);
     let target = null;
     if (body.op === 'next') {
       const ev = nextEventAfter(from);
@@ -124,8 +138,8 @@ async function handlePost(req) {
       return { status: 400, payload: { error: 'Unknown debug op' } };
     }
     happened = advance(state, target, null);
-    save(state);
-    return { status: 200, payload: presentWorld(state, true, happened) };
+    await save(state, fromClock);
+    return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
   }
 
   return { status: 400, payload: { error: 'Unknown action' } };
@@ -154,12 +168,8 @@ async function proxySprite(req, res) {
 }
 
 async function worldNow() {
-  const state = load();
-  if (!state.useSim) {
-    const live = await liveHeatFor(STARTER_NAME);
-    advance(state, new Date(), live);
-    save(state);
-  }
+  await syncWorld(false);
+  const state = await load();
   const now = new Date(state.clock);
   const next = nextArenaAfter(now);
   const last = state.lastArena || null;
@@ -190,7 +200,7 @@ async function handleArena(req, res) {
   }
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if ((req.query.path || '') === 'arena') return handleArena(req, res);
@@ -199,7 +209,7 @@ module.exports = async function handler(req, res) {
       return proxySprite(req, res);
     }
     if (req.method === 'GET') {
-      const payload = await locked(() => withWorld(debugAllowed(req)));
+      const payload = await locked(() => syncWorld(debugAllowed(req)));
       return res.status(200).json(payload);
     }
     if (req.method === 'POST') {
@@ -211,4 +221,7 @@ module.exports = async function handler(req, res) {
     console.error('spoops', err);
     return res.status(500).json({ error: 'Server error', detail: err.message || String(err) });
   }
-};
+}
+
+module.exports = handler;
+module.exports.syncWorld = syncWorld;

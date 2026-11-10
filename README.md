@@ -52,6 +52,8 @@ To log loot drops from the [Dink](https://github.com/pajlads/DinkPlugin) plugin:
 
 **Boss kill leader change → Discord:** After each snapshot cron run, SpoopTool checks who has the most total boss kills. If that leader changed (someone overtook the previous leader), it can post to Discord. Add env var `DISCORD_LEADERBOARD_WEBHOOK_URL` with an incoming webhook URL for the channel where you want these notifications. Run `sql/migration_leaderboard_state.sql` in Neon so the cron can store the previous leader and detect changes.
 
+**Spoop updates → Discord:** Each spoop's training, loot, and nightly arena result can post to one channel. In that channel, create an incoming webhook and set `DISCORD_SPOOP_WEBHOOK_URL` to its URL. The world is stored in Neon (`sql/migration_spoop_world.sql`, also created on first use). Updates go out when someone opens the Spoops page and again on the snapshot cron, so the same tick is only sent once.
+
 **Deploy results → Discord (for collaborators):** On Vercel Hobby you can’t add team members, but you can still share deploy status. Vercel can send webhooks when a deployment succeeds, fails, or is canceled; SpoopTool can forward those to a Discord channel.
 
 **Quick setup:**

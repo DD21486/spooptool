@@ -459,6 +459,13 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  try {
+    const { syncWorld } = require('../spoops');
+    await syncWorld(false);
+  } catch (spoopErr) {
+    console.error('spoop discord', spoopErr?.message || spoopErr);
+  }
+
   return res.status(200).json({
     ok: true,
     snapshots: written,
