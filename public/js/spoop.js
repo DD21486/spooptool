@@ -654,7 +654,11 @@
         '</a>'
       );
     }).join('');
-    root.innerHTML = renderMap(spoops) + (cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>');
+    const pk = state.pk;
+    const pkBanner = pk
+      ? '<a class="spoop-pk" href="/arena.html">PK · ' + escapeHtml(pk.a) + ' vs ' + escapeHtml(pk.b) + ' · ' + escapeHtml(pk.reason) + '</a>'
+      : '';
+    root.innerHTML = pkBanner + renderMap(spoops) + (cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>');
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
     paint(state);
@@ -842,6 +846,9 @@
           '<h1 class="text-2xl text-slate-100">' + escapeHtml(spoop.name) + '</h1>' +
           (spoop.owner && spoop.owner !== spoop.name ? '<p class="text-xs text-slate-500">' + escapeHtml(spoop.owner) + '</p>' : '') +
           '<p class="text-slate-400 text-sm">' + gold(spoop.gold) + ' · Arena ' + spoop.arenaWins + 'W ' + spoop.arenaLosses + 'L</p>' +
+          (state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
+            ? '<p class="text-sm mt-1"><a class="text-rose-300 hover:text-rose-200" href="/arena.html">PK vs ' + escapeHtml(state.pk.a === spoop.name ? state.pk.b : state.pk.a) + '</a></p>'
+            : '') +
         '</div>' +
         '<section class="ml-auto max-w-md text-right">' +
           '<p class="text-xs uppercase tracking-wide text-slate-500">Right now</p>' +

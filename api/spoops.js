@@ -1,6 +1,6 @@
 const { load, save } = require('../lib/spoop/store');
-const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
-const { postSpoopUpdates } = require('../lib/spoop/discord');
+const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot } = require('../lib/spoop/engine');
+const { publishEvents } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
 function cors(res) {
@@ -67,7 +67,7 @@ async function syncWorld(debug) {
     events = events.concat(advance(state, new Date()));
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
-    await postSpoopUpdates(events, state);
+    if (await publishEvents(events, state)) await save(state, state.clock);
   } else if (changedGear) {
     await save(state, expected);
   }
@@ -91,7 +91,9 @@ async function handlePost(req) {
     const result = openCrate(spoop, body.crate, now, rng);
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
-    if (saved) await postSpoopUpdates([{ name: spoop.name, text: result.text }], state);
+    if (saved && await publishEvents([{ name: spoop.name, text: result.text }], state)) {
+      await save(state, state.clock);
+    }
     const payload = presentWorld(state, debug, [result.text]);
     payload.roll = result.roll;
     return { status: 200, payload };
@@ -110,7 +112,7 @@ async function handlePost(req) {
       const fromClock = state.clock;
       happened = advance(state, new Date());
       const saved = await save(state, fromClock);
-      if (saved) await postSpoopUpdates(happened, state);
+      if (saved && await publishEvents(happened, state)) await save(state, state.clock);
       return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
     }
     state.useSim = true;
@@ -163,17 +165,7 @@ async function proxySprite(req, res) {
 async function worldNow() {
   await syncWorld(false);
   const state = await load();
-  const now = new Date(state.clock);
-  const next = nextArenaAfter(now);
-  const last = state.lastArena || null;
-  return {
-    now: state.clock,
-    clockLabel: formatEt(now),
-    useSim: !!state.useSim,
-    nextAt: next ? next.when.toISOString() : null,
-    nextLabel: next ? formatEt(next.when) : null,
-    last,
-  };
+  return arenaSnapshot(state);
 }
 
 /** GET /api/arena (rewrite → ?path=arena). Same function as /api/spoops. */

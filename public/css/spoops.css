@@ -59,6 +59,19 @@
 
 .spoop-lead span { color: #c5ced8; }
 
+.spoop-pk {
+  display: block;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 113, 113, 0.45);
+  background: rgba(127, 29, 29, 0.28);
+  color: #fecaca;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.spoop-pk:hover { color: #fff; }
+
 .spoop-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -31,7 +31,15 @@
   let fetchingNight = false;
   let retryAt = 0;
   const SEEN = 'spoop-arena-seen';
+  const SEEN_PK = 'spoop-arena-pk-seen';
   const actors = new Map();
+  const waitKicker = document.getElementById('arena-wait-kicker');
+  let fightTitle = 'Spoopfight';
+  let pkAtMs = 0;
+  let pkA = '';
+  let pkB = '';
+  let pkReason = '';
+  let lastFetchAt = 0;
 
   function escapeHtml(s) {
     return String(s == null ? '' : s)
@@ -248,9 +256,10 @@
         if (view.card) view.card.classList.add('is-winner');
       }
       banner.hidden = false;
+      const note = bout.pkNote ? ' · ' + bout.pkNote : '';
       banner.innerHTML = '<span class="text-xs uppercase tracking-wide">Winner</span><strong>' +
         escapeHtml(winner.name) + '</strong><span class="text-sm text-slate-300">Combat ' + winner.combat +
-        (bout.called ? ' · time called' : '') + '</span>';
+        (bout.called ? ' · time called' : '') + escapeHtml(note) + '</span>';
     }
     if (linesEl) linesEl.innerHTML = '';
     statusEl.textContent = winner ? winner.name + ' wins.' : 'The pit is empty.';
@@ -285,22 +294,23 @@
     }
     drawAims();
     if (t < bout.duration && standingCount(t) > 1) {
-      statusEl.textContent = 'Spoopfight';
+      statusEl.textContent = fightTitle;
       raf = requestAnimationFrame(frame);
     } else {
       finish();
     }
   }
 
-  function arm(fight) {
+  function arm(fight, title) {
     cancelAnimationFrame(raf);
     playing = false;
     bout = fight;
+    fightTitle = title || 'Spoopfight';
     shownHit = 0;
     shownDeath = 0;
     renderRoster(fight);
     mountActors(fight);
-    statusEl.textContent = 'Spoopfight';
+    statusEl.textContent = fightTitle;
   }
 
   function start() {
@@ -325,7 +335,7 @@
       view.y = startPos.y;
       place(view.el, startPos.x, startPos.y, bout.width, bout.height);
     });
-    statusEl.textContent = 'Spoopfight';
+    statusEl.textContent = fightTitle;
     raf = requestAnimationFrame(frame);
   }
 
@@ -378,22 +388,68 @@
     resultsEl.innerHTML = '<h2>Last Spoopfight' + (last.label ? ' · ' + escapeHtml(last.label) : '') + potBit + levelBit + '</h2>' + cards;
   }
 
+  function renderPkResults(pk) {
+    if (!pk) {
+      resultsEl.hidden = true;
+      resultsEl.innerHTML = '';
+      return;
+    }
+    const item = pk.item ? 'Took ' + pk.item + '.' : 'Nothing equipped to take.';
+    resultsEl.hidden = false;
+    resultsEl.innerHTML = '<h2>PK · ' + escapeHtml(pk.a) + ' vs ' + escapeHtml(pk.b) + '</h2>' +
+      '<article class="result-card is-first"><div class="place">Winner</div><strong>' + escapeHtml(pk.winner) +
+      '</strong><div class="meta">' + escapeHtml(item) + '</div></article>' +
+      '<article class="result-card"><div class="place">Lost</div><strong>' + escapeHtml(pk.loser) +
+      '</strong><div class="meta">vs ' + escapeHtml(pk.winner) + '</div></article>';
+  }
+
+  function worldMs() {
+    return simMode ? worldNowMs : Date.now() + clockOffset;
+  }
+
+  function showPkWait(text) {
+    countdownEl.classList.add('is-pk');
+    waitEl.classList.add('is-pk');
+    if (waitKicker) waitKicker.textContent = 'PK';
+    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'PK ' + text;
+    waitClock.textContent = text;
+    waitWhen.textContent = pkA + ' vs ' + pkB + (pkReason ? ' — ' + pkReason : '');
+  }
+
+  function showNightWait(text) {
+    countdownEl.classList.remove('is-pk');
+    waitEl.classList.remove('is-pk');
+    if (waitKicker) waitKicker.textContent = 'Next Spoopfight';
+    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next Spoopfight ' + text;
+    waitClock.textContent = text;
+    waitWhen.textContent = nextLabel || '';
+  }
+
   function tickCountdown() {
     if (playing) {
-      countdownEl.textContent = 'Spoopfight';
+      countdownEl.textContent = fightTitle;
+      return;
+    }
+    const nowMs = worldMs();
+    if (pkAtMs && pkAtMs > nowMs) {
+      showPkWait(formatRemain(pkAtMs - nowMs));
+      return;
+    }
+    if (pkAtMs && pkAtMs <= nowMs && !simMode && !playing && !fetchingNight && Date.now() >= retryAt) {
+      retryAt = Date.now() + 15000;
+      loadNight();
       return;
     }
     if (!nextAtMs) {
+      countdownEl.classList.remove('is-pk');
+      waitEl.classList.remove('is-pk');
+      if (waitKicker) waitKicker.textContent = 'Next Spoopfight';
       countdownEl.textContent = 'Next Spoopfight';
       waitClock.textContent = '--:--:--';
       return;
     }
-    const nowMs = simMode ? worldNowMs : Date.now() + clockOffset;
     const remain = nextAtMs - nowMs;
-    const text = formatRemain(remain);
-    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next Spoopfight ' + text;
-    waitClock.textContent = text;
-    waitWhen.textContent = nextLabel || '';
+    showNightWait(formatRemain(remain));
     if (!simMode && remain <= 0 && !playing && !fetchingNight && Date.now() >= retryAt) {
       retryAt = Date.now() + 20000;
       loadNight();
@@ -408,8 +464,17 @@
     try { localStorage.setItem(SEEN, at); } catch (err) { /* private mode */ }
   }
 
+  function seenPk() {
+    try { return localStorage.getItem(SEEN_PK); } catch (err) { return null; }
+  }
+
+  function markPk(at) {
+    try { localStorage.setItem(SEEN_PK, at); } catch (err) { /* private mode */ }
+  }
+
   async function loadNight() {
     fetchingNight = true;
+    lastFetchAt = Date.now();
     try {
       const res = await fetch('/api/arena');
       const data = await res.json().catch(() => ({}));
@@ -419,9 +484,31 @@
       clockOffset = worldNowMs - Date.now();
       nextAtMs = data.nextAt ? Date.parse(data.nextAt) : 0;
       nextLabel = data.nextLabel || '';
+      pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
+      pkA = data.pk ? data.pk.a || '' : '';
+      pkB = data.pk ? data.pk.b || '' : '';
+      pkReason = data.pk ? data.pk.reason || '' : '';
       const last = data.last;
-      const unseen = !!(last && last.bout && seenAt() !== last.at);
-      if (unseen) {
+      const lastPk = data.lastPk;
+      const waiting = !!(pkAtMs && worldMs() < pkAtMs);
+      const pkUnseen = !!(lastPk && lastPk.bout && seenPk() !== lastPk.at && !waiting);
+      if ((waiting || pkUnseen) && last && last.at) markSeen(last.at);
+      const nightUnseen = !!(last && last.bout && seenAt() !== last.at && !waiting && !pkUnseen);
+      if (pkUnseen) {
+        resultsEl.hidden = true;
+        waitEl.hidden = true;
+        lastPk.bout.pkNote = lastPk.item ? 'Took ' + lastPk.item : '';
+        nightDone = function () {
+          markPk(lastPk.at);
+          banner.hidden = true;
+          renderPkResults(lastPk);
+          waitEl.hidden = false;
+          pkAtMs = 0;
+          tickCountdown();
+        };
+        arm(lastPk.bout, 'PK');
+        start();
+      } else if (nightUnseen) {
         resultsEl.hidden = true;
         waitEl.hidden = true;
         nightDone = function () {
@@ -431,12 +518,23 @@
           waitEl.hidden = false;
           tickCountdown();
         };
-        arm(last.bout);
+        arm(last.bout, 'Spoopfight');
         start();
+      } else if (waiting) {
+        cancelAnimationFrame(raf);
+        playing = false;
+        banner.hidden = true;
+        resultsEl.hidden = true;
+        resultsEl.innerHTML = '';
+        waitEl.hidden = false;
+        rosterEl.innerHTML = '';
+        statusEl.textContent = pkA + ' vs ' + pkB;
+        tickCountdown();
       } else {
         cancelAnimationFrame(raf);
         playing = false;
-        renderResults(last);
+        if (lastPk && seenPk() === lastPk.at && (!last || String(lastPk.at) > String(last.at))) renderPkResults(lastPk);
+        else renderResults(last);
         waitEl.hidden = false;
         if (!last || !last.bout) rosterEl.innerHTML = '';
         statusEl.textContent = last && last.winner ? last.winner + ' won the last Spoopfight.' : 'Waiting for 9:00pm ET.';
@@ -450,5 +548,10 @@
   }
 
   window.setInterval(tickCountdown, 250);
+  window.setInterval(() => {
+    if (playing || fetchingNight) return;
+    if (Date.now() - lastFetchAt < 30000) return;
+    loadNight();
+  }, 5000);
   loadNight();
 })();

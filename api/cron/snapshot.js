@@ -17,6 +17,7 @@ const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
 const { computeSpoopScore, computeBossScore } = require('../../lib/spoopscore');
 const { sendDueArenaReminders } = require('../../lib/spoop/arena-reminders');
+const { syncPk } = require('../../lib/spoop/pk-settle');
 
 function xpFromData(data) {
   if (!data || !data.skills || !data.skills.overall) return 0;
@@ -204,8 +205,9 @@ module.exports = async function handler(req, res) {
 
   if (req.query.arena_reminder === '1' || req.query.arena_reminder === 'true') {
     try {
+      const pk = await syncPk(new Date());
       const result = await sendDueArenaReminders(new Date());
-      return res.status(200).json({ ok: true, ...result });
+      return res.status(200).json({ ok: true, pk, ...result });
     } catch (err) {
       console.error('arena reminder', err);
       return res.status(500).json({ error: err.message || String(err) });

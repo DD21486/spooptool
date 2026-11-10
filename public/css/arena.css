@@ -138,6 +138,8 @@
   min-width: 11rem;
 }
 
+.countdown.is-pk { color: #fca5a5; }
+
 .results {
   display: flex;
   flex-wrap: wrap;
@@ -195,6 +197,13 @@
   text-shadow: 0 2px 0 #3a2a18;
 }
 .wait-when { margin-top: 4px; font-size: 13px; color: #e2e8f0; }
+
+.wait-card.is-pk {
+  border-color: rgba(248, 113, 113, 0.75);
+  max-width: 340px;
+}
+
+.wait-card.is-pk .wait-kicker { color: #fca5a5; }
 
 .actor {
   position: absolute;
