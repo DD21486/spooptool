@@ -13,7 +13,8 @@
   const waitWhen = document.getElementById('arena-wait-when');
 
   const PACE = 0.55;
-  const SPEED = 1.5;
+  const ARENA_SPEED = 1.5;
+  const PK_SPEED = 2;
 
   let bout = null;
   let playing = false;
@@ -35,6 +36,7 @@
   const actors = new Map();
   const waitKicker = document.getElementById('arena-wait-kicker');
   let fightTitle = 'Spoopfight';
+  let playSpeed = ARENA_SPEED;
   let pkAtMs = 0;
   let pkA = '';
   let pkB = '';
@@ -270,7 +272,7 @@
 
   function frame(now) {
     if (!playing || !bout) return;
-    const t = playFrom + ((now - playOrigin) / 1000) * SPEED * PACE;
+    const t = playFrom + ((now - playOrigin) / 1000) * playSpeed * PACE;
     for (const f of bout.fighters) {
       const view = actors.get(f.id);
       if (!view || view.dead) continue;
@@ -306,6 +308,7 @@
     playing = false;
     bout = fight;
     fightTitle = title || 'Spoopfight';
+    playSpeed = fightTitle === 'PK' ? PK_SPEED : ARENA_SPEED;
     shownHit = 0;
     shownDeath = 0;
     renderRoster(fight);
