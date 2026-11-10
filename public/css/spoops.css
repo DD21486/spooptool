@@ -337,6 +337,7 @@
 .spoop-pin-ranged { background: #4ade80; --glow: rgba(74, 222, 128, 0.9); }
 .spoop-pin-magic { background: #60a5fa; --glow: rgba(96, 165, 250, 0.95); }
 .spoop-pin-skilling { background: #fbbf24; --glow: rgba(251, 191, 36, 0.95); }
+.spoop-pin-quest { background: #c084fc; --glow: rgba(192, 132, 252, 0.95); }
 
 @media (hover: hover) and (pointer: fine) {
   .spoop-pin:hover,

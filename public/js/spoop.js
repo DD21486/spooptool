@@ -386,7 +386,7 @@
       }
       left = Math.max(4, Math.min(96, left));
       top = Math.max(5, Math.min(94, top));
-      const style = ['melee', 'ranged', 'magic', 'skilling'].includes(act.style) ? act.style : 'melee';
+      const style = ['melee', 'ranged', 'magic', 'skilling', 'quest'].includes(act.style) ? act.style : 'melee';
       const low = top < 12 ? ' is-low' : '';
       return '<a class="spoop-pin' + low + '" data-spoop="' + escapeHtml(spoopKey(spoop)) + '" href="/spoop.html?name=' + encodeURIComponent(spoopKey(spoop)) + '" style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%">' +
         '<span class="spoop-pin-tip">' +
@@ -803,8 +803,10 @@
     }
     const heat = influenceOf(state, spoop);
     const heatLabel = state.useSim ? 'Debug heat, applied as you simulate' : 'From the real account, last 18 hours';
+    const quests = spoop.quests || { points: 0, done: 0, total: 0 };
+    const focus = (spoop.activity && spoop.activity.skills) || [spoop.activity.skill];
     const skills = spoop.skills.map((s) => {
-      const training = spoop.activity.skill === s.id;
+      const training = focus.indexOf(s.id) >= 0;
       return '<div class="flex items-center gap-2 py-1' + (training ? ' text-amber-200' : '') + '">' +
         '<img src="' + SKILL_ICON[s.id] + '" alt="" width="16" height="16" class="shrink-0">' +
         '<span class="w-16 text-sm">' + escapeHtml(s.name) + '</span>' +
@@ -856,7 +858,7 @@
           '<p class="text-xs uppercase tracking-wide text-slate-500">Right now</p>' +
           '<h2 class="text-xl text-amber-200 mt-1">' + escapeHtml(spoop.activity.name) + '</h2>' +
           '<p class="text-slate-300 mt-1">' + escapeHtml(spoop.activity.detail) + '</p>' +
-          '<p class="text-xs text-slate-500 mt-2">Training ' + escapeHtml(spoop.activity.skill) + '</p>' +
+          '<p class="text-xs text-slate-500 mt-2">' + (spoop.activity.quest ? 'Quest reward this hour' : 'Training ' + escapeHtml(spoop.activity.skill)) + '</p>' +
           (spoop.activity.money ? '<p class="text-xs text-amber-200/80 mt-1">Slow training. The gold is the point.</p>' : '') +
           nextActionHtml(spoop, state, true) +
           '<div class="flex gap-1 mt-3 justify-end">' + pip(heat.xp, 'XP') + pip(heat.boss, 'Boss') + pip(heat.loot, 'Drop') + '</div>' +
@@ -867,10 +869,10 @@
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-2">' +
             '<h3 class="text-sm text-slate-300">Skills</h3>' +
-            '<p class="text-sm text-slate-100 tabular-nums">Combat ' + spoop.combat + '</p>' +
+            '<p class="text-sm text-slate-100 tabular-nums">Combat ' + spoop.combat + ' · ' + quests.points + ' QP</p>' +
           '</div>' +
           '<div class="flex items-center gap-2 mb-3">' + bar(gate.progress) + '</div>' +
-          '<p class="text-[11px] text-slate-500 mb-2">' + escapeHtml(gateLabel) + '</p>' +
+          '<p class="text-[11px] text-slate-500 mb-2">' + escapeHtml(gateLabel) + ' · ' + quests.done + '/' + quests.total + ' quests</p>' +
           skills +
           statsHtml +
         '</section>' +
