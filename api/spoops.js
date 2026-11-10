@@ -1,5 +1,5 @@
 const { load, save } = require('../lib/spoop/store');
-const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32 } = require('../lib/spoop/engine');
+const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, buildArenaTest, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
 const { liveHeatFor } = require('../lib/spoop/liveHeat');
 
 function cors(res) {
@@ -153,9 +153,47 @@ async function proxySprite(req, res) {
   return res.status(404).end();
 }
 
+async function worldNow() {
+  const state = load();
+  if (!state.useSim) {
+    const live = await liveHeatFor(STARTER_NAME);
+    advance(state, new Date(), live);
+    save(state);
+  }
+  const now = new Date(state.clock);
+  const next = nextArenaAfter(now);
+  const last = state.lastArena || null;
+  return {
+    now: state.clock,
+    clockLabel: formatEt(now),
+    useSim: !!state.useSim,
+    nextAt: next ? next.when.toISOString() : null,
+    nextLabel: next ? formatEt(next.when) : null,
+    last,
+  };
+}
+
+/** GET/POST /api/arena (rewrite → ?path=arena). Same function as /api/spoops. */
+async function handleArena(req, res) {
+  try {
+    if (req.method === 'GET') {
+      return res.status(200).json(await worldNow());
+    }
+    if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+    const body = await readBody(req);
+    const count = Math.max(2, Math.min(20, parseInt(body.count, 10) || 8));
+    const seed = (Math.random() * 4294967296) >>> 0;
+    return res.status(200).json(buildArenaTest(count, seed));
+  } catch (err) {
+    console.error('arena', err);
+    return res.status(500).json({ error: 'Could not build the arena', detail: err.message || String(err) });
+  }
+}
+
 module.exports = async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
+  if ((req.query.path || '') === 'arena') return handleArena(req, res);
   try {
     if (req.method === 'GET' && (req.query.icon === '1' || req.query.icon === 'true')) {
       return proxySprite(req, res);

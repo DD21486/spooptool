@@ -11,6 +11,8 @@
     { "source": "/api/test-leaderboard-webhook", "destination": "/api/loot?testLeaderboard=1" },
     { "source": "/api/player-history", "destination": "/api/player-deltas?path=history" },
     { "source": "/api/character-snapshot", "destination": "/api/characters-with-snapshots" },
-    { "source": "/api/ge-prices", "destination": "/api/aggregate-history?path=ge" }
+    { "source": "/api/ge-prices", "destination": "/api/aggregate-history?path=ge" },
+    { "source": "/api/arena", "destination": "/api/spoops?path=arena" },
+    { "source": "/api/spoopscore-history", "destination": "/api/characters?path=spoopscore-history" }
   ]
 }
