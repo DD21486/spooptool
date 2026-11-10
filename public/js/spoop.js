@@ -388,17 +388,20 @@
       top = Math.max(5, Math.min(94, top));
       const style = ['melee', 'ranged', 'magic', 'skilling'].includes(act.style) ? act.style : 'melee';
       const low = top < 12 ? ' is-low' : '';
-      return '<a class="spoop-pin' + low + '" href="/spoop.html?name=' + encodeURIComponent(spoopKey(spoop)) + '" style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%" title="' + escapeHtml(spoop.name + ' — ' + (act.name || '')) + '">' +
-        '<span class="spoop-pin-name">' + escapeHtml(spoop.name) + '</span>' +
-        '<span class="spoop-pin-act">' + escapeHtml(act.name || '') + '</span>' +
+      return '<a class="spoop-pin' + low + '" data-spoop="' + escapeHtml(spoopKey(spoop)) + '" href="/spoop.html?name=' + encodeURIComponent(spoopKey(spoop)) + '" style="left:' + left.toFixed(2) + '%;top:' + top.toFixed(2) + '%">' +
+        '<span class="spoop-pin-tip">' +
+          '<span class="spoop-pin-name">' + escapeHtml(spoop.name) + '</span>' +
+          '<span class="spoop-pin-act">' + escapeHtml(act.name || '') + '</span>' +
+        '</span>' +
         '<span class="spoop-pin-orb spoop-pin-' + style + '"></span>' +
       '</a>';
     }).join('');
     return '<section class="gielinor-wrap">' +
-      '<h2 class="text-sm text-slate-300 mb-2">On Gielinor</h2>' +
+      '<p class="gielinor-kicker">On Gielinor</p>' +
       '<div class="gielinor">' +
         '<div class="gielinor-stage">' +
           '<img class="gielinor-map" src="/assets/gielinor-map.png" alt="Map of Gielinor" width="704" height="391">' +
+          '<img class="gielinor-map gielinor-map-sharp" alt="" width="1408" height="782">' +
           pins +
         '</div>' +
         '<div class="gielinor-zoom" role="group" aria-label="Map zoom">' +
@@ -430,8 +433,39 @@
       y = Math.min(0, Math.max(Math.min(0, vh - sh), y));
     }
 
+    const SHARP_AT = 2;
+    const sharp = stage.querySelector('.gielinor-map-sharp');
+
+    function syncSharp() {
+      if (!sharp) return;
+      const want = scale >= SHARP_AT;
+      if (want && !sharp.getAttribute('src')) {
+        sharp.addEventListener('load', () => {
+          if (scale >= SHARP_AT) stage.classList.add('is-sharp');
+        });
+        sharp.src = '/assets/gielinor-map-2x.png';
+      }
+      const ready = sharp.complete && sharp.naturalWidth > 0;
+      stage.classList.toggle('is-sharp', want && ready);
+    }
+
     function apply() {
       stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+      syncSharp();
+    }
+
+    function reveal(pin) {
+      if (!pin || scale <= 1.05) return;
+      const viewRect = view.getBoundingClientRect();
+      const pinRect = pin.getBoundingClientRect();
+      const pad = 36;
+      const outside = pinRect.left < viewRect.left + pad || pinRect.right > viewRect.right - pad ||
+        pinRect.top < viewRect.top + pad || pinRect.bottom > viewRect.bottom - pad;
+      if (!outside) return;
+      x += (viewRect.left + viewRect.width / 2) - (pinRect.left + pinRect.width / 2);
+      y += (viewRect.top + viewRect.height / 2) - (pinRect.top + pinRect.height / 2);
+      clamp();
+      apply();
     }
 
     function zoomAt(clientX, clientY, next) {
@@ -533,6 +567,29 @@
         else zoomAt(cx, cy, 1);
       });
     });
+
+    return { reveal };
+  }
+
+  function bindSpoopHover(root, map) {
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    root.querySelectorAll('.spoop-card, .spoop-pin').forEach((el) => {
+      const key = el.getAttribute('data-spoop');
+      if (!key) return;
+      const mates = () => Array.from(root.querySelectorAll('[data-spoop]')).filter((other) => other.getAttribute('data-spoop') === key);
+      el.addEventListener('pointerenter', () => {
+        mates().forEach((other) => other.classList.add('is-hot'));
+        if (map && el.classList.contains('spoop-card')) {
+          const pin = mates().find((other) => other.classList.contains('spoop-pin'));
+          if (pin) map.reveal(pin);
+        }
+      });
+      el.addEventListener('pointerleave', () => {
+        mates().forEach((other) => other.classList.remove('is-hot'));
+      });
+      el.addEventListener('focus', () => mates().forEach((other) => other.classList.add('is-hot')));
+      el.addEventListener('blur', () => mates().forEach((other) => other.classList.remove('is-hot')));
+    });
   }
 
   function renderList(state) {
@@ -543,7 +600,7 @@
         ? '<p class="spoop-owner">' + escapeHtml(spoop.owner) + '</p>'
         : '';
       return (
-        '<a href="/spoop.html?name=' + encodeURIComponent(spoopKey(spoop)) + '" class="spoop-card">' +
+        '<a href="/spoop.html?name=' + encodeURIComponent(spoopKey(spoop)) + '" class="spoop-card" data-spoop="' + escapeHtml(spoopKey(spoop)) + '">' +
           '<canvas class="spoop-sprite" width="16" height="24" data-spoop="' + escapeHtml(spoopKey(spoop)) + '"></canvas>' +
           '<h2>' + escapeHtml(spoop.name) + '</h2>' +
           owner +
@@ -556,9 +613,22 @@
         '</a>'
       );
     }).join('');
-    root.innerHTML = renderMap(spoops) + (cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="text-slate-500">No spoops yet.</p>');
-    mountMapZoom(root);
+    root.innerHTML = renderMap(spoops) + (cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>');
+    const map = mountMapZoom(root);
+    bindSpoopHover(root, map);
     paint(state);
+  }
+
+  function activityLog(spoop) {
+    const rows = (spoop.log || []).slice(0, 20);
+    if (!rows.length) return '<p class="spoop-log-empty">Nothing recorded yet.</p>';
+    return '<ol class="spoop-log-list">' + rows.map((row) => {
+      const text = String(row.text || '');
+      const parts = text.split(' — ');
+      const time = parts.length > 1 ? parts[0] : '';
+      const body = parts.length > 1 ? parts.slice(1).join(' — ') : text;
+      return '<li><time>' + escapeHtml(time) + '</time><p>' + escapeHtml(body) + '</p></li>';
+    }).join('') + '</ol>';
   }
 
   function bar(pct) {
@@ -692,9 +762,7 @@
         : '<div class="spoop-slot"></div>');
     }
     const bank = '<div class="flex flex-wrap gap-1">' + bankCells.join('') + '</div>';
-    const log = spoop.log.length
-      ? spoop.log.map((row) => '<li class="py-1 border-b border-slate-800/80">' + escapeHtml(row.text) + '</li>').join('')
-      : '<li class="text-slate-600">Nothing has happened yet. On localhost, use the debug clock.</li>';
+    const log = activityLog(spoop);
     const fight = spoop.fights[0];
     const fightHtml = fight
       ? '<p class="text-sm ' + (fight.won ? 'text-emerald-300' : 'text-rose-300') + '">' + escapeHtml(fight.summary) + '</p>' +
@@ -760,9 +828,9 @@
         '</div>' +
         bank +
       '</section>' +
-      '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
-        '<h3 class="text-sm text-slate-300 mb-2">Life</h3>' +
-        '<ul class="text-sm text-slate-300">' + log + '</ul>' +
+      '<section class="spoop-log mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+        '<h3>Activity</h3>' +
+        log +
       '</section>';
 
     drawSpoop(document.getElementById('spoop-hero'), spoop);
