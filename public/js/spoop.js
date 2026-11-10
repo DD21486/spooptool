@@ -451,6 +451,8 @@
 
     function apply() {
       stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
+      // Counter the map scale, then shrink a bit more so the tile under each pin stays visible.
+      stage.style.setProperty('--pin-scale', (1 / Math.pow(scale, 1.35)).toFixed(4));
       syncSharp();
     }
 
@@ -592,6 +594,68 @@
     });
   }
 
+  function nextActionPhrase(kind) {
+    if (kind === 'arena') return 'Arena';
+    if (kind === 'drop') return 'Activity and loot';
+    return 'Next activity';
+  }
+
+  function formatRemain(ms) {
+    const total = Math.max(0, Math.ceil(ms / 1000));
+    const h = Math.floor(total / 3600);
+    const m = Math.floor((total % 3600) / 60);
+    const s = total % 60;
+    if (h > 0) return h + 'h ' + String(m).padStart(2, '0') + 'm';
+    if (m > 0) return m + 'm ' + String(s).padStart(2, '0') + 's';
+    return s + 's';
+  }
+
+  function nextActionHtml(spoop, state, detail) {
+    const next = spoop && spoop.nextAction;
+    if (!next || !next.at) return '';
+    const cls = detail ? 'spoop-next mt-3 text-sm text-slate-300' : 'spoop-next';
+    return '<p class="' + cls + '" data-next-at="' + escapeHtml(next.at) + '" data-next-kind="' + escapeHtml(next.kind || 'tick') + '" data-next-time="' + escapeHtml(next.time || '') + '"' +
+      (detail ? ' data-next-detail="1"' : '') +
+      (state && state.useSim ? ' data-sim="1" data-sim-clock="' + escapeHtml(state.clock || '') + '"' : '') +
+      '></p>';
+  }
+
+  function nextActionText(el) {
+    const what = nextActionPhrase(el.getAttribute('data-next-kind'));
+    const time = el.getAttribute('data-next-time') || '';
+    const at = Date.parse(el.getAttribute('data-next-at') || '');
+    const clockBit = time ? ' · ' + time + ' ET' : '';
+    if (!Number.isFinite(at)) return what;
+    if (el.getAttribute('data-sim') === '1') return what + ' at ' + (time || 'the next slot') + ' ET';
+    const ms = at - Date.now();
+    if (ms <= 0) return what + ' due now' + (el.getAttribute('data-next-detail') === '1' ? clockBit : '');
+    const line = what + ' in ' + formatRemain(ms);
+    return el.getAttribute('data-next-detail') === '1' ? line + clockBit : line;
+  }
+
+  let nextTimer = null;
+  let nextRefreshAt = 0;
+
+  function paintNextActions() {
+    let due = false;
+    document.querySelectorAll('[data-next-at]').forEach((el) => {
+      const at = Date.parse(el.getAttribute('data-next-at') || '');
+      const time = el.getAttribute('data-next-time');
+      el.textContent = nextActionText(el);
+      if (time) el.title = time + ' ET';
+      if (el.getAttribute('data-sim') !== '1' && Number.isFinite(at) && at <= Date.now()) due = true;
+    });
+    if (!due || document.querySelector('.roll-overlay') || Date.now() < nextRefreshAt) return;
+    nextRefreshAt = Date.now() + 15000;
+    boot();
+  }
+
+  function startNextTimers() {
+    paintNextActions();
+    if (nextTimer) return;
+    nextTimer = window.setInterval(paintNextActions, 1000);
+  }
+
   function renderList(state) {
     const root = document.getElementById('spoop-root');
     const spoops = state.spoops || [];
@@ -610,6 +674,7 @@
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
           '</dl>' +
           '<p class="spoop-act">' + escapeHtml(spoop.activity.name) + '</p>' +
+          nextActionHtml(spoop, state) +
         '</a>'
       );
     }).join('');
@@ -792,6 +857,7 @@
           '<p class="text-slate-300 mt-1">' + escapeHtml(spoop.activity.detail) + '</p>' +
           '<p class="text-xs text-slate-500 mt-2">Training ' + escapeHtml(spoop.activity.skill) + '</p>' +
           (spoop.activity.money ? '<p class="text-xs text-amber-200/80 mt-1">Slow training. The gold is the point.</p>' : '') +
+          nextActionHtml(spoop, state, true) +
           '<div class="flex gap-1 mt-3 justify-end">' + pip(heat.xp, 'XP') + pip(heat.boss, 'Boss') + pip(heat.loot, 'Drop') + '</div>' +
           '<p class="text-[11px] text-slate-500 mt-1">' + heatLabel + '</p>' +
         '</section>' +
@@ -1017,6 +1083,7 @@
     if (clock) {
       clock.textContent = (state.useSim ? 'Simulated · ' : '') + state.clockLabel;
     }
+    startNextTimers();
   }
 
   let bootSeq = 0;
@@ -1044,7 +1111,13 @@
 
   window.SpoopArt = { drawSpoop };
 
-  window.addEventListener('pagehide', () => { bootSeq += 1; });
+  window.addEventListener('pagehide', () => {
+    bootSeq += 1;
+    if (nextTimer) {
+      window.clearInterval(nextTimer);
+      nextTimer = null;
+    }
+  });
   window.addEventListener('pageshow', (ev) => {
     if (ev.persisted) boot();
   });

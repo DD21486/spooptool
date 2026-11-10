@@ -153,6 +153,15 @@
   white-space: nowrap;
 }
 
+.spoop-next {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #9fb0c3;
+  font-variant-numeric: tabular-nums;
+  max-width: 100%;
+}
+
 .spoop-card .spoop-sprite {
   width: 52px;
   height: 78px;
@@ -254,13 +263,15 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  transform: translate(-50%, -100%);
+  transform-origin: center bottom;
+  transform: translate(-50%, -100%) scale(var(--pin-scale, 1));
   text-decoration: none;
   max-width: 46%;
 }
 
 .spoop-pin.is-low {
-  transform: translate(-50%, 0);
+  transform-origin: center top;
+  transform: translate(-50%, 0) scale(var(--pin-scale, 1));
   flex-direction: column-reverse;
 }
 

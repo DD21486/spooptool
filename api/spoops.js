@@ -63,7 +63,7 @@ async function syncWorld(debug) {
     events = events.concat(advance(state, new Date(), live));
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
-    await postSpoopUpdates(events);
+    await postSpoopUpdates(events, state);
   } else if (changedGear) {
     await save(state, expected);
   }
@@ -87,7 +87,7 @@ async function handlePost(req) {
     const result = openCrate(spoop, body.crate, now, rng);
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
-    if (saved) await postSpoopUpdates([{ name: spoop.name, text: result.text }]);
+    if (saved) await postSpoopUpdates([{ name: spoop.name, text: result.text }], state);
     const payload = presentWorld(state, debug, [result.text]);
     payload.roll = result.roll;
     return { status: 200, payload };
@@ -117,7 +117,7 @@ async function handlePost(req) {
       const live = await liveHeatFor(STARTER_NAME);
       happened = advance(state, new Date(), live);
       const saved = await save(state, fromClock);
-      if (saved) await postSpoopUpdates(happened);
+      if (saved) await postSpoopUpdates(happened, state);
       return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
     }
     state.useSim = true;
