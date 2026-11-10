@@ -1,6 +1,5 @@
 const { load, save } = require('../lib/spoop/store');
 const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, formatEt, nextArenaAfter } = require('../lib/spoop/engine');
-const { liveHeatFor } = require('../lib/spoop/liveHeat');
 const { postSpoopUpdates } = require('../lib/spoop/discord');
 
 function cors(res) {
@@ -59,8 +58,7 @@ async function syncWorld(debug) {
   }
   const changedGear = events.length > 0;
   if (!state.useSim) {
-    const live = await liveHeatFor(STARTER_NAME);
-    events = events.concat(advance(state, new Date(), live));
+    events = events.concat(advance(state, new Date()));
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
     await postSpoopUpdates(events, state);
@@ -101,21 +99,10 @@ async function handlePost(req) {
       await save(fresh);
       return { status: 200, payload: presentWorld(fresh, true, ['Reset SpoopSpooply.']) };
     }
-    if (body.op === 'heat') {
-      spoop.heat = {
-        xp: !!body.xp,
-        boss: !!body.boss,
-        loot: !!body.loot,
-      };
-      state.useSim = true;
-      await save(state);
-      return { status: 200, payload: presentWorld(state, true, []) };
-    }
     if (body.op === 'real') {
       state.useSim = false;
       const fromClock = state.clock;
-      const live = await liveHeatFor(STARTER_NAME);
-      happened = advance(state, new Date(), live);
+      happened = advance(state, new Date());
       const saved = await save(state, fromClock);
       if (saved) await postSpoopUpdates(happened, state);
       return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
@@ -137,7 +124,7 @@ async function handlePost(req) {
     } else {
       return { status: 400, payload: { error: 'Unknown debug op' } };
     }
-    happened = advance(state, target, null);
+    happened = advance(state, target);
     await save(state, fromClock);
     return { status: 200, payload: presentWorld(state, true, happenedLines(happened)) };
   }

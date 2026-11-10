@@ -246,16 +246,6 @@
     return data;
   }
 
-  function influenceOf(state, spoop) {
-    if (state.useSim) return spoop.heat || { xp: false, boss: false, loot: false };
-    return state.liveHeat || { xp: false, boss: false, loot: false };
-  }
-
-  function pip(on, label) {
-    const cls = on ? 'bg-amber-400 text-slate-900' : 'bg-slate-800 text-slate-500';
-    return '<span class="px-1.5 py-0.5 rounded text-[10px] font-semibold ' + cls + '">' + label + '</span>';
-  }
-
   function itemLine(item) {
     if (!item) return '<span class="text-slate-600">Empty</span>';
     return '<span class="text-slate-100">' + escapeHtml(item.name) + '</span>';
@@ -276,7 +266,6 @@
       document.body.appendChild(panel);
     }
     const next = state.nextEvent ? state.nextEvent.label : 'No event';
-    const heat = (state.spoops[0] && state.spoops[0].heat) || { xp: false, boss: false, loot: false };
     const happened = (state.happened || []).slice(-6);
     panel.innerHTML =
       '<div class="flex items-center justify-between gap-2 mb-2">' +
@@ -291,12 +280,6 @@
         '<button type="button" data-debug="week" class="px-2 py-1 rounded bg-slate-700 text-slate-100">+7 days</button>' +
         '<button type="button" data-debug="month" class="px-2 py-1 rounded bg-slate-700 text-slate-100">+30 days</button>' +
       '</div>' +
-      '<p class="text-slate-500 mb-1">Heat while simulating</p>' +
-      '<div class="flex flex-wrap gap-1 mb-2">' +
-        heatBtn('xp', 'Big XP', heat.xp) +
-        heatBtn('boss', 'Bossing', heat.boss) +
-        heatBtn('loot', 'Nice drop', heat.loot) +
-      '</div>' +
       '<div class="flex flex-wrap gap-1">' +
         '<button type="button" data-debug="real" class="px-2 py-1 rounded bg-slate-800 text-slate-300">Use real clock</button>' +
         '<button type="button" data-debug="reset" class="px-2 py-1 rounded bg-slate-800 text-rose-300">Reset spoop</button>' +
@@ -309,14 +292,7 @@
     });
   }
 
-  function heatBtn(key, label, on) {
-    return '<button type="button" data-debug="heat-' + key + '" class="px-2 py-1 rounded ' +
-      (on ? 'bg-amber-400 text-slate-900' : 'bg-slate-800 text-slate-300') + '">' + label + '</button>';
-  }
-
   async function onDebug(op) {
-    const spoop = lastState && lastState.spoops && lastState.spoops[0];
-    const heat = (spoop && spoop.heat) || { xp: false, boss: false, loot: false };
     try {
       let body;
       if (op === 'next') body = { action: 'debug', op: 'next' };
@@ -327,10 +303,6 @@
       else if (op === 'reset') {
         if (!window.confirm('Reset SpoopSpooply back to a new spoop?')) return;
         body = { action: 'debug', op: 'reset' };
-      } else if (op.indexOf('heat-') === 0) {
-        const key = op.slice(5);
-        body = { action: 'debug', op: 'heat', xp: !!heat.xp, boss: !!heat.boss, loot: !!heat.loot };
-        body[key] = !heat[key];
       }
       const data = await api('/api/spoops', {
         method: 'POST',
@@ -818,8 +790,6 @@
       root.innerHTML = '<p class="text-slate-400">No spoop named ' + escapeHtml(name) + '.</p>';
       return;
     }
-    const heat = influenceOf(state, spoop);
-    const heatLabel = state.useSim ? 'Debug heat, applied as you simulate' : 'From the real account, last 18 hours';
     const quests = spoop.quests || { points: 0, done: 0, total: 0 };
     const focus = (spoop.activity && spoop.activity.skills) || [spoop.activity.skill];
     const skills = spoop.skills.map((s) => {
@@ -880,8 +850,6 @@
           '<p class="text-xs text-slate-500 mt-2">' + escapeHtml(questStatus(spoop.activity)) + '</p>' +
           (spoop.activity.money ? '<p class="text-xs text-amber-200/80 mt-1">Slow training. The gold is the point.</p>' : '') +
           nextActionHtml(spoop, state, true) +
-          '<div class="flex gap-1 mt-3 justify-end">' + pip(heat.xp, 'XP') + pip(heat.boss, 'Boss') + pip(heat.loot, 'Drop') + '</div>' +
-          '<p class="text-[11px] text-slate-500 mt-1">' + heatLabel + '</p>' +
         '</section>' +
       '</div>' +
       '<div class="mt-6 grid gap-4 md:grid-cols-2">' +
