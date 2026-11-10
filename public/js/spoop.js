@@ -451,8 +451,9 @@
 
     function apply() {
       stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
-      // Counter the map scale, then shrink a bit more so the tile under each pin stays visible.
+      // Dots shrink past the map scale so the tile stays visible. Labels shrink less so the names stay readable.
       stage.style.setProperty('--pin-scale', (1 / Math.pow(scale, 1.35)).toFixed(4));
+      stage.style.setProperty('--label-scale', Math.pow(scale, 0.22).toFixed(4));
       syncSharp();
     }
 

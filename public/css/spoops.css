@@ -280,7 +280,11 @@
   flex-direction: column;
   align-items: center;
   max-width: 100%;
+  transform: scale(var(--label-scale, 1));
+  transform-origin: center bottom;
 }
+
+.spoop-pin.is-low .spoop-pin-tip { transform-origin: center top; }
 
 .spoop-pin-name {
   font-size: 10px;
