@@ -28,6 +28,9 @@
   let worldNowMs = 0;
   let simMode = false;
   let nextAtMs = 0;
+  const LOG_KEY = 'spoop-arena-log';
+  let logHidden = false;
+  try { logHidden = localStorage.getItem(LOG_KEY) === 'off'; } catch (err) { logHidden = false; }
   let nextLabel = '';
   let fetchingNight = false;
   let retryAt = 0;
@@ -59,6 +62,13 @@
   fightMusic.preload = 'auto';
   const victoryMusic = new Audio('/audio/victory.mp3');
   victoryMusic.preload = 'auto';
+  const hitVoices = [];
+  for (let i = 0; i < 8; i++) {
+    const voice = new Audio('/audio/hit.mp3');
+    voice.preload = 'auto';
+    hitVoices.push(voice);
+  }
+  let hitVoice = 0;
   let musicMode = 'off';
   let soundOn = true;
   try { soundOn = localStorage.getItem(SOUND_KEY) !== 'off'; } catch (err) { /* private mode */ }
@@ -119,11 +129,43 @@
     });
   }
 
+  function playHitSound() {
+    if (!soundOn) return;
+    const audio = hitVoices[hitVoice];
+    hitVoice = (hitVoice + 1) % hitVoices.length;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.playbackRate = 0.86 + Math.random() * 0.3;
+    audio.volume = 0.45 + Math.random() * 0.5;
+    const pending = audio.play();
+    if (pending) pending.catch(function () {});
+  }
+
+  function primeHits() {
+    hitVoices.forEach(function (audio) {
+      if (audio.dataset.primed) return;
+      const volume = audio.volume;
+      audio.volume = 0;
+      const pending = audio.play();
+      if (!pending) return;
+      pending.then(function () {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volume;
+        audio.playbackRate = 1;
+        audio.dataset.primed = '1';
+      }).catch(function () {
+        audio.volume = volume;
+      });
+    });
+  }
+
   function resumeMusic(ev) {
     if (!soundOn) return;
     if (ev && ev.target && ev.target.closest && ev.target.closest('#arena-sound')) return;
     primeTrack(fightMusic, musicMode === 'fight');
     primeTrack(victoryMusic, musicMode === 'victory');
+    primeHits();
   }
 
   function paintSound() {
@@ -149,6 +191,12 @@
     bar.className = 'roster-bar';
     rosterEl.parentNode.insertBefore(bar, rosterEl);
     bar.appendChild(rosterEl);
+    const pot = document.createElement('div');
+    pot.id = 'arena-pot';
+    pot.className = 'arena-pot';
+    pot.hidden = true;
+    pot.innerHTML = '<span class="pot-kicker">Pot</span><strong id="arena-pot-value">0</strong><span class="pot-meta" id="arena-pot-meta"></span>';
+    bar.insertBefore(pot, rosterEl);
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.id = 'arena-sound';
@@ -195,11 +243,13 @@
     if (!pit || pit.querySelector('.pit-stage')) return;
     const stage = document.createElement('div');
     stage.className = 'pit-stage';
-    const stay = new Set([banner, waitEl].filter(Boolean));
+    const stay = new Set([banner, waitEl, document.getElementById('arena-log')].filter(Boolean));
     Array.from(pit.children).forEach((child) => {
       if (!stay.has(child)) stage.appendChild(child);
     });
     pit.insertBefore(stage, pit.firstChild);
+    mountColosseum(stage);
+    mountCombatLog();
     const controls = document.createElement('div');
     controls.className = 'pit-zoom';
     controls.setAttribute('role', 'group');
@@ -243,13 +293,13 @@
     }
 
     pit.addEventListener('wheel', (ev) => {
-      if (ev.target.closest('.pit-zoom')) return;
+      if (ev.target.closest('.pit-zoom, .combat-log-toggle')) return;
       ev.preventDefault();
       zoomAt(ev.clientX, ev.clientY, scale * (ev.deltaY < 0 ? 1.12 : 1 / 1.12));
     }, { passive: false });
 
     pit.addEventListener('pointerdown', (ev) => {
-      if (ev.target.closest('.pit-zoom') || scale <= 1.01) return;
+      if (ev.target.closest('.pit-zoom, .combat-log-toggle') || scale <= 1.01) return;
       drag = { id: ev.pointerId, x: ev.clientX, y: ev.clientY };
       pit.classList.add('is-drag');
       pit.setPointerCapture(ev.pointerId);
@@ -274,7 +324,7 @@
     pit.addEventListener('pointercancel', endDrag);
 
     pit.addEventListener('dblclick', (ev) => {
-      if (ev.target.closest('.pit-zoom')) return;
+      if (ev.target.closest('.pit-zoom, .combat-log-toggle')) return;
       zoomAt(ev.clientX, ev.clientY, scale > 1.01 ? 1 : 2);
     });
 
@@ -304,6 +354,8 @@
   let pkReason = '';
   let lastFetchAt = 0;
   let replayLast = null;
+  let upcomingPot = null;
+  let lastPot = null;
   let holdPk = '';
   let holdNight = '';
 
@@ -338,7 +390,8 @@
     if (!fighter) return;
     if (loadoutId === fighter.id && !loadoutEl.hidden) return;
     loadoutId = fighter.id;
-    loadoutEl.innerHTML = '<div class="loadout-grid">' + gearCells(fighter) + '</div>';
+    loadoutEl.innerHTML = '<p class="loadout-name">' + escapeHtml(fighter.name) + '</p>' +
+      '<div class="loadout-grid">' + gearCells(fighter) + '</div>';
     loadoutEl.hidden = false;
   }
 
@@ -472,6 +525,93 @@
       view.cardBar.style.width = Math.max(0, pct * 100) + '%';
       view.cardBar.style.background = hpColor(pct);
     }
+  }
+
+  function paintPot(purse) {
+    const el = document.getElementById('arena-pot');
+    const value = document.getElementById('arena-pot-value');
+    const meta = document.getElementById('arena-pot-meta');
+    if (!el || !value) return;
+    if (!purse || purse.gold == null) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    value.textContent = Number(purse.gold).toLocaleString();
+    if (meta) {
+      const bits = [];
+      if (purse.avgLevel) bits.push('avg ' + purse.avgLevel);
+      if (purse.count) bits.push(purse.count + ' in');
+      meta.textContent = bits.join(' · ');
+    }
+  }
+
+  const feedLines = [];
+
+  function paintLogToggle() {
+    const btn = document.getElementById('arena-log-toggle');
+    const wrap = document.getElementById('arena-log');
+    if (wrap) wrap.classList.toggle('is-hidden', logHidden);
+    if (!btn) return;
+    btn.textContent = logHidden ? 'Show log' : 'Hide log';
+    btn.setAttribute('aria-pressed', logHidden ? 'true' : 'false');
+    btn.setAttribute('aria-label', logHidden ? 'Show combat log' : 'Hide combat log');
+  }
+
+  function mountCombatLog() {
+    if (!pit || document.getElementById('arena-log')) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'arena-log';
+    wrap.className = 'combat-log';
+    wrap.innerHTML = '<button type="button" id="arena-log-toggle" class="combat-log-toggle">Hide log</button>' +
+      '<ol id="arena-feed" class="combat-feed"></ol>';
+    pit.appendChild(wrap);
+    const btn = wrap.querySelector('.combat-log-toggle');
+    btn.addEventListener('click', function () {
+      logHidden = !logHidden;
+      try { localStorage.setItem(LOG_KEY, logHidden ? 'off' : 'on'); } catch (err) { /* private mode */ }
+      paintLogToggle();
+    });
+    paintLogToggle();
+  }
+
+  function clearFeed() {
+    feedLines.length = 0;
+    const feed = document.getElementById('arena-feed');
+    if (feed) feed.innerHTML = '';
+  }
+
+  function pushFeed(text, kind) {
+    const feed = document.getElementById('arena-feed');
+    if (!feed) return;
+    feedLines.push({ text, kind });
+    if (feedLines.length > 8) feedLines.shift();
+    feed.innerHTML = feedLines.map((row) => '<li class="' + row.kind + '">' + row.text + '</li>').join('');
+  }
+
+  function mountColosseum(stage) {
+    if (!stage || stage.querySelector('.colosseum')) return;
+    const robes = ['#3d4f73', '#6b3a3a', '#3f5c45', '#5c4a32', '#4a3d5c', '#6b5a3a', '#3a4a55'];
+    const fans = [];
+    function row(side, count) {
+      for (let i = 0; i < count; i++) {
+        const t = (i + 0.5) / count;
+        const x = 5 + t * 90;
+        const wave = Math.sin(t * Math.PI);
+        const y = side === 'top' ? 2.4 + wave * 3.2 : 96.6 - wave * 3.2;
+        const robe = robes[(i * 3 + (side === 'top' ? 0 : 2)) % robes.length];
+        fans.push('<span class="fan" style="left:' + x.toFixed(2) + '%;top:' + y.toFixed(2) + '%;--robe:' + robe + '"></span>');
+      }
+    }
+    row('top', 22);
+    row('bottom', 20);
+    const el = document.createElement('div');
+    el.className = 'colosseum';
+    el.setAttribute('aria-hidden', 'true');
+    el.innerHTML = '<div class="stands stands-top"></div><div class="stands stands-bottom"></div>' +
+      fans.join('') +
+      '<div class="wall wall-top"></div><div class="wall wall-bottom"></div>';
+    stage.insertBefore(el, stage.firstChild);
   }
 
   function renderRoster(fight) {
@@ -752,8 +892,14 @@
     const to = actors.get(hit.to);
     if (!attacker || !victim || !to) return;
     setHp(victim, hit.hp);
-    if (hit.miss) floater(to.x, to.y, 0, true);
-    else floater(to.x, to.y, hit.amount, false);
+    if (hit.miss || !(hit.amount > 0)) {
+      floater(to.x, to.y, 0, true);
+      pushFeed(escapeHtml(attacker.name) + ' misses ' + escapeHtml(victim.name), 'miss');
+    } else {
+      floater(to.x, to.y, hit.amount, false);
+      playHitSound();
+      pushFeed(escapeHtml(attacker.name) + ' hits ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
+    }
     if (!from) return;
     faceView(from, to);
     playAttack(from, hit.style, to);
@@ -781,6 +927,8 @@
       if (view.cardPray) view.cardPray.parentElement.hidden = true;
       if (view.card) view.card.classList.add('is-dead');
       bloodPool(view.x, view.y);
+      const fallen = bout && bout.fighters.find((f) => f.id === death.id);
+      if (fallen) pushFeed(escapeHtml(fallen.name) + ' is defeated', 'dead');
     }
   }
 
@@ -867,10 +1015,13 @@
     cancelAnimationFrame(raf);
     playing = false;
     bout = fight;
-    fightTitle = title || 'Spoopfight';
-    playSpeed = fightTitle === 'PK' ? PK_SPEED : ARENA_SPEED;
+    const styleName = { ring: 'Ring', pairs: 'Pairs', scatter: 'Random' };
+    const style = fight && styleName[fight.formation] ? styleName[fight.formation] : '';
+    fightTitle = (title || 'Spoopfight') + (style ? ' · ' + style : '');
+    playSpeed = (title || '') === 'PK' ? PK_SPEED : ARENA_SPEED;
     shownHit = 0;
     shownDeath = 0;
+    clearFeed();
     renderRoster(fight);
     mountActors(fight);
     const call = pit && pit.querySelector('.fight-call');
@@ -1095,6 +1246,8 @@
       call.hidden = true;
     }
     rosterEl.innerHTML = '';
+    clearFeed();
+    paintPot(upcomingPot);
     resultsEl.hidden = true;
     resultsEl.innerHTML = '';
     waitEl.hidden = false;
@@ -1189,6 +1342,11 @@
       pkB = data.pk ? data.pk.b || '' : '';
       pkReason = data.pk ? data.pk.reason || '' : '';
       const last = data.last;
+      upcomingPot = data.pot || null;
+      lastPot = last && last.pot != null
+        ? { gold: last.pot, avgLevel: last.avgLevel, count: (last.results || []).length }
+        : null;
+      paintPot(upcomingPot);
       const lastPk = data.lastPk;
       replayLast = last && last.bout ? last : null;
       const waiting = !!(pkAtMs && worldMs() < pkAtMs);
@@ -1220,6 +1378,7 @@
           syncReplay();
           tickCountdown();
         };
+        paintPot(lastPot || upcomingPot);
         arm(last.bout, 'Spoopfight');
         beginFight(worldMs() - Date.parse(last.at) < 15000);
       } else if (waiting) {
@@ -1258,6 +1417,7 @@
     if (!replayLast || !replayLast.bout || playing) return;
     waitEl.hidden = true;
     replayBtn.hidden = true;
+    paintPot(lastPot || upcomingPot);
     nightDone = function () {
       restPit();
       statusEl.textContent = (replayLast.winner || 'Someone') + ' won the Spoopfight.';

@@ -33,20 +33,9 @@
     }).join('');
   }
 
-  function describe(data) {
-    const fighters = (data.bout && data.bout.fighters) || [];
-    const bits = fighters.map((f) => {
-      const prayer = f.prayer;
-      const overhead = prayer ? prayer.name + ', ' + Math.round(prayer.off) + 's' : 'no prayer';
-      return f.name + ' ' + overhead;
-    });
-    const winner = data.winner || 'Nobody';
-    return winner + ' wins. ' + Math.round((data.duration || 0) * 10) / 10 + 's. ' + bits.join(' · ');
-  }
-
   function play(data) {
     last = data;
-    notesEl.textContent = describe(data);
+    if (notesEl) notesEl.textContent = '';
     statusEl.textContent = 'Test fight';
     if (window.ArenaPit) window.ArenaPit.play(data.bout, speedEl.value);
   }
