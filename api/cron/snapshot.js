@@ -16,7 +16,6 @@ const { neon } = require('@neondatabase/serverless');
 const { getStats } = require('osrs-json-hiscores');
 const { insertActivity, pruneTo50 } = require('../../lib/activity-log');
 const { computeSpoopScore, computeBossScore } = require('../../lib/spoopscore');
-const { sendDueArenaReminders } = require('../../lib/spoop/arena-reminders');
 const { syncPk } = require('../../lib/spoop/pk-settle');
 
 function xpFromData(data) {
@@ -205,9 +204,10 @@ module.exports = async function handler(req, res) {
 
   if (req.query.arena_reminder === '1' || req.query.arena_reminder === 'true') {
     try {
+      const { syncWorld } = require('../spoops');
       const pk = await syncPk(new Date());
-      const result = await sendDueArenaReminders(new Date());
-      return res.status(200).json({ ok: true, pk, ...result });
+      await syncWorld(false);
+      return res.status(200).json({ ok: true, pk });
     } catch (err) {
       console.error('arena reminder', err);
       return res.status(500).json({ error: err.message || String(err) });

@@ -1,6 +1,7 @@
 const { load, save } = require('../lib/spoop/store');
 const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot } = require('../lib/spoop/engine');
-const { publishEvents } = require('../lib/spoop/publish');
+const { publishEvents, publishArena } = require('../lib/spoop/publish');
+const { keepReminderMarks } = require('../lib/spoop/store');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
 function cors(res) {
@@ -55,7 +56,16 @@ async function syncWorld(debug) {
     console.error('arena reminder', err && err.message ? err.message : err);
   }
   const state = await load();
-  const expected = state.clock;
+  let expected = state.clock;
+  if (!state.useSim && state.lastArena && state.lastArena.needsPost && state.lastArena.at) {
+    const due = new Date(state.lastArena.at);
+    if (due <= new Date(state.clock)) {
+      if (await publishArena(state)) {
+        keepReminderMarks(state);
+        if (await save(state, expected)) expected = state.clock;
+      }
+    }
+  }
   let events = [];
   for (const spoop of Object.values(state.spoops)) {
     for (const text of applyWearRules(spoop, new Date(state.clock))) {
@@ -68,6 +78,7 @@ async function syncWorld(debug) {
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
     if (await publishEvents(events, state)) await save(state, state.clock);
+    else if (await publishArena(state)) await save(state, state.clock);
   } else if (changedGear) {
     await save(state, expected);
   }
