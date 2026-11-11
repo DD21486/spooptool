@@ -243,6 +243,26 @@
 
 .gielinor-stage.is-sharp .gielinor-map-sharp { opacity: 1; }
 
+.gielinor-tiles {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.28s ease;
+}
+
+.gielinor-stage.is-detail .gielinor-tiles { opacity: 1; }
+
+.gielinor-tile {
+  position: absolute;
+  opacity: 0;
+  image-rendering: auto;
+  pointer-events: none;
+}
+
+.gielinor-tile.is-in { opacity: 1; }
+
 .gielinor-zoom {
   position: absolute;
   z-index: 8;

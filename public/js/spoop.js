@@ -374,6 +374,7 @@
         '<div class="gielinor-stage">' +
           '<img class="gielinor-map" src="/assets/gielinor-map.png" alt="Map of Gielinor" width="704" height="391">' +
           '<img class="gielinor-map gielinor-map-sharp" alt="" width="1408" height="782">' +
+          '<div class="gielinor-tiles" aria-hidden="true"></div>' +
           pins +
         '</div>' +
         '<div class="gielinor-zoom" role="group" aria-label="Map zoom">' +
@@ -407,6 +408,13 @@
 
     const SHARP_AT = 2;
     const sharp = stage.querySelector('.gielinor-map-sharp');
+    const tiles = stage.querySelector('.gielinor-tiles');
+    // Wiki surface tiles, zoom 3: 8 px per game square. File index * 32 is the south-west corner.
+    const TILE_Z = 3;
+    const TILE_SPAN = 32;
+    const TILE_URL = 'https://maps.runescape.wiki/osrs/tiles/0_2019-10-31_1/' + TILE_Z + '/0_';
+    const worldW = GIELINOR.w / GIELINOR.scale;
+    const worldH = GIELINOR.h / GIELINOR.scale;
 
     function syncSharp() {
       if (!sharp) return;
@@ -421,12 +429,72 @@
       stage.classList.toggle('is-sharp', want && ready);
     }
 
+    function syncTiles() {
+      if (!tiles) return;
+      const close = scale >= 7.2;
+      stage.classList.toggle('is-detail', close);
+      if (scale < 6.8) {
+        tiles.replaceChildren();
+        return;
+      }
+      const stageW = stage.offsetWidth;
+      const stageH = stage.offsetHeight;
+      if (!stageW || !stageH) return;
+      const viewW = view.clientWidth / scale;
+      const viewH = view.clientHeight / scale;
+      const left = -x / scale;
+      const top = -y / scale;
+      const gameX0 = GIELINOR.x0 + (left / stageW) * worldW;
+      const gameX1 = GIELINOR.x0 + ((left + viewW) / stageW) * worldW;
+      const gameY1 = GIELINOR.yTop - (top / stageH) * worldH;
+      const gameY0 = GIELINOR.yTop - ((top + viewH) / stageH) * worldH;
+      const tx0 = Math.floor(gameX0 / TILE_SPAN) - 1;
+      const tx1 = Math.floor(gameX1 / TILE_SPAN) + 1;
+      const ty0 = Math.floor(gameY0 / TILE_SPAN) - 1;
+      const ty1 = Math.floor(gameY1 / TILE_SPAN) + 1;
+      const want = new Set();
+      for (let tx = tx0; tx <= tx1; tx += 1) {
+        for (let ty = ty0; ty <= ty1; ty += 1) {
+          if (tx < 0 || ty < 0) continue;
+          want.add(tx + '_' + ty);
+        }
+      }
+      tiles.querySelectorAll('.gielinor-tile').forEach((img) => {
+        if (!want.has(img.dataset.tile)) img.remove();
+      });
+      want.forEach((key) => {
+        if (tiles.querySelector('[data-tile="' + key + '"]')) return;
+        const parts = key.split('_');
+        const tx = Number(parts[0]);
+        const ty = Number(parts[1]);
+        const img = document.createElement('img');
+        img.className = 'gielinor-tile';
+        img.alt = '';
+        img.draggable = false;
+        img.dataset.tile = key;
+        const leftPct = ((tx * TILE_SPAN - GIELINOR.x0) / worldW) * 100;
+        const topPct = ((GIELINOR.yTop - (ty + 1) * TILE_SPAN) / worldH) * 100;
+        img.style.left = leftPct + '%';
+        img.style.top = topPct + '%';
+        img.style.width = 'calc(' + ((TILE_SPAN / worldW) * 100) + '% + 1px)';
+        img.style.height = 'calc(' + ((TILE_SPAN / worldH) * 100) + '% + 1px)';
+        img.addEventListener('load', () => img.classList.add('is-in'));
+        img.addEventListener('error', () => img.remove());
+        img.src = TILE_URL + key + '.png';
+        tiles.appendChild(img);
+      });
+    }
+
     function apply() {
       stage.style.transform = 'translate(' + x + 'px,' + y + 'px) scale(' + scale + ')';
       // Dots shrink past the map scale so the tile stays visible. Labels shrink less so the names stay readable.
-      stage.style.setProperty('--pin-scale', (1 / Math.pow(scale, 1.35)).toFixed(4));
+      // The last step to full zoom grows both a little, and only then.
+      const full = Math.min(1, Math.max(0, (scale - 7) / (8 - 7)));
+      const boost = 1 + 0.22 * full;
+      stage.style.setProperty('--pin-scale', (boost / Math.pow(scale, 1.35)).toFixed(4));
       stage.style.setProperty('--label-scale', Math.pow(scale, 0.22).toFixed(4));
       syncSharp();
+      syncTiles();
     }
 
     function reveal(pin) {
