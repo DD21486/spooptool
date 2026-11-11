@@ -198,6 +198,20 @@
 }
 .wait-when { margin-top: 4px; font-size: 13px; color: #e2e8f0; }
 
+.replay-btn {
+  pointer-events: auto;
+  margin-top: 12px;
+  padding: 6px 14px;
+  border: 1px solid rgba(240, 216, 120, 0.7);
+  border-radius: 999px;
+  background: #1c140c;
+  color: #fde68a;
+  font-size: 13px;
+  cursor: pointer;
+}
+.replay-btn:hover { background: #2a1d12; }
+.replay-btn[hidden] { display: none; }
+
 .wait-card.is-pk {
   border-color: rgba(248, 113, 113, 0.75);
   max-width: 340px;

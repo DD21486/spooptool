@@ -647,6 +647,9 @@
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
           '</dl>' +
           '<p class="spoop-act">' + escapeHtml(spoop.activity.name) + '</p>' +
+          (spoop.follower
+            ? '<p class="spoop-next">Followed by ' + escapeHtml(spoop.follower.name) + '</p>'
+            : '') +
           (spoop.gearGate && spoop.gearGate.idle
             ? '<p class="spoop-next">' + escapeHtml(spoop.gearGate.place) + ' · ' + spoop.gearGate.hoursLeft + 'h of ' + escapeHtml(spoop.gearGate.lootName) + ' drops</p>'
             : '') +
@@ -846,6 +849,14 @@
           '<h1 class="text-2xl text-slate-100">' + escapeHtml(spoop.name) + '</h1>' +
           (spoop.owner && spoop.owner !== spoop.name ? '<p class="text-xs text-slate-500">' + escapeHtml(spoop.owner) + '</p>' : '') +
           '<p class="text-slate-400 text-sm">' + gold(spoop.gold) + ' · Arena ' + spoop.arenaWins + 'W ' + spoop.arenaLosses + 'L</p>' +
+          (spoop.follower
+            ? '<p class="text-sm text-amber-200 mt-1 flex items-center gap-2">' +
+              (spoop.follower.osrsId
+                ? '<img src="/api/spoops?icon=1&id=' + Number(spoop.follower.osrsId) + '" alt="" width="24" height="24">'
+                : '') +
+              '<span>Followed by ' + escapeHtml(spoop.follower.name) +
+              (spoop.follower.owned > 1 ? ' · ' + spoop.follower.owned + ' pets' : '') + '</span></p>'
+            : '') +
           (state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
             ? '<p class="text-sm mt-1"><a class="text-rose-300 hover:text-rose-200" href="/arena.html">PK vs ' + escapeHtml(state.pk.a === spoop.name ? state.pk.b : state.pk.a) + '</a></p>'
             : '') +
