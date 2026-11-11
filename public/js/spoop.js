@@ -670,6 +670,7 @@
   }
 
   function questStatus(activity) {
+    if (activity && activity.errand) return 'Errand';
     if (!activity || !activity.quest) {
       const skill = activity && activity.skill ? activity.skill : '';
       return activity && activity.idle ? 'Idle ground · training ' + skill : 'Training ' + skill;
