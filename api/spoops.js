@@ -92,7 +92,7 @@ async function handlePost(req) {
     const state = await load();
     const seed = String(body.seed || '').trim().slice(0, 80) || String(Date.now());
     const names = Array.isArray(body.names) ? body.names.slice(0, 16) : [];
-    const result = testArena(state, names, seed);
+    const result = testArena(state, names, seed, body.formation);
     if (result.error) return { status: 400, payload: { error: result.error } };
     return { status: 200, payload: result };
   }

@@ -2,6 +2,7 @@
   const picks = document.getElementById('pit-picks');
   const seedEl = document.getElementById('pit-seed');
   const speedEl = document.getElementById('pit-speed');
+  const formationEl = document.getElementById('pit-formation');
   const fightBtn = document.getElementById('pit-fight');
   const replayBtn = document.getElementById('pit-replay');
   const statusEl = document.getElementById('arena-status');
@@ -65,7 +66,12 @@
       const res = await fetch('/api/spoops', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'arena-test', names, seed: seedEl.value.trim() }),
+        body: JSON.stringify({
+          action: 'arena-test',
+          names,
+          seed: seedEl.value.trim(),
+          formation: formationEl ? formationEl.value : 'ring',
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Could not run the fight');

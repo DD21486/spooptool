@@ -58,8 +58,12 @@
 
   function drawSpoop(canvas, spoop, opts) {
     if (!canvas) return;
-    const W = 16;
-    const H = 24;
+    const layer = (opts && opts.layer) || 'all';
+    const pose = (opts && opts.pose) || 'idle';
+    const ox = (opts && opts.ox) || 0;
+    const oy = (opts && opts.oy) || 0;
+    const W = (opts && opts.width) || 16;
+    const H = (opts && opts.height) || 24;
     canvas.width = W;
     canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -67,7 +71,9 @@
     const grid = [];
     for (let y = 0; y < H; y++) grid.push(new Array(W).fill(null));
     const put = (x, y, color) => {
-      if (x >= 0 && y >= 0 && x < W && y < H && color) grid[y][x] = color;
+      const px = x + ox;
+      const py = y + oy;
+      if (px >= 0 && py >= 0 && px < W && py < H && color) grid[py][px] = color;
     };
     const fill = (x, y, w, h, color) => {
       for (let yy = 0; yy < h; yy++) {
@@ -99,6 +105,7 @@
     const topHi = helm ? shiftColor(TIER_COLORS[helm.tier] || hair, 48) : hairHi;
     const topLo = helm ? shiftColor(TIER_COLORS[helm.tier] || hair, -42) : hairLo;
 
+    if (layer !== 'weapon') {
     const cape = eq.cape;
     if (cape) {
       const cq = QUALITY_RANK[cape.quality] || 0;
@@ -145,9 +152,9 @@
       put(7, 11, skin);
       put(8, 11, skin);
     }
-    fill(2, 11, 2, 4, skin);
+    if (pose === 'idle') fill(2, 11, 2, 4, skin);
     fill(12, 11, 2, 4, skin);
-    put(2, 14, clothDk);
+    if (pose === 'idle') put(2, 14, clothDk);
     put(13, 14, clothDk);
 
     if (bodyQ >= 4 && tierHex) {
@@ -162,6 +169,36 @@
       put(8, 12, '#fff6c8');
     }
     if (bodyQ === 0 && tierHex) put(5, 13, '#3a2a1c');
+
+    if (pose === 'windup') {
+      put(3, 11, skin);
+      put(2, 10, skin);
+      put(1, 9, skin);
+      put(1, 8, skin);
+      put(0, 8, skin);
+      put(0, 9, skinDk);
+    } else if (pose === 'strike') {
+      put(3, 12, skin);
+      put(4, 11, skin);
+      put(5, 10, skin);
+      put(6, 9, skin);
+      put(7, 8, skin);
+      put(8, 8, skinDk);
+    } else if (pose === 'draw') {
+      put(1, 12, skin);
+      put(1, 11, skin);
+      put(2, 12, skin);
+      put(3, 9, skin);
+      put(4, 8, skin);
+      put(4, 9, skinDk);
+    } else if (pose === 'cast') {
+      put(3, 11, skin);
+      put(2, 10, skin);
+      put(1, 9, skin);
+      put(1, 8, skin);
+      put(2, 8, skin);
+      put(2, 9, skinDk);
+    }
 
     const legs = eq.legs;
     const legQ = legs ? (QUALITY_RANK[legs.quality] || 0) : -1;
@@ -192,9 +229,10 @@
       if (sq >= 5) put(13, 12, '#f0d878');
       if (sq >= 6) put(14, 14, '#fff6c8');
     }
+    }
 
     const weapon = eq.weapon;
-    if (weapon) {
+    if (weapon && layer !== 'body') {
       const style = weapon.style;
       const wq = QUALITY_RANK[weapon.quality] || 0;
       const wc = style === 'ranged'
@@ -203,20 +241,58 @@
           ? '#7c6ad8'
           : (TIER_COLORS[weapon.tier] || '#c0c0c0');
       const len = 4 + wq;
+      const tip = shiftColor(wc, 46);
+      const guard = shiftColor(wc, 28);
+      const sweep = (x0, y0, x1, y1, steps, color, end) => {
+        const n = Math.max(1, steps);
+        for (let i = 0; i <= n; i++) {
+          const u = i / n;
+          put(Math.round(x0 + (x1 - x0) * u), Math.round(y0 + (y1 - y0) * u), i === n ? end : color);
+        }
+      };
       if (style === 'ranged') {
         for (let i = 0; i < 6; i++) put(0, 11 + i, wc);
         put(1, 12, wc);
         put(1, 15, wc);
-        put(1, 13, '#efe4c8');
-        put(1, 14, '#efe4c8');
+        if (pose === 'draw') {
+          put(2, 13, '#cbb98a');
+          put(3, 12, '#efe4c8');
+          put(4, 12, '#fffaf0');
+          put(5, 12, '#fffaf0');
+        } else {
+          put(1, 13, '#efe4c8');
+          put(1, 14, '#efe4c8');
+        }
       } else if (style === 'magic') {
-        for (let i = 0; i < len; i++) put(0, 17 - i, wc);
-        put(0, 17 - len, '#f0d878');
-        put(1, 17 - len, '#fff6c8');
+        if (pose === 'cast') {
+          const tx = 2 + Math.round((len - 1) * 0.35);
+          const ty = 8 - Math.max(2, len - 3);
+          sweep(1, 10, tx, ty, len - 1, wc, '#fff6c8');
+          put(tx, ty - 1, '#ffffff');
+          put(tx + 1, ty - 1, '#ffffff');
+          put(tx + 1, ty, '#fff6c8');
+          put(tx + 2, ty, '#ffffff');
+        } else {
+          for (let i = 0; i < len; i++) put(0, 17 - i, wc);
+          put(0, 17 - len, '#f0d878');
+          put(1, 17 - len, '#fff6c8');
+        }
+      } else if (pose === 'windup') {
+        const tipX = -Math.max(2, Math.round(len * 0.45));
+        const tipY = 8 - Math.max(3, Math.round(len * 0.6));
+        sweep(0, 9, tipX, tipY + 1, len, shiftColor(wc, -18), guard);
+        sweep(0, 8, tipX, tipY, len, wc, tip);
+      } else if (pose === 'strike') {
+        const tipX = 8 + Math.max(3, Math.round(len * 0.55));
+        const tipY = 8 - Math.max(4, Math.round(len * 0.7));
+        const bright = shiftColor(wc, 42);
+        sweep(8, 9, tipX, tipY + 1, len, shiftColor(wc, -12), guard);
+        sweep(8, 8, tipX, tipY, len, bright, '#fff6c8');
+        if (wq >= 5) put(tipX, tipY - 1, '#f0d878');
       } else {
         for (let i = 0; i < len; i++) put(0, 16 - i, wc);
-        put(0, 16 - len, shiftColor(wc, 46));
-        put(1, 15, shiftColor(wc, 28));
+        put(0, 16 - len, tip);
+        put(1, 15, guard);
         if (wq >= 5) put(1, 14, '#f0d878');
       }
     }
