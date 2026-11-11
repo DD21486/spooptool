@@ -218,6 +218,13 @@ module.exports = async function handler(req, res) {
     return res.status(500).json({ error: 'DATABASE_URL not set' });
   }
 
+  try {
+    const { syncWorld } = require('../spoops');
+    await syncWorld(false);
+  } catch (spoopErr) {
+    console.error('spoop discord', spoopErr?.message || spoopErr);
+  }
+
   const sql = neon(process.env.DATABASE_URL);
 
   if (req.query.weekly_awards === '1' || req.query.weekly_awards === 'true') {

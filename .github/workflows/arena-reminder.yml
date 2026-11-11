@@ -1,9 +1,10 @@
-# Every minute so the 5-minute Spoopfight ping still lands before 9:00 PM ET.
+# Every 5 minutes. GitHub drops a every-minute schedule, and this run also
+# advances the world so hourly spoop posts are not left until the long snapshot.
 name: Arena reminders
 
 on:
   schedule:
-    - cron: '* * * * *'
+    - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
