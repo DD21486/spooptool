@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot } = require('../lib/spoop/engine');
+const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, testArena } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, enqueueDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -88,6 +88,14 @@ async function syncWorld(debug) {
 async function handlePost(req) {
   const body = await readBody(req);
   const action = body.action;
+  if (action === 'arena-test') {
+    const state = await load();
+    const seed = String(body.seed || '').trim().slice(0, 80) || String(Date.now());
+    const names = Array.isArray(body.names) ? body.names.slice(0, 16) : [];
+    const result = testArena(state, names, seed);
+    if (result.error) return { status: 400, payload: { error: result.error } };
+    return { status: 200, payload: result };
+  }
   const state = await load();
   const expected = state.clock;
   const debug = debugAllowed(req);

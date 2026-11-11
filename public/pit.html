@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Pit</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <link rel="stylesheet" href="/css/arena.css" />
+</head>
+<body class="arena-page" data-page="pit">
+  <header class="arena-bar">
+    <div id="pit-picks" class="pit-picks"></div>
+    <div class="pit-controls">
+      <label>Seed <input id="pit-seed" type="text" autocomplete="off" spellcheck="false" /></label>
+      <label>Speed
+        <select id="pit-speed">
+          <option value="0.75">Slow</option>
+          <option value="1.5" selected>Normal</option>
+          <option value="3">Fast</option>
+        </select>
+      </label>
+      <button type="button" id="pit-fight">Fight</button>
+      <button type="button" id="pit-replay">Replay</button>
+      <p id="arena-status" class="text-xs text-slate-400">Pick spoops and fight.</p>
+    </div>
+  </header>
+  <p id="pit-notes" class="pit-notes"></p>
+  <ul id="arena-roster" class="roster"></ul>
+  <div id="arena-pit" class="pit" aria-label="Arena">
+    <div class="pit-post pit-post-nw"></div>
+    <div class="pit-post pit-post-ne"></div>
+    <div class="pit-post pit-post-sw"></div>
+    <div class="pit-post pit-post-se"></div>
+    <svg id="arena-lines" class="aim-lines" viewBox="0 0 100 72" preserveAspectRatio="none"></svg>
+    <div id="arena-actors"></div>
+    <div id="arena-fx"></div>
+    <div id="arena-banner" class="arena-banner" hidden></div>
+    <div id="arena-wait" class="wait-card" hidden></div>
+  </div>
+  <script src="/js/spoop.js"></script>
+  <script src="/js/arena.js"></script>
+  <script src="/js/pit.js"></script>
+</body>
+</html>

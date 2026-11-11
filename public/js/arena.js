@@ -123,10 +123,14 @@
 
   function renderRoster(fight) {
     rosterEl.innerHTML = fight.fighters.map((f) => {
+      const pray = f.prayer
+        ? '<div class="tile-pray" title="' + escapeHtml(f.prayer.name) + '"><span></span></div>'
+        : '';
       return '<li class="tile" data-id="' + f.id + '">' +
         '<div class="tile-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
         '<canvas width="16" height="24" data-spoop="' + escapeHtml(f.name) + '"></canvas>' +
         '<div class="tile-hp"><span></span></div>' +
+        pray +
       '</li>';
     }).join('');
     if (!window.SpoopArt) return;
@@ -147,8 +151,15 @@
     fight.fighters.forEach((f) => {
       const el = document.createElement('div');
       el.className = 'actor';
+      const pray = f.prayer
+        ? '<div class="pray" title="' + escapeHtml(f.prayer.name) + '">' +
+            '<img class="pray-icon" alt="' + escapeHtml(f.prayer.name) + '" src="/assets/prayers/' + String(f.prayer.id || '').replace(/[^a-z0-9-]/g, '') + '.png">' +
+            '<div class="pray-track"><span></span></div>' +
+          '</div>'
+        : '';
       el.innerHTML =
         '<div class="hud">' +
+          pray +
           '<div class="hud-name">' + escapeHtml(f.name) + '</div>' +
           '<div class="hud-cb">Cb ' + f.combat + '</div>' +
           '<div class="hp-track"><span></span></div>' +
@@ -163,8 +174,12 @@
         el,
         wrap: el.querySelector('.sprite-wrap'),
         bar: el.querySelector('.hp-track > span'),
+        pray: el.querySelector('.pray'),
+        prayBar: el.querySelector('.pray-track > span'),
+        prayer: f.prayer || null,
         card,
         cardBar: card ? card.querySelector('.tile-hp > span') : null,
+        cardPray: card ? card.querySelector('.tile-pray > span') : null,
         pts: tracks[f.id] || [],
         hp: f.maxHp,
         dead: false,
@@ -177,7 +192,21 @@
       view.y = start.y;
       place(el, start.x, start.y, fight.width, fight.height);
       setHp(f, f.maxHp);
+      setPrayer(view, 0);
     });
+  }
+
+  function setPrayer(view, t) {
+    if (!view || !view.prayer) return;
+    const left = view.dead ? 0 : Math.max(0, view.prayer.max - view.prayer.rate * t);
+    const on = left > 0.05;
+    if (view.pray) view.pray.hidden = !on;
+    const width = view.prayer.max ? Math.max(0, left / view.prayer.max * 100) + '%' : '0%';
+    if (view.prayBar) view.prayBar.style.width = width;
+    if (view.cardPray) {
+      view.cardPray.parentElement.hidden = !on;
+      view.cardPray.style.width = width;
+    }
   }
 
   function floater(x, y, amount, miss) {
@@ -241,6 +270,8 @@
       view.dead = true;
       view.el.classList.add('is-dead');
       view.el.classList.remove('is-lunge');
+      if (view.pray) view.pray.hidden = true;
+      if (view.cardPray) view.cardPray.parentElement.hidden = true;
       if (view.card) view.card.classList.add('is-dead');
     }
   }
@@ -289,6 +320,7 @@
       const faceLeft = pos.faceLeft != null ? pos.faceLeft : pos.x < prevX - 0.02;
       view.wrap.classList.toggle('is-left', !!faceLeft && pos.moving);
       view.wrap.classList.toggle('is-walk', !!pos.moving);
+      setPrayer(view, t);
     }
     while (shownHit < bout.hits.length && bout.hits[shownHit].t <= t) {
       applyEvent(bout.hits[shownHit]);
@@ -327,9 +359,9 @@
     playFrom = 0;
     playOrigin = performance.now();
     playing = true;
-    banner.hidden = true;
-    resultsEl.hidden = true;
-    waitEl.hidden = true;
+    if (banner) banner.hidden = true;
+    if (resultsEl) resultsEl.hidden = true;
+    if (waitEl) waitEl.hidden = true;
     bout.fighters.forEach((f) => {
       const view = actors.get(f.id);
       if (!view) return;
@@ -337,6 +369,7 @@
       view.el.classList.remove('is-dead', 'is-winner', 'is-lunge');
       if (view.card) view.card.classList.remove('is-dead', 'is-winner');
       setHp(f, f.maxHp);
+      setPrayer(view, 0);
       const startPos = sampleTrack(view.pts, 0);
       view.x = startPos.x;
       view.y = startPos.y;
@@ -523,6 +556,20 @@
     } finally {
       fetchingNight = false;
     }
+  }
+
+  if (document.body.getAttribute('data-page') === 'pit') {
+    window.ArenaPit = {
+      play(fight, speed) {
+        if (waitEl) waitEl.hidden = true;
+        nightDone = null;
+        arm(fight, 'Test fight');
+        const next = Number(speed);
+        playSpeed = next > 0 ? next : ARENA_SPEED;
+        start();
+      },
+    };
+    return;
   }
 
   if (replayBtn) replayBtn.addEventListener('click', function () {
