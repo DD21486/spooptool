@@ -120,7 +120,7 @@ async function handlePost(req) {
     const from = new Date(fromClock);
     let target = null;
     if (body.op === 'next') {
-      const ev = nextEventAfter(from);
+      const ev = nextEventAfter(from, state);
       if (!ev) return { status: 400, payload: { error: 'No upcoming event' } };
       target = ev.when;
     } else if (body.op === 'hours') {
