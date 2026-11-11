@@ -587,23 +587,25 @@
     const next = spoop && spoop.nextAction;
     if (!next || !next.at) return '';
     const cls = detail ? 'spoop-next mt-3 text-sm text-slate-300' : 'spoop-next';
-    return '<p class="' + cls + '" data-next-at="' + escapeHtml(next.at) + '" data-next-kind="' + escapeHtml(next.kind || 'tick') + '" data-next-time="' + escapeHtml(next.time || '') + '"' +
+    return '<p class="' + cls + '" data-next-at="' + escapeHtml(next.at) + '" data-next-kind="' + escapeHtml(next.kind || 'tick') + '" data-next-time="' + escapeHtml(next.time || '') + '" data-next-line="' + escapeHtml(next.line || '') + '"' +
       (detail ? ' data-next-detail="1"' : '') +
       (state && state.useSim ? ' data-sim="1" data-sim-clock="' + escapeHtml(state.clock || '') + '"' : '') +
       '></p>';
   }
 
   function nextActionText(el) {
-    const what = nextActionPhrase(el.getAttribute('data-next-kind'));
+    const line = el.getAttribute('data-next-line') || '';
+    const what = line || nextActionPhrase(el.getAttribute('data-next-kind'));
     const time = el.getAttribute('data-next-time') || '';
     const at = Date.parse(el.getAttribute('data-next-at') || '');
-    const clockBit = time ? ' · ' + time + ' ET' : '';
+    if (!line && time) {
+      if (el.getAttribute('data-sim') === '1') return what + ' at ' + time + ' ET';
+    }
     if (!Number.isFinite(at)) return what;
-    if (el.getAttribute('data-sim') === '1') return what + ' at ' + (time || 'the next slot') + ' ET';
+    if (el.getAttribute('data-sim') === '1') return what;
     const ms = at - Date.now();
-    if (ms <= 0) return what + ' due now' + (el.getAttribute('data-next-detail') === '1' ? clockBit : '');
-    const line = what + ' in ' + formatRemain(ms);
-    return el.getAttribute('data-next-detail') === '1' ? line + clockBit : line;
+    if (ms <= 0) return what;
+    return what + ' · in ' + formatRemain(ms);
   }
 
   let nextTimer = null;
@@ -683,8 +685,11 @@
 
   function activityLog(spoop) {
     const rows = (spoop.log || []).slice(0, 20);
-    if (!rows.length) return '<p class="spoop-log-empty">Nothing recorded yet.</p>';
-    return '<ol class="spoop-log-list">' + rows.map((row) => {
+    const schedule = spoop.nextAction && spoop.nextAction.line
+      ? '<li class="is-next"><time>Next</time><p>' + escapeHtml(spoop.nextAction.line) + '</p></li>'
+      : '';
+    if (!rows.length && !schedule) return '<p class="spoop-log-empty">Nothing recorded yet.</p>';
+    return '<ol class="spoop-log-list">' + schedule + rows.map((row) => {
       const text = String(row.text || '');
       const parts = text.split(' — ');
       const time = parts.length > 1 ? parts[0] : '';

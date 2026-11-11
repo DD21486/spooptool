@@ -422,6 +422,10 @@
   line-height: 1.45;
 }
 
+.spoop-log-list li.is-next p {
+  color: #fde68a;
+}
+
 .spoop-log-empty {
   margin: 8px 0 0;
   color: #6d7888;
