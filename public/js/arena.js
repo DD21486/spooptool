@@ -560,7 +560,8 @@
       const icon = id > 0
         ? '<img src="/api/spoops?icon=1&id=' + id + '" alt="" width="36" height="36">'
         : '';
-      return '<div class="spoop-slot"' + style + '>' + icon + '</div>';
+      const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
+      return '<div class="spoop-slot"' + style + '>' + icon + rate + '</div>';
     }).join('')).join('');
   }
 
@@ -573,7 +574,10 @@
     if (!fighter) return;
     if (loadoutId === fighter.id && !loadoutEl.hidden) return;
     loadoutId = fighter.id;
-    loadoutEl.innerHTML = '<p class="loadout-name">' + escapeHtml(fighter.name) + '</p>' +
+    const gear = fighter.gearRating != null
+      ? '<span class="loadout-gear">Gear ' + fighter.gearRating + '</span>'
+      : '';
+    loadoutEl.innerHTML = '<p class="loadout-name">' + escapeHtml(fighter.name) + gear + '</p>' +
       '<div class="loadout-grid">' + gearCells(fighter) + '</div>';
     loadoutEl.hidden = false;
   }

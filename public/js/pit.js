@@ -36,7 +36,7 @@
       const prayer = (spoop.skills || []).find((skill) => skill.id === 'prayer');
       const weapon = spoop.equipped && spoop.equipped.weapon;
       const style = weapon && weapon.style ? weapon.style : 'melee';
-      const hint = 'Cb ' + spoop.combat + ' · ' + style + ' · prayer ' + (prayer ? prayer.level : 1);
+      const hint = 'Cb ' + spoop.combat + ' · gear ' + (spoop.gearRating || 0) + ' · ' + style + ' · prayer ' + (prayer ? prayer.level : 1);
       return '<label title="' + escapeHtml(hint) + '"><input type="checkbox" checked value="' + escapeHtml(spoop.name) + '">' +
         escapeHtml(spoop.name) + '</label>';
     }).join('');

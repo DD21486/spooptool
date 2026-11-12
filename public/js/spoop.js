@@ -107,15 +107,16 @@
 
     if (layer !== 'weapon') {
     const cape = eq.cape;
-    if (cape) {
-      const cq = QUALITY_RANK[cape.quality] || 0;
-      const cc = shiftColor(TIER_COLORS[cape.tier] || '#3d5a8a', -18);
-      const len = 5 + Math.min(5, cq);
-      fill(1, 11, 1, len, cc);
-      fill(14, 11, 1, len, cc);
-      if (cq >= 5) {
-        put(1, 11, '#f0d878');
-        put(14, 11, '#f0d878');
+    const capeQ = cape ? (QUALITY_RANK[cape.quality] || 0) : -1;
+    const capeCol = cape ? shiftColor(TIER_COLORS[cape.tier] || '#3d5a8a', -58) : null;
+    const capeDk = capeCol ? shiftColor(capeCol, -22) : null;
+    if (capeCol) {
+      // Behind the body, and only down to the ankles. Boots stay on the ground.
+      const bottom = capeQ >= 4 ? 18 : 17;
+      for (let y = 10; y <= bottom; y++) {
+        for (let x = 5; x <= 10; x++) {
+          put(x, y, x === 7 || x === 8 ? capeDk : capeCol);
+        }
       }
     }
 
@@ -145,6 +146,12 @@
     if (helm) fill(4, 5, 8, 1, topLo);
 
     fill(6, 9, 4, 1, skin);
+    if (capeCol) {
+      put(4, 9, capeDk);
+      put(5, 9, capeDk);
+      put(10, 9, capeDk);
+      put(11, 9, capeDk);
+    }
 
     fill(4, 10, 8, 5, cloth);
     fill(6, 11, 4, 3, clothDk);
@@ -223,11 +230,35 @@
     const shield = eq.shield;
     if (shield) {
       const sq = QUALITY_RANK[shield.quality] || 0;
-      const sc = shiftColor(TIER_COLORS[shield.tier] || cloth, sq >= 3 ? 10 : 0);
-      fill(13, 12, 2, 3 + (sq >= 4 ? 1 : 0), sc);
-      put(14, 13, shiftColor(sc, -40));
-      if (sq >= 5) put(13, 12, '#f0d878');
-      if (sq >= 6) put(14, 14, '#fff6c8');
+      const face = shiftColor(TIER_COLORS[shield.tier] || '#9aa3ad', sq >= 3 ? 14 : 0);
+      const hi = shiftColor(face, 48);
+      const mid = shiftColor(face, -18);
+      const rim = '#2c241c';
+      const boss = sq >= 6 ? '#fff6c8' : sq >= 3 ? '#f0d878' : hi;
+      const kite = [
+        ' ### ',
+        '#####',
+        '#+++#',
+        '#+*+#',
+        '#+++#',
+        ' ### ',
+        '  #  ',
+      ];
+      const x0 = 10;
+      const y0 = 10;
+      kite.forEach((row, yy) => {
+        for (let xx = 0; xx < row.length; xx++) {
+          const ch = row[xx];
+          if (ch === ' ') continue;
+          const color = ch === '#' ? rim : ch === '*' ? boss : (xx === 2 ? mid : face);
+          put(x0 + xx, y0 + yy, color);
+        }
+      });
+      put(x0 + 1, y0 + 2, hi);
+      if (sq >= 5) {
+        put(x0 + 2, y0 + 1, '#e6c15a');
+        put(x0 + 2, y0 + 5, '#e6c15a');
+      }
     }
     }
 
@@ -692,13 +723,13 @@
 
   function bindSpoopHover(root, map) {
     if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
-    root.querySelectorAll('.spoop-card, .spoop-pin').forEach((el) => {
+    root.querySelectorAll('.spoop-card, .spoop-pin, .spoop-feed-item').forEach((el) => {
       const key = el.getAttribute('data-spoop');
       if (!key) return;
       const mates = () => Array.from(root.querySelectorAll('[data-spoop]')).filter((other) => other.getAttribute('data-spoop') === key);
       el.addEventListener('pointerenter', () => {
         mates().forEach((other) => other.classList.add('is-hot'));
-        if (map && el.classList.contains('spoop-card')) {
+        if (map && !el.classList.contains('spoop-pin')) {
           const pin = mates().find((other) => other.classList.contains('spoop-pin'));
           if (pin) map.reveal(pin);
         }
@@ -775,6 +806,123 @@
     nextTimer = window.setInterval(paintNextActions, 1000);
   }
 
+  function feedLine(text) {
+    const parts = String(text || '').split(' — ');
+    const time = parts.length > 1 ? parts[0] : '';
+    let body = parts.length > 1 ? parts.slice(1).join(' — ') : String(text || '');
+    const xp = [];
+    body = body.replace(/\+([\d,]+) ([A-Za-z]+) XP/g, (match, amount, skill) => {
+      xp.push('+' + amount + ' ' + skill + ' XP');
+      return ' ';
+    });
+    body = body.replace(/\s*[A-Z][A-Za-z']*(?: [A-Za-z']+)* is now level \d+\.?/g, ' ');
+    body = body.replace(/\s*[+\-][\d,]+ gold\.?/g, ' ');
+    body = body.replace(/\s*Staked [\d,]+ gold, took [\d,]+ from the pot\.?/gi, ' ');
+    body = body.replace(/\s*Skilling paid [\d,]+ extra\.?/gi, ' ');
+    body = body.replace(/(?:\s*\.){2,}/g, '.').replace(/\s{2,}/g, ' ').trim();
+    body = body.replace(/^\.\s*/, '').replace(/\s+\./g, '.').replace(/\.\s*$/, '.');
+    if (body && !/[.!?]$/.test(body)) body += '.';
+    return { time, body, xp };
+  }
+
+  const FEED_SKILL_ICON = {
+    attack: '/assets/Attack_icon.png',
+    strength: '/assets/Strength_icon.png',
+    defence: '/assets/Defence_icon.png',
+    hitpoints: '/assets/Hitpoints_icon.png',
+    ranged: '/assets/Ranged_icon.png',
+    magic: '/assets/Magic_icon.png',
+    prayer: '/assets/Prayer_icon.png',
+    agility: '/assets/Agility_icon.png',
+    construction: '/assets/Construction_icon.png',
+    cooking: '/assets/Cooking_icon.png',
+    crafting: '/assets/Crafting_icon.png',
+    farming: '/assets/Farming_icon.png',
+    firemaking: '/assets/Firemaking_icon.png',
+    fishing: '/assets/Fishing_icon.png',
+    fletching: '/assets/Fletching_icon.png',
+    herblore: '/assets/Herblore_icon.png',
+    hunter: '/assets/Hunter_icon.png',
+    mining: '/assets/Mining_icon.png',
+    runecraft: '/assets/Runecraft_icon.png',
+    sailing: '/assets/Sailing_icon.png',
+    slayer: '/assets/Slayer_icon.png',
+    smithing: '/assets/Smithing_icon.png',
+    thieving: '/assets/Thieving_icon.png',
+    woodcutting: '/assets/Woodcutting_icon.png',
+  };
+
+  const FEED_MARK = {
+    quest: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3.5h9.2L19 7.2V20.5H6z"/><path fill="#1a1030" d="M15 3.8V8h4.1"/><path fill="none" stroke="#1a1030" stroke-width="1.2" d="M8.5 12h7M8.5 15h5"/></svg>',
+    'quest-done': '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M6 3.5h9.2L19 7.2V20.5H6z"/><path fill="#2a2208" d="M15 3.8V8h4.1"/><path fill="none" stroke="#2a2208" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M8.4 13.2l2.3 2.3 4.8-5"/></svg>',
+    loot: '<svg viewBox="0 0 24 24"><path fill="currentColor" d="M4 9h16v10.5H4z"/><path fill="currentColor" d="M3 7.2h18v2.4H3z"/><path fill="#102018" d="M11 9h2v10.5h-2z"/></svg>',
+    pet: '<svg viewBox="0 0 24 24"><circle cx="7" cy="8" r="2.1" fill="currentColor"/><circle cx="12" cy="6.2" r="2.1" fill="currentColor"/><circle cx="17" cy="8" r="2.1" fill="currentColor"/><ellipse cx="12" cy="15.2" rx="5.2" ry="4" fill="currentColor"/></svg>',
+  };
+
+  function feedKind(body, xp) {
+    const text = body || '';
+    if (/^found /i.test(text) || /rare drop/i.test(text)) return { kind: 'loot', label: 'Found gear' };
+    if (/followed them home/i.test(text)) return { kind: 'pet', label: 'Pet' };
+    if (/\bpk\b/i.test(text) || /^challenged /i.test(text)) return { kind: 'pk', label: 'PK' };
+    if (/^spoopfight/i.test(text) || /^fought /i.test(text)) return { kind: 'arena', label: 'Arena' };
+    if (/^died /i.test(text)) return { kind: 'death', label: 'Died' };
+    if (/^finished /i.test(text) || / and finished it/i.test(text)) return { kind: 'quest-done', label: 'Finished a quest' };
+    if (/^started /i.test(text) || /^still on /i.test(text)) return { kind: 'quest', label: 'On a quest' };
+    const skill = xp.length ? xp[0].replace(/^\+[\d,]+\s+/, '').replace(/ XP$/, '').toLowerCase() : '';
+    if (/^(kept at|wandered off to) /i.test(text) || skill) return { kind: 'train', label: skill ? 'Training ' + skill : 'Training', skill: skill };
+    return { kind: 'activity', label: 'Activity' };
+  }
+
+  function feedMark(kind) {
+    const title = escapeHtml(kind.label);
+    if (kind.kind === 'train') {
+      const src = FEED_SKILL_ICON[kind.skill] || '/assets/Skills_icon.png';
+      return '<img class="spoop-feed-icon" src="' + src + '" alt="" title="' + title + '">';
+    }
+    if (kind.kind === 'pk') return '<img class="spoop-feed-icon" src="/assets/Skull_(status)_icon.png" alt="" title="' + title + '">';
+    if (kind.kind === 'death') return '<img class="spoop-feed-icon" src="/assets/Hitpoints_icon.png" alt="" title="' + title + '">';
+    if (kind.kind === 'arena') return '<img class="spoop-feed-icon" src="/assets/Combat_icon.png" alt="" title="' + title + '">';
+    if (kind.kind === 'activity') return '<img class="spoop-feed-icon" src="/assets/Skills_icon.png" alt="" title="' + title + '">';
+    return '<span class="spoop-feed-mark is-' + kind.kind + '" title="' + title + '">' + (FEED_MARK[kind.kind] || '') + '</span>';
+  }
+
+  function renderFeed(spoops) {
+    const rows = [];
+    spoops.forEach((spoop) => {
+      (spoop.log || []).forEach((row) => {
+        const line = feedLine(row.text);
+        if (!line.body && !line.xp.length) return;
+        const kind = feedKind(line.body, line.xp);
+        rows.push({
+          at: Date.parse(row.at) || 0,
+          time: line.time,
+          body: line.body,
+          xp: line.xp,
+          name: spoop.name,
+          key: spoopKey(spoop),
+          kind: kind,
+        });
+      });
+    });
+    rows.sort((a, b) => b.at - a.at);
+    const items = rows.slice(0, 80).map((row) => {
+      const xp = row.xp.length ? '<p class="spoop-feed-xp">' + row.xp.map(escapeHtml).join(' · ') + '</p>' : '';
+      const body = row.body ? '<p class="spoop-feed-do">' + escapeHtml(row.body) + '</p>' : '';
+      const find = row.kind.kind === 'loot' ? ' is-find' : '';
+      return '<li><a class="spoop-feed-item is-' + row.kind.kind + find + '" data-spoop="' + escapeHtml(row.key) + '" href="/spoop.html?name=' + encodeURIComponent(row.key) + '">' +
+        feedMark(row.kind) +
+        '<span class="spoop-feed-copy">' +
+          '<span class="spoop-feed-who"><span>' + escapeHtml(row.name) + '</span><time>' + escapeHtml(row.time) + '</time></span>' +
+          body + xp +
+        '</span>' +
+      '</a></li>';
+    }).join('');
+    return '<aside class="spoop-feed" aria-label="Activity">' +
+      '<h2>Activity</h2>' +
+      (items ? '<ol class="spoop-feed-list">' + items + '</ol>' : '<p class="spoop-log-empty">Nothing recorded yet.</p>') +
+    '</aside>';
+  }
+
   function renderList(state) {
     const root = document.getElementById('spoop-root');
     const spoops = state.spoops || [];
@@ -789,6 +937,7 @@
           owner +
           '<dl class="spoop-stats">' +
             '<div><dt>Combat</dt><dd>' + spoop.combat + '</dd></div>' +
+            '<div><dt title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1.">Gear</dt><dd>' + (spoop.gearRating || 0) + '</dd></div>' +
             '<div><dt>Gold</dt><dd>' + Number(spoop.gold || 0).toLocaleString() + '</dd></div>' +
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
           '</dl>' +
@@ -807,7 +956,8 @@
     const pkBanner = pk
       ? '<a class="spoop-pk" href="/arena.html">PK · ' + escapeHtml(pk.a) + ' vs ' + escapeHtml(pk.b) + ' · ' + escapeHtml(pk.reason) + '</a>'
       : '';
-    root.innerHTML = pkBanner + renderMap(spoops) + (cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>');
+    const board = cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>';
+    root.innerHTML = '<div class="spoop-main">' + pkBanner + renderMap(spoops) + board + '</div>' + renderFeed(spoops);
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
     paint(state);
@@ -913,8 +1063,12 @@
       const met = skill && skill.level >= req.level;
       reqHtml = '<p class="mt-1.5 ' + (met ? 'text-slate-400' : 'text-rose-300') + '">Requires ' + req.level + ' ' + escapeHtml(req.skillName) + '</p>';
     }
+    const rating = item.rating != null
+      ? '<p class="text-[10px] uppercase tracking-wide text-slate-500">Rating ' + item.rating + '</p>'
+      : '';
     return '<div class="spoop-tip" role="tooltip">' +
       '<p class="text-xs" style="color:' + (QUALITY_COLOR[item.quality] || '#fde68a') + '">' + escapeHtml(item.name) + '</p>' +
+      rating +
       reqHtml +
       block('Attack', attack) +
       block('Defence', defence) +
@@ -926,7 +1080,8 @@
     const color = item && QUALITY_COLOR[item.quality];
     const style = color ? ' style="border-color:' + color + '"' : '';
     const tip = item ? itemTip(item, spoop) : '';
-    return '<div class="spoop-slot"' + style + ' tabindex="0">' + inner + tip + '</div>';
+    const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
+    return '<div class="spoop-slot"' + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
 
   function gearCell(slot, item, spoop) {
@@ -1024,7 +1179,7 @@
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-2">' +
             '<h3 class="text-sm text-slate-300">Skills</h3>' +
-            '<p class="text-sm text-slate-100 tabular-nums">Combat ' + spoop.combat + ' · ' + quests.points + ' QP</p>' +
+            '<p class="text-sm text-slate-100 tabular-nums">Combat ' + spoop.combat + ' · Gear ' + (spoop.gearRating || 0) + ' · ' + quests.points + ' QP</p>' +
           '</div>' +
           '<div class="flex items-center gap-2 mb-3">' + bar(gate.progress) + '</div>' +
           '<p class="text-[11px] text-slate-500 mb-2">' + escapeHtml(gateLabel) + ' · ' + quests.done + '/' + quests.total + ' quests</p>' +
@@ -1032,7 +1187,10 @@
           statsHtml +
         '</section>' +
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
-          '<h3 class="text-sm text-slate-300 mb-3">Wearing</h3>' +
+          '<div class="flex items-baseline justify-between gap-3 mb-3">' +
+            '<h3 class="text-sm text-slate-300">Wearing</h3>' +
+            '<p class="text-sm text-amber-200 tabular-nums" title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1. Each quality step adds 1, and each metal adds 10.">Gear ' + (spoop.gearRating || 0) + '</p>' +
+          '</div>' +
           '<div class="spoop-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
