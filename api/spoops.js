@@ -1,6 +1,6 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
 const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, testArena } = require('../lib/spoop/engine');
-const { publishEvents, publishArena, enqueueDiscord } = require('../lib/spoop/publish');
+const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
 function cors(res) {
@@ -74,11 +74,14 @@ async function syncWorld(debug) {
   const changedGear = events.length > 0;
   if (!state.useSim) {
     events = events.concat(advance(state, new Date()));
-    enqueueDiscord(state, events);
+    const claimed = takeDiscordQueue(state, events);
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
-    if (await publishEvents([], state)) await save(state, state.clock);
-    else if (await publishArena(state)) await save(state, state.clock);
+    const delivered = await deliverDiscord(state, claimed);
+    const published = await publishEvents([], state);
+    if (published || delivered || (state.discordQueue && state.discordQueue.length)) {
+      await save(state, state.clock);
+    }
   } else if (changedGear) {
     await save(state, expected);
   }
