@@ -479,8 +479,7 @@
       '<p class="gielinor-kicker">On Gielinor</p>' +
       '<div class="gielinor">' +
         '<div class="gielinor-stage">' +
-          '<img class="gielinor-map" src="/assets/gielinor-map.png" alt="Map of Gielinor" width="704" height="391">' +
-          '<img class="gielinor-map gielinor-map-sharp" alt="" width="1408" height="782">' +
+          '<img class="gielinor-map" src="/assets/gielinor-map-2x.png" alt="Map of Gielinor" width="1408" height="782">' +
           '<div class="gielinor-tiles" aria-hidden="true"></div>' +
           pins +
         '</div>' +
@@ -513,39 +512,48 @@
       y = Math.min(0, Math.max(Math.min(0, vh - sh), y));
     }
 
-    const SHARP_AT = 2;
-    const sharp = stage.querySelector('.gielinor-map-sharp');
     const tiles = stage.querySelector('.gielinor-tiles');
-    // Wiki surface tiles, zoom 3: 8 px per game square. File index * 32 is the south-west corner.
-    const TILE_Z = 3;
-    const TILE_SPAN = 32;
-    const TILE_URL = 'https://maps.runescape.wiki/osrs/tiles/0_2019-10-31_1/' + TILE_Z + '/0_';
+    // Wiki surface tiles are 256px. A higher zoom covers fewer squares, so each one is sharper.
+    // File index * span is the south-west corner.
+    const TILE_LEVELS = [
+      { z: 0, span: 256, until: 1.8 },
+      { z: 1, span: 128, until: 3.4 },
+      { z: 2, span: 64, until: 6.2 },
+      { z: 3, span: 32, until: Infinity },
+    ];
+    const TILE_ROOT = 'https://maps.runescape.wiki/osrs/tiles/0_2019-10-31_1/';
     const worldW = GIELINOR.w / GIELINOR.scale;
     const worldH = GIELINOR.h / GIELINOR.scale;
 
-    function syncSharp() {
-      if (!sharp) return;
-      const want = scale >= SHARP_AT;
-      if (want && !sharp.getAttribute('src')) {
-        sharp.addEventListener('load', () => {
-          if (scale >= SHARP_AT) stage.classList.add('is-sharp');
-        });
-        sharp.src = '/assets/gielinor-map-2x.png';
+    function tileLevel() {
+      return TILE_LEVELS.find((level) => scale < level.until) || TILE_LEVELS[TILE_LEVELS.length - 1];
+    }
+
+    function revealTile(img, tile) {
+      try {
+        const ctx = tile.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(img, 0, 0, tile.width, tile.height);
+        const image = ctx.getImageData(0, 0, tile.width, tile.height);
+        const data = image.data;
+        let visible = 0;
+        for (let i = 0; i < data.length; i += 4) {
+          if (data[i] < 4 && data[i + 1] < 4 && data[i + 2] < 4) data[i + 3] = 0;
+          else visible += 1;
+        }
+        if (visible < 32) return false;
+        ctx.putImageData(image, 0, 0);
+        return true;
+      } catch (err) {
+        return false;
       }
-      const ready = sharp.complete && sharp.naturalWidth > 0;
-      stage.classList.toggle('is-sharp', want && ready);
     }
 
     function syncTiles() {
       if (!tiles) return;
-      const close = scale >= 7.2;
-      stage.classList.toggle('is-detail', close);
-      if (scale < 6.8) {
-        tiles.replaceChildren();
-        return;
-      }
+      const level = tileLevel();
       const stageW = stage.offsetWidth;
       const stageH = stage.offsetHeight;
+      stage.classList.toggle('is-detail', !!(stageW && stageH));
       if (!stageW || !stageH) return;
       const viewW = view.clientWidth / scale;
       const viewH = view.clientHeight / scale;
@@ -555,15 +563,15 @@
       const gameX1 = GIELINOR.x0 + ((left + viewW) / stageW) * worldW;
       const gameY1 = GIELINOR.yTop - (top / stageH) * worldH;
       const gameY0 = GIELINOR.yTop - ((top + viewH) / stageH) * worldH;
-      const tx0 = Math.floor(gameX0 / TILE_SPAN) - 1;
-      const tx1 = Math.floor(gameX1 / TILE_SPAN) + 1;
-      const ty0 = Math.floor(gameY0 / TILE_SPAN) - 1;
-      const ty1 = Math.floor(gameY1 / TILE_SPAN) + 1;
+      const tx0 = Math.floor(gameX0 / level.span) - 1;
+      const tx1 = Math.floor(gameX1 / level.span) + 1;
+      const ty0 = Math.floor(gameY0 / level.span) - 1;
+      const ty1 = Math.floor(gameY1 / level.span) + 1;
       const want = new Set();
       for (let tx = tx0; tx <= tx1; tx += 1) {
         for (let ty = ty0; ty <= ty1; ty += 1) {
           if (tx < 0 || ty < 0) continue;
-          want.add(tx + '_' + ty);
+          want.add(level.z + '_' + tx + '_' + ty);
         }
       }
       tiles.querySelectorAll('.gielinor-tile').forEach((img) => {
@@ -572,23 +580,29 @@
       want.forEach((key) => {
         if (tiles.querySelector('[data-tile="' + key + '"]')) return;
         const parts = key.split('_');
-        const tx = Number(parts[0]);
-        const ty = Number(parts[1]);
-        const img = document.createElement('img');
-        img.className = 'gielinor-tile';
-        img.alt = '';
-        img.draggable = false;
-        img.dataset.tile = key;
-        const leftPct = ((tx * TILE_SPAN - GIELINOR.x0) / worldW) * 100;
-        const topPct = ((GIELINOR.yTop - (ty + 1) * TILE_SPAN) / worldH) * 100;
-        img.style.left = leftPct + '%';
-        img.style.top = topPct + '%';
-        img.style.width = 'calc(' + ((TILE_SPAN / worldW) * 100) + '% + 1px)';
-        img.style.height = 'calc(' + ((TILE_SPAN / worldH) * 100) + '% + 1px)';
-        img.addEventListener('load', () => img.classList.add('is-in'));
-        img.addEventListener('error', () => img.remove());
-        img.src = TILE_URL + key + '.png';
-        tiles.appendChild(img);
+        const tx = Number(parts[1]);
+        const ty = Number(parts[2]);
+        const tile = document.createElement('canvas');
+        tile.className = 'gielinor-tile';
+        tile.dataset.tile = key;
+        tile.width = 256;
+        tile.height = 256;
+        const leftPct = ((tx * level.span - GIELINOR.x0) / worldW) * 100;
+        const topPct = ((GIELINOR.yTop - (ty + 1) * level.span) / worldH) * 100;
+        tile.style.left = leftPct + '%';
+        tile.style.top = topPct + '%';
+        tile.style.width = 'calc(' + ((level.span / worldW) * 100) + '% + 1px)';
+        tile.style.height = 'calc(' + ((level.span / worldH) * 100) + '% + 1px)';
+        const img = new Image();
+        img.crossOrigin = 'anonymous';
+        img.addEventListener('load', () => {
+          if (!tile.isConnected) return;
+          if (revealTile(img, tile)) tile.classList.add('is-in');
+          else tile.remove();
+        });
+        img.addEventListener('error', () => tile.remove());
+        img.src = TILE_ROOT + level.z + '/0_' + tx + '_' + ty + '.png';
+        tiles.appendChild(tile);
       });
     }
 
@@ -600,7 +614,6 @@
       const boost = 1 + 0.22 * full;
       stage.style.setProperty('--pin-scale', (boost / Math.pow(scale, 1.35)).toFixed(4));
       stage.style.setProperty('--label-scale', Math.pow(scale, 0.22).toFixed(4));
-      syncSharp();
       syncTiles();
     }
 
@@ -717,6 +730,10 @@
         else zoomAt(cx, cy, 1);
       });
     });
+
+    apply();
+    const baseMap = stage.querySelector('.gielinor-map');
+    if (baseMap && !baseMap.complete) baseMap.addEventListener('load', syncTiles);
 
     return { reveal };
   }
@@ -865,7 +882,8 @@
     if (/followed them home/i.test(text)) return { kind: 'pet', label: 'Pet' };
     if (/\bpk\b/i.test(text) || /^challenged /i.test(text)) return { kind: 'pk', label: 'PK' };
     if (/^spoopfight/i.test(text) || /^fought /i.test(text)) return { kind: 'arena', label: 'Arena' };
-    if (/^died /i.test(text)) return { kind: 'death', label: 'Died' };
+    if (/^died\b/i.test(text)) return { kind: 'death', label: 'Died' };
+    if (/^killed /i.test(text)) return { kind: 'boss', label: 'Boss kill' };
     if (/^finished /i.test(text) || / and finished it/i.test(text)) return { kind: 'quest-done', label: 'Finished a quest' };
     if (/^started /i.test(text) || /^still on /i.test(text)) return { kind: 'quest', label: 'On a quest' };
     const skill = xp.length ? xp[0].replace(/^\+[\d,]+\s+/, '').replace(/ XP$/, '').toLowerCase() : '';
@@ -881,7 +899,7 @@
     }
     if (kind.kind === 'pk') return '<img class="spoop-feed-icon" src="/assets/Skull_(status)_icon.png" alt="" title="' + title + '">';
     if (kind.kind === 'death') return '<img class="spoop-feed-icon" src="/assets/Hitpoints_icon.png" alt="" title="' + title + '">';
-    if (kind.kind === 'arena') return '<img class="spoop-feed-icon" src="/assets/Combat_icon.png" alt="" title="' + title + '">';
+    if (kind.kind === 'arena' || kind.kind === 'boss') return '<img class="spoop-feed-icon" src="/assets/Combat_icon.png" alt="" title="' + title + '">';
     if (kind.kind === 'activity') return '<img class="spoop-feed-icon" src="/assets/Skills_icon.png" alt="" title="' + title + '">';
     return '<span class="spoop-feed-mark is-' + kind.kind + '" title="' + title + '">' + (FEED_MARK[kind.kind] || '') + '</span>';
   }
@@ -965,6 +983,7 @@
 
   function questStatus(activity) {
     if (activity && activity.errand) return 'Errand';
+    if (activity && activity.boss) return 'Boss';
     if (!activity || !activity.quest) {
       const skill = activity && activity.skill ? activity.skill : '';
       return activity && activity.idle ? 'Idle ground · training ' + skill : 'Training ' + skill;
@@ -1093,6 +1112,28 @@
     return slotFrame(item, inner, spoop);
   }
 
+  function bossGrid(spoop) {
+    const bosses = spoop.bosses || [];
+    if (!bosses.length) return '';
+    const total = bosses.reduce((sum, boss) => sum + (Number(boss.kc) || 0), 0);
+    const cells = bosses.map((boss) => {
+      const kc = Number(boss.kc) || 0;
+      const title = boss.name + ' — ' + kc.toLocaleString() + (kc === 1 ? ' kill' : ' kills');
+      const count = kc ? '<span class="boss-kc-count">' + kc.toLocaleString() + '</span>' : '';
+      return '<span class="boss-kc' + (kc ? '' : ' is-zero') + '" title="' + escapeHtml(title) + '">' +
+        '<img src="' + escapeHtml(boss.icon) + '" alt="' + escapeHtml(boss.name) + '" width="40" height="40">' +
+        count +
+      '</span>';
+    }).join('');
+    return '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+      '<div class="flex items-baseline justify-between gap-3 mb-2">' +
+        '<h3 class="text-sm text-slate-300">Bosses</h3>' +
+        '<p class="text-xs text-slate-500 tabular-nums">' + total.toLocaleString() + ' kills</p>' +
+      '</div>' +
+      '<div class="boss-kc-grid">' + cells + '</div>' +
+    '</section>';
+  }
+
   function renderDetail(state) {
     const root = document.getElementById('spoop-root');
     const params = new URLSearchParams(window.location.search);
@@ -1194,6 +1235,7 @@
           '<div class="spoop-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
+      bossGrid(spoop) +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<h3 class="text-sm text-slate-300 mb-2">Crates</h3>' +
         '<div class="flex items-center gap-2 mb-1">' + bar(goal.progress) + '</div>' +

@@ -230,6 +230,45 @@ body[data-page="list"] #spoop-root {
 
 .spoop-pk:hover { color: #fff; }
 
+.boss-kc-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.boss-kc {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.boss-kc img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.boss-kc.is-zero { opacity: 0.32; }
+
+.boss-kc-count {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  padding: 0 3px;
+  border-radius: 4px;
+  background: rgba(8, 10, 14, 0.86);
+  color: #f8fafc;
+  font-size: 10px;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
 .spoop-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -383,23 +422,9 @@ body[data-page="list"] #spoop-root {
   display: block;
   width: 100%;
   height: auto;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+  image-rendering: auto;
   pointer-events: none;
 }
-
-.gielinor-map-sharp {
-  position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  image-rendering: auto;
-  transition: opacity 0.28s ease;
-}
-
-.gielinor-stage.is-sharp .gielinor-map-sharp { opacity: 1; }
 
 .gielinor-tiles {
   position: absolute;
@@ -414,6 +439,7 @@ body[data-page="list"] #spoop-root {
 
 .gielinor-tile {
   position: absolute;
+  display: block;
   opacity: 0;
   image-rendering: auto;
   pointer-events: none;
