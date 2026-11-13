@@ -822,8 +822,10 @@
 
 .actor.is-entrance .hp-track,
 .actor.is-entrance .pray,
+.actor.is-entrance .speed-track,
 .actor.is-flying .hp-track,
-.actor.is-flying .pray { visibility: hidden; }
+.actor.is-flying .pray,
+.actor.is-flying .speed-track { visibility: hidden; }
 
 .actor.is-entrance .hud-name,
 .actor.is-flying .hud-name {
@@ -935,6 +937,27 @@
   width: 100%;
   background: hsl(120 70% 42%);
 }
+
+.speed-track {
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 32px;
+  height: 4px;
+  transform: translateX(-50%);
+  background: #3a2a18;
+  border: 1px solid #0b0704;
+  overflow: hidden;
+}
+
+.speed-track > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: #ffd15a;
+}
+
+.actor.is-dead .speed-track { opacity: 0.35; }
 
 .sprite-wrap {
   position: relative;

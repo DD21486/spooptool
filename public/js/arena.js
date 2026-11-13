@@ -856,7 +856,10 @@
           '<div class="hud-cb">' + (f.monster ? 'Boss' : 'Cb ' + f.combat) + '</div>' +
           '<div class="hp-track"><span></span></div>' +
         '</div>' +
-        sprite;
+        sprite +
+        (f.monster || !(f.attack > 0)
+          ? ''
+          : '<div class="speed-track" title="Attack speed"><span></span></div>');
       el.querySelector('.hud').style.transform = 'translateY(' + ((f.id.charCodeAt(f.id.length - 1) % 3) - 1) * 7 + 'px)';
       actorsEl.appendChild(el);
       const card = rosterEl.querySelector('[data-id="' + f.id + '"]');
@@ -875,6 +878,10 @@
         monster: f.monster || '',
         attackGen: 0,
         bar: el.querySelector('.hp-track > span'),
+        speedBar: el.querySelector('.speed-track > span'),
+        attack: f.attack || 0,
+        windup: Number(f.windup) || 0,
+        myHits: (fight.hits || []).filter((hit) => hit.from === f.id),
         pray: el.querySelector('.pray'),
         prayBar: el.querySelector('.pray-track > span'),
         prayer: f.prayer || null,
@@ -897,6 +904,7 @@
       paintLayers(view, 'idle');
       setHp(f, f.maxHp);
       setPrayer(view, 0);
+      setSpeed(view, 0);
     });
     actors.forEach((view) => {
       const other = view.target ? actors.get(view.target) : null;
@@ -980,6 +988,23 @@
   function faceView(view, other) {
     if (!view || !other || !view.wrap) return;
     view.wrap.classList.toggle('is-left', other.x < view.x - 0.35);
+  }
+
+  function setSpeed(view, t) {
+    if (!view || !view.speedBar || !(view.attack > 0) || view.dead) return;
+    let from = 0;
+    let cd = view.windup;
+    const hits = view.myHits || [];
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      if (hit.t > t) break;
+      cd = Math.max(0, cd - (hit.t - from));
+      cd = view.attack;
+      from = hit.t;
+    }
+    cd = Math.max(0, cd - (t - from));
+    const fill = Math.max(0, Math.min(1, 1 - cd / view.attack));
+    view.speedBar.style.width = (fill * 100).toFixed(1) + '%';
   }
 
   function setPrayer(view, t) {
@@ -1275,6 +1300,7 @@
       view.wrap.classList.toggle('is-left', facingLeft(view, pos, prevX));
       view.wrap.classList.toggle('is-walk', !!pos.moving);
       setPrayer(view, t);
+      setSpeed(view, t);
     }
     while (shownHit < bout.hits.length && bout.hits[shownHit].t <= t) {
       applyEvent(bout.hits[shownHit]);
@@ -1484,6 +1510,7 @@
       if (view.card) view.card.classList.remove('is-dead', 'is-winner');
       setHp(f, f.maxHp);
       setPrayer(view, 0);
+      setSpeed(view, 0);
       const startPos = sampleTrack(view.pts, 0);
       view.x = startPos.x;
       view.y = startPos.y;
