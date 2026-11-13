@@ -120,30 +120,249 @@
       }
     }
 
-    fill(4, 1, 8, 2, top);
-    fill(3, 3, 10, 2, top);
-    fill(5, 1, 3, 1, topHi);
-    put(3, 4, topLo);
-    put(12, 4, topLo);
-    if (helm && helmQ >= 4) fill(5, 2, 6, 1, topHi);
-    if (helm && helmQ >= 6) {
-      put(7, 1, '#f0d878');
-      put(8, 1, '#fff6c8');
-    }
-
-    fill(4, 5, 8, 4, skin);
-    put(5, 6, eye);
-    put(6, 6, pupil);
-    put(9, 6, pupil);
-    put(10, 6, eye);
-    put(7, 7, skinDk);
-    put(8, 7, skinDk);
-    if (!helm && beard) fill(6, 8, 4, 1, hairLo);
-    else {
+    const helmKind = helm ? (helm.baseId || 'med-helm') : null;
+    const paintFace = () => {
+      fill(4, 5, 8, 4, skin);
+      put(5, 6, eye);
+      put(6, 6, pupil);
+      put(9, 6, pupil);
+      put(10, 6, eye);
+      put(7, 7, skinDk);
+      put(8, 7, skinDk);
       put(6, 8, skinDk);
       put(9, 8, skinDk);
+    };
+    const paintDome = (col, hi, lo) => {
+      fill(4, 1, 8, 2, col);
+      fill(3, 3, 10, 2, col);
+      fill(5, 1, 3, 1, hi);
+      put(3, 4, lo);
+      put(12, 4, lo);
+    };
+    const metalTrim = () => {
+      if (helmQ >= 4) fill(5, 2, 6, 1, topHi);
+      if (helmQ >= 6) {
+        put(7, 1, '#f0d878');
+        put(8, 1, '#fff6c8');
+      }
+    };
+    const paintVisor = (col, lo) => {
+      fill(4, 1, 8, 2, col);
+      fill(3, 3, 10, 6, col);
+      fill(5, 1, 3, 1, shiftColor(col, 36));
+      put(3, 4, lo);
+      put(12, 4, lo);
+      put(3, 8, lo);
+      put(12, 8, lo);
+      fill(5, 6, 2, 1, '#141414');
+      fill(9, 6, 2, 1, '#141414');
+      put(7, 6, lo);
+      put(8, 6, lo);
+      put(6, 8, '#141414');
+      put(7, 8, lo);
+      put(8, 8, lo);
+      put(9, 8, '#141414');
+    };
+
+    if (!helm) {
+      paintDome(top, topHi, topLo);
+      paintFace();
+      if (beard) fill(6, 8, 4, 1, hairLo);
+    } else if (helmKind === 'full-helm') {
+      paintVisor(top, topLo);
+      metalTrim();
+    } else if (helmKind === 'wizard-hat' || helmKind === 'ancestral-hat') {
+      const hat = helmKind === 'ancestral-hat' ? '#6a3aa0' : '#3a4e9a';
+      const hatHi = helmKind === 'ancestral-hat' ? '#c89ae8' : '#7a92e0';
+      const hatLo = helmKind === 'ancestral-hat' ? '#3a1860' : '#243268';
+      put(7, 0, hatHi);
+      put(8, 0, hat);
+      fill(6, 1, 4, 1, hat);
+      fill(5, 2, 6, 1, hat);
+      fill(3, 3, 10, 1, hatLo);
+      fill(4, 4, 8, 1, hat);
+      if (helmKind === 'ancestral-hat') {
+        put(7, 3, hatHi);
+        put(8, 3, '#f3e6ff');
+      }
+      paintFace();
+    } else if (helmKind === 'coif') {
+      paintFace();
+      fill(4, 1, 8, 2, '#6e4a2e');
+      fill(5, 1, 3, 1, '#8d6340');
+      fill(3, 3, 1, 7, '#6e4a2e');
+      fill(12, 3, 1, 7, '#6e4a2e');
+      fill(4, 3, 8, 1, '#3e2918');
+      put(4, 4, '#6e4a2e');
+      put(11, 4, '#6e4a2e');
+      put(4, 8, '#3e2918');
+      put(11, 8, '#3e2918');
+    } else if (helmKind === 'spiny-helm') {
+      paintDome(top, topHi, topLo);
+      put(6, 0, topLo);
+      put(8, 0, topHi);
+      put(10, 0, topLo);
+      put(4, 2, topHi);
+      put(12, 2, topHi);
+      paintFace();
+      fill(4, 5, 8, 1, topLo);
+    } else if (helmKind === 'black-mask') {
+      paintDome('#2a2a2a', '#4a4a4a', '#111111');
+      paintFace();
+      fill(4, 4, 8, 3, '#1a1a1a');
+      put(5, 6, '#9a3030');
+      put(6, 6, '#2a1010');
+      put(9, 6, '#2a1010');
+      put(10, 6, '#9a3030');
+      put(7, 7, '#3a3a3a');
+      put(8, 7, '#3a3a3a');
+    } else if (helmKind === 'slayer-helm') {
+      fill(5, 0, 6, 1, '#6a7268');
+      paintVisor('#3a4038', '#232820');
+      fill(5, 6, 2, 1, '#d5dcc8');
+      fill(9, 6, 2, 1, '#d5dcc8');
+      fill(6, 8, 4, 1, '#1e221c');
+      put(6, 8, '#8a9480');
+      put(9, 8, '#8a9480');
+    } else if (helmKind === 'initiate-sallet' || helmKind === 'proselyte-sallet') {
+      const white = helmKind === 'proselyte-sallet' ? '#f7f4ea' : '#e4e0d4';
+      paintDome(white, '#ffffff', '#b7b29f');
+      if (helmKind === 'proselyte-sallet') {
+        put(7, 2, '#e0b84a');
+        put(8, 2, '#e0b84a');
+      }
+      paintFace();
+      fill(4, 5, 8, 1, '#e0b84a');
+    } else if (helmKind === 'berserker-helm') {
+      const metal = '#9aa0a8';
+      const metalLo = '#5c636c';
+      const horn = '#e7e2d6';
+      paintDome(metal, '#d5d8dc', metalLo);
+      put(4, 0, horn);
+      put(4, 1, horn);
+      put(11, 0, horn);
+      put(11, 1, horn);
+      paintFace();
+      put(7, 5, metalLo);
+      put(8, 5, metalLo);
+      put(7, 6, metal);
+    } else if (helmKind === 'warrior-helm' || helmKind === 'neitiznot-helm' || helmKind === 'faceguard') {
+      const metal = '#8a8175';
+      const metalHi = '#c2b8a4';
+      const metalLo = '#5a5348';
+      const horn = '#efe6d4';
+      paintDome(metal, metalHi, metalLo);
+      if (helmKind === 'warrior-helm') {
+        put(7, 0, metalHi);
+        put(8, 0, metal);
+      } else {
+        put(3, 0, horn);
+        put(2, 1, horn);
+        put(4, 1, metalLo);
+        put(12, 0, horn);
+        put(13, 1, horn);
+        put(11, 1, metalLo);
+      }
+      if (helmKind === 'faceguard') {
+        paintVisor(metal, metalLo);
+        put(3, 0, horn);
+        put(2, 1, horn);
+        put(12, 0, horn);
+        put(13, 1, horn);
+      } else {
+        paintFace();
+        put(7, 5, metalLo);
+        put(8, 5, metalLo);
+        put(7, 6, metal);
+        if (helmKind === 'neitiznot-helm') {
+          fill(3, 6, 1, 3, metal);
+          fill(12, 6, 1, 3, metal);
+        }
+      }
+    } else if (helmKind === 'archer-helm') {
+      paintDome('#3f6b34', '#6ea05a', '#243f1e');
+      paintFace();
+      fill(3, 4, 10, 1, '#243f1e');
+      put(7, 2, '#6ea05a');
+    } else if (helmKind === 'farseer-helm') {
+      paintDome('#3a3a68', '#7a7ab8', '#222244');
+      put(7, 2, '#9fd4ff');
+      put(8, 2, '#e8f7ff');
+      paintFace();
+      fill(4, 5, 8, 1, '#222244');
+    } else if (helmKind === 'void-melee' || helmKind === 'void-ranger' || helmKind === 'void-mage') {
+      const stripe = helmKind === 'void-ranger' ? '#3d8f45' : helmKind === 'void-mage' ? '#3a57b5' : '#8a8a90';
+      paintDome('#d5d5d8', '#ffffff', '#8e9096');
+      fill(4, 2, 8, 1, stripe);
+      fill(4, 5, 8, 4, '#9aa0a8');
+      fill(5, 6, 2, 1, '#1a1a1a');
+      fill(9, 6, 2, 1, '#1a1a1a');
+      put(7, 8, '#6a6e74');
+      put(8, 8, '#6a6e74');
+    } else if (helmKind === 'granite-helm') {
+      fill(3, 1, 10, 3, '#b0b0b0');
+      fill(4, 1, 4, 1, '#e4e4e4');
+      fill(3, 4, 10, 1, '#6e6e6e');
+      paintFace();
+      fill(3, 5, 2, 3, '#b0b0b0');
+      fill(11, 5, 2, 3, '#b0b0b0');
+      fill(5, 5, 6, 1, '#8a8a8a');
+    } else if (helmKind === 'obsidian-helm') {
+      paintVisor('#2a2428', '#4a4048');
+      fill(5, 6, 2, 1, '#e23b2f');
+      fill(9, 6, 2, 1, '#e23b2f');
+    } else if (helmKind === 'serpentine-helm') {
+      paintVisor('#2f8a45', '#1a4a28');
+      put(2, 4, '#1a4a28');
+      put(13, 4, '#1a4a28');
+      put(5, 1, '#7ed48a');
+      put(5, 6, '#e6d25a');
+      put(10, 6, '#e6d25a');
+      put(6, 8, '#f4f0e0');
+      put(9, 8, '#f4f0e0');
+    } else if (helmKind === 'armadyl-helm') {
+      paintDome('#c8ccd4', '#ffffff', '#7a808a');
+      put(1, 3, '#e2c15a');
+      put(2, 2, '#e2c15a');
+      put(2, 4, '#a89040');
+      put(14, 3, '#e2c15a');
+      put(13, 2, '#e2c15a');
+      put(13, 4, '#a89040');
+      put(7, 2, '#e2c15a');
+      put(8, 2, '#fff1b0');
+      paintFace();
+      fill(4, 5, 8, 1, '#e2c15a');
+    } else if (helmKind === 'inquisitor-helm') {
+      paintVisor('#b7b1a4', '#6e685c');
+      put(7, 0, '#d7b45a');
+      put(8, 0, '#d7b45a');
+      put(7, 5, '#d7b45a');
+      put(8, 5, '#d7b45a');
+      put(7, 8, '#d7b45a');
+      put(8, 8, '#d7b45a');
+    } else if (helmKind === 'justiciar-helm') {
+      paintVisor('#f7f4ee', '#c8c2b4');
+      fill(4, 0, 8, 1, '#e0b84a');
+      fill(5, 6, 6, 1, '#1a1a1a');
+      put(7, 6, '#e0b84a');
+      put(8, 6, '#e0b84a');
+      fill(6, 8, 4, 1, '#e0b84a');
+    } else if (helmKind === 'torva-helm') {
+      paintVisor('#2c2c2c', '#5a2020');
+      put(5, 0, '#9a3030');
+      put(10, 0, '#9a3030');
+      put(4, 1, '#9a3030');
+      put(11, 1, '#9a3030');
+      fill(5, 6, 2, 1, '#c04545');
+      fill(9, 6, 2, 1, '#c04545');
+      put(6, 8, '#9a3030');
+      put(9, 8, '#9a3030');
+    } else {
+      paintDome(top, topHi, topLo);
+      metalTrim();
+      paintFace();
+      fill(4, 5, 8, 1, topLo);
     }
-    if (helm) fill(4, 5, 8, 1, topLo);
 
     fill(6, 9, 4, 1, skin);
     if (capeCol) {
@@ -152,6 +371,12 @@
       put(10, 9, capeDk);
       put(11, 9, capeDk);
     }
+    const neck = eq.neck;
+    if (neck) {
+      const gem = shiftColor(TIER_COLORS[neck.tier] || '#f0d878', 24);
+      put(7, 9, gem);
+      put(8, 9, shiftColor(gem, 40));
+    }
 
     fill(4, 10, 8, 5, cloth);
     fill(6, 11, 4, 3, clothDk);
@@ -159,10 +384,26 @@
       put(7, 11, skin);
       put(8, 11, skin);
     }
-    if (pose === 'idle') fill(2, 11, 2, 4, skin);
-    fill(12, 11, 2, 4, skin);
+    const gloves = eq.gloves;
+    const gloveQ = gloves ? (QUALITY_RANK[gloves.quality] || 0) : -1;
+    const hand = gloves
+      ? shiftColor(TIER_COLORS[gloves.tier] || '#8d5a34', gloveQ >= 3 ? 18 : -6)
+      : skin;
+    const handDk = gloves ? shiftColor(hand, -30) : skinDk;
+    if (pose === 'idle') fill(2, 11, 2, 4, hand);
+    fill(12, 11, 2, 4, hand);
     if (pose === 'idle') put(2, 14, clothDk);
-    put(13, 14, clothDk);
+    put(13, 14, handDk);
+    const ring = eq.ring;
+    if (ring) put(13, 13, shiftColor(TIER_COLORS[ring.tier] || '#f0d878', 28));
+    const ammo = eq.ammo;
+    if (ammo) {
+      const shaft = shiftColor(TIER_COLORS[ammo.tier] || '#cbb98a', -8);
+      put(3, 10, '#efe4c8');
+      put(3, 11, shaft);
+      put(3, 12, shaft);
+      put(4, 12, shiftColor(shaft, 24));
+    }
 
     if (bodyQ >= 4 && tierHex) {
       fill(2, 10, 2, 2, cloth);
@@ -178,33 +419,33 @@
     if (bodyQ === 0 && tierHex) put(5, 13, '#3a2a1c');
 
     if (pose === 'windup') {
-      put(3, 11, skin);
-      put(2, 10, skin);
-      put(1, 9, skin);
-      put(1, 8, skin);
-      put(0, 8, skin);
-      put(0, 9, skinDk);
+      put(3, 11, hand);
+      put(2, 10, hand);
+      put(1, 9, hand);
+      put(1, 8, hand);
+      put(0, 8, hand);
+      put(0, 9, handDk);
     } else if (pose === 'strike') {
-      put(3, 12, skin);
-      put(4, 11, skin);
-      put(5, 10, skin);
-      put(6, 9, skin);
-      put(7, 8, skin);
-      put(8, 8, skinDk);
+      put(3, 12, hand);
+      put(4, 11, hand);
+      put(5, 10, hand);
+      put(6, 9, hand);
+      put(7, 8, hand);
+      put(8, 8, handDk);
     } else if (pose === 'draw') {
-      put(1, 12, skin);
-      put(1, 11, skin);
-      put(2, 12, skin);
-      put(3, 9, skin);
-      put(4, 8, skin);
-      put(4, 9, skinDk);
+      put(1, 12, hand);
+      put(1, 11, hand);
+      put(2, 12, hand);
+      put(3, 9, hand);
+      put(4, 8, hand);
+      put(4, 9, handDk);
     } else if (pose === 'cast') {
-      put(3, 11, skin);
-      put(2, 10, skin);
-      put(1, 9, skin);
-      put(1, 8, skin);
-      put(2, 8, skin);
-      put(2, 9, skinDk);
+      put(3, 11, hand);
+      put(2, 10, hand);
+      put(1, 9, hand);
+      put(1, 8, hand);
+      put(2, 8, hand);
+      put(2, 9, handDk);
     }
 
     const legs = eq.legs;
@@ -264,67 +505,169 @@
 
     const weapon = eq.weapon;
     if (weapon && layer !== 'body') {
-      const style = weapon.style;
+      const style = weapon.style || 'melee';
+      const kind = weapon.baseId || (style === 'ranged' ? 'shortbow' : style === 'magic' ? 'staff' : 'sword');
       const wq = QUALITY_RANK[weapon.quality] || 0;
-      const wc = style === 'ranged'
-        ? '#8a5a2b'
-        : style === 'magic'
-          ? '#7c6ad8'
-          : (TIER_COLORS[weapon.tier] || '#c0c0c0');
-      const len = 4 + wq;
-      const tip = shiftColor(wc, 46);
-      const guard = shiftColor(wc, 28);
-      const sweep = (x0, y0, x1, y1, steps, color, end) => {
-        const n = Math.max(1, steps);
-        for (let i = 0; i <= n; i++) {
-          const u = i / n;
-          put(Math.round(x0 + (x1 - x0) * u), Math.round(y0 + (y1 - y0) * u), i === n ? end : color);
-        }
+      const metal = TIER_COLORS[weapon.tier] || '#c0c0c0';
+      const wc = metal;
+      const colors = {
+        grip: '#5c3a22',
+        haft: '#6b4228',
+        guard: shiftColor(wc, 30),
+        blade: wc,
+        edge: shiftColor(wc, 42),
+        tip: wq >= 5 ? '#fff6c8' : shiftColor(wc, 56),
+        string: '#efe4c8',
+        wood: '#6b3e1f',
       };
-      if (style === 'ranged') {
-        for (let i = 0; i < 6; i++) put(0, 11 + i, wc);
-        put(1, 12, wc);
-        put(1, 15, wc);
-        if (pose === 'draw') {
-          put(2, 13, '#cbb98a');
-          put(3, 12, '#efe4c8');
-          put(4, 12, '#fffaf0');
-          put(5, 12, '#fffaf0');
-        } else {
-          put(1, 13, '#efe4c8');
-          put(1, 14, '#efe4c8');
+      // Limb and string colors sampled from the shortbow icons in the item grid.
+      const BOW_COLORS = {
+        bronze: { limb: '#74500d', hi: '#946818', string: '#c6b15a', grip: '#3e2a0c' },
+        iron: { limb: '#8b7111', hi: '#b09020', string: '#d4c06a', grip: '#4a380c' },
+        steel: { limb: '#80782e', hi: '#a09848', string: '#d2c878', grip: '#3e3a16' },
+        black: { limb: '#8a756e', hi: '#b09890', string: '#c8b89a', grip: '#4a3c36' },
+        mithril: { limb: '#8b7911', hi: '#c4a040', string: '#e0cc70', grip: '#4a3c0c' },
+        adamant: { limb: '#18645c', hi: '#2a9084', string: '#9ed4c8', grip: '#0c3834' },
+        rune: { limb: '#155c55', hi: '#979566', string: '#c8c4a0', grip: '#0c3430' },
+        dragon: { limb: '#241e16', hi: '#4d5609', string: '#a6ba15', grip: '#151111' },
+        barrows: { limb: '#343422', hi: '#6c6464', string: '#8a8478', grip: '#18180d' },
+        raid: { limb: '#241e16', hi: '#4d5609', string: '#a6ba15', grip: '#151111' },
+      };
+      if (kind === 'shortbow') {
+        const bowCol = BOW_COLORS[weapon.tier] || BOW_COLORS.bronze;
+        colors.wood = bowCol.limb;
+        colors.edge = bowCol.hi;
+        colors.grip = bowCol.grip;
+        colors.string = bowCol.string;
+        colors.haft = '#c4a56a';
+        colors.tip = '#f2ecd4';
+        colors.blade = '#e8e0c0';
+      }
+      if (kind === 'staff') {
+        colors.haft = shiftColor(metal, -24);
+        colors.tip = '#fff6c8';
+        colors.edge = '#d7c4ff';
+      }
+      // lx is across the blade, ly runs from the grip toward the tip.
+      const stamp = (ox, oy, dx, dy, marks) => {
+        const mag = Math.hypot(dx, dy) || 1;
+        const ux = dx / mag;
+        const uy = dy / mag;
+        const px = -uy;
+        const py = ux;
+        marks.forEach((mark) => {
+          put(
+            Math.round(ox + mark.lx * px + mark.ly * ux),
+            Math.round(oy + mark.lx * py + mark.ly * uy),
+            colors[mark.part] || colors.blade
+          );
+        });
+      };
+      const straight = (len, guardW, ridge) => {
+        const marks = [{ lx: 0, ly: 0, part: 'grip' }];
+        for (let lx = -guardW; lx <= guardW; lx++) marks.push({ lx, ly: 1, part: 'guard' });
+        for (let ly = 2; ly < len; ly++) {
+          marks.push({ lx: 0, ly, part: 'blade' });
+          if (ridge && ly > 2 && ly < len - 1) marks.push({ lx: 1, ly, part: 'edge' });
         }
-      } else if (style === 'magic') {
-        if (pose === 'cast') {
-          const tx = 2 + Math.round((len - 1) * 0.35);
-          const ty = 8 - Math.max(2, len - 3);
-          sweep(1, 10, tx, ty, len - 1, wc, '#fff6c8');
-          put(tx, ty - 1, '#ffffff');
-          put(tx + 1, ty - 1, '#ffffff');
-          put(tx + 1, ty, '#fff6c8');
-          put(tx + 2, ty, '#ffffff');
-        } else {
-          for (let i = 0; i < len; i++) put(0, 17 - i, wc);
-          put(0, 17 - len, '#f0d878');
-          put(1, 17 - len, '#fff6c8');
+        marks.push({ lx: 0, ly: len, part: 'tip' });
+        return marks;
+      };
+      const curved = (len) => {
+        const marks = [
+          { lx: 0, ly: 0, part: 'grip' },
+          { lx: -1, ly: 1, part: 'guard' },
+          { lx: 0, ly: 1, part: 'guard' },
+          { lx: 1, ly: 1, part: 'guard' },
+        ];
+        for (let ly = 2; ly <= len; ly++) {
+          const t = (ly - 2) / Math.max(1, len - 2);
+          const curve = t < 0.4 ? 0 : t < 0.72 ? -1 : -2;
+          const tip = ly === len;
+          marks.push({ lx: curve + 1, ly, part: tip ? 'edge' : 'blade' });
+          marks.push({ lx: curve, ly, part: tip ? 'tip' : 'edge' });
         }
+        return marks;
+      };
+      const mace = (len) => {
+        const shaft = Math.max(3, len - 3);
+        const marks = [];
+        for (let ly = 0; ly <= shaft; ly++) marks.push({ lx: 0, ly, part: ly === 0 ? 'grip' : 'haft' });
+        const head = shaft + 1;
+        [[-1, 0], [0, 0], [1, 0], [-1, 1], [0, 1], [1, 1], [0, 2]].forEach((pair) => {
+          marks.push({ lx: pair[0], ly: head + pair[1], part: pair[1] === 2 ? 'tip' : 'blade' });
+        });
+        return marks;
+      };
+      const bow = (drawn) => {
+        const marks = [];
+        for (let ly = 1; ly <= 8; ly++) marks.push({ lx: 0, ly, part: 'wood' });
+        marks.push({ lx: 1, ly: 2, part: 'edge' });
+        marks.push({ lx: 1, ly: 7, part: 'edge' });
+        marks.push({ lx: 0, ly: 4, part: 'grip' });
+        marks.push({ lx: 0, ly: 5, part: 'grip' });
+        const stringX = drawn ? 3 : 1;
+        for (let ly = 3; ly <= 6; ly++) marks.push({ lx: stringX, ly, part: 'string' });
+        if (drawn) {
+          marks.push({ lx: 4, ly: 4, part: 'haft' });
+          marks.push({ lx: 5, ly: 4, part: 'haft' });
+          marks.push({ lx: 6, ly: 4, part: 'tip' });
+          marks.push({ lx: 6, ly: 3, part: 'edge' });
+        }
+        return marks;
+      };
+      const staff = (len) => {
+        const marks = straight(len, 0, false).map((mark) => (
+          mark.part === 'guard' ? { lx: mark.lx, ly: mark.ly, part: 'haft' } : mark
+        ));
+        marks.push({ lx: -1, ly: len, part: 'tip' });
+        marks.push({ lx: 1, ly: len, part: 'tip' });
+        marks.push({ lx: -1, ly: len + 1, part: 'edge' });
+        marks.push({ lx: 0, ly: len + 1, part: 'tip' });
+        marks.push({ lx: 1, ly: len + 1, part: 'edge' });
+        marks.push({ lx: 0, ly: len + 2, part: 'tip' });
+        return marks;
+      };
+      let held;
+      if (kind === 'dagger') held = { marks: straight(4 + Math.floor(wq / 2), 1, false) };
+      else if (kind === 'longsword') held = { marks: straight(8 + wq, 2, true) };
+      else if (kind === 'scimitar') held = { marks: curved(7 + wq) };
+      else if (kind === 'mace') held = { marks: mace(6 + Math.floor(wq / 2)) };
+      else if (kind === 'shortbow') held = { marks: bow(pose === 'draw'), ox: 0, oy: 17 };
+      else if (kind === 'staff') held = { marks: staff(6 + wq) };
+      else held = { marks: straight(6 + wq, 1, true) };
+      let ox = 2;
+      let oy = 14;
+      let dx = 0;
+      let dy = -1;
+      if (kind === 'shortbow') {
+        ox = 1;
+        oy = 17;
+      } else if (kind === 'scimitar' && pose !== 'windup' && pose !== 'strike') {
+        ox = 3;
+      } else if (kind === 'staff' && pose === 'cast') {
+        ox = 2;
+        oy = 13;
+        dx = -0.45;
+        dy = -1;
       } else if (pose === 'windup') {
-        const tipX = -Math.max(2, Math.round(len * 0.45));
-        const tipY = 8 - Math.max(3, Math.round(len * 0.6));
-        sweep(0, 9, tipX, tipY + 1, len, shiftColor(wc, -18), guard);
-        sweep(0, 8, tipX, tipY, len, wc, tip);
+        ox = 2;
+        oy = 11;
+        dx = -0.72;
+        dy = -1;
       } else if (pose === 'strike') {
-        const tipX = 8 + Math.max(3, Math.round(len * 0.55));
-        const tipY = 8 - Math.max(4, Math.round(len * 0.7));
-        const bright = shiftColor(wc, 42);
-        sweep(8, 9, tipX, tipY + 1, len, shiftColor(wc, -12), guard);
-        sweep(8, 8, tipX, tipY, len, bright, '#fff6c8');
-        if (wq >= 5) put(tipX, tipY - 1, '#f0d878');
-      } else {
-        for (let i = 0; i < len; i++) put(0, 16 - i, wc);
-        put(0, 16 - len, tip);
-        put(1, 15, guard);
-        if (wq >= 5) put(1, 14, '#f0d878');
+        ox = 6;
+        oy = 12;
+        dx = 1.05;
+        dy = -0.78;
+      }
+      if (held.ox != null) ox = held.ox;
+      if (held.oy != null) oy = held.oy;
+      stamp(ox, oy, dx, dy, held.marks);
+      if (kind === 'staff' && pose === 'cast') {
+        const mag = Math.hypot(dx, dy) || 1;
+        const tipLy = 8 + wq;
+        put(Math.round(ox + tipLy * dx / mag) + 1, Math.round(oy + tipLy * dy / mag) - 1, '#ffffff');
       }
     }
 
