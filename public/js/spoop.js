@@ -1327,6 +1327,15 @@
   function questStatus(activity) {
     if (activity && activity.errand) return 'Errand';
     if (activity && activity.boss) return 'Boss';
+    if (activity && activity.clue) {
+      const left = activity.hoursLeft || 0;
+      const total = activity.hours || 1;
+      if (left > 0 && left === total - 1) return 'Started this hour.';
+      if (left > 1) return 'Still on it. ' + left + ' hours left.';
+      if (left === 1) return 'Still on it. One hour left.';
+      if (total <= 1) return 'Started and finished this hour.';
+      return 'Finished this hour.';
+    }
     if (!activity || !activity.quest) {
       const skill = activity && activity.skill ? activity.skill : '';
       return activity && activity.idle ? 'Idle ground · training ' + skill : 'Training ' + skill;
