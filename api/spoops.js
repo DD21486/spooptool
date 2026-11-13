@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, testArena } = require('../lib/spoop/engine');
+const { advance, openCrate, sellBankItem, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, testArena } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -119,6 +119,15 @@ async function handlePost(req) {
     const payload = presentWorld(state, debug, [result.text]);
     payload.roll = result.roll;
     return { status: 200, payload };
+  }
+
+  if (action === 'sell') {
+    const now = new Date(state.clock);
+    const result = sellBankItem(spoop, body.item, now);
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try the sale again.' } };
+    return { status: 200, payload: presentWorld(state, debug, [result.text]) };
   }
 
   if (action === 'debug') {

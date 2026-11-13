@@ -1428,8 +1428,12 @@
     const rating = item.rating != null
       ? '<p class="text-[10px] uppercase tracking-wide text-slate-500">Rating ' + item.rating + '</p>'
       : '';
+    const value = item.value != null
+      ? '<p class="text-amber-200 tabular-nums">' + Number(item.value).toLocaleString() + ' gold</p>'
+      : '';
     return '<div class="spoop-tip" role="tooltip">' +
       '<p class="text-xs" style="color:' + (QUALITY_COLOR[item.quality] || '#fde68a') + '">' + escapeHtml(item.name) + '</p>' +
+      value +
       rating +
       reqHtml +
       block('Attack', attack) +
@@ -1438,12 +1442,18 @@
     '</div>';
   }
 
-  function slotFrame(item, inner, spoop) {
+  function slotFrame(item, inner, spoop, sell) {
     const color = item && QUALITY_COLOR[item.quality];
     const style = color ? ' style="border-color:' + color + '"' : '';
-    const tip = item ? itemTip(item, spoop) : '';
+    let tip = item ? itemTip(item, spoop) : '';
+    if (sell && item) {
+      tip = tip.replace(/<\/div>$/, '<p class="mt-1.5 text-slate-400">Click to sell</p></div>');
+    }
     const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
-    return '<div class="spoop-slot"' + style + ' tabindex="0">' + inner + rate + tip + '</div>';
+    const sellAttr = sell && item
+      ? ' data-sell="' + item.id + '" role="button" aria-label="Sell ' + escapeHtml(item.name) + ' for ' + Number(item.value || 0).toLocaleString() + ' gold"'
+      : '';
+    return '<div class="spoop-slot"' + sellAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
 
   function gearCell(slot, item, spoop) {
@@ -1511,7 +1521,7 @@
     for (let i = 0; i < bankSlots; i++) {
       const item = spoop.bank[i];
       bankCells.push(item
-        ? slotFrame(item, itemIcon(item), spoop)
+        ? slotFrame(item, itemIcon(item), spoop, true)
         : '<div class="spoop-slot"></div>');
     }
     const bank = '<div class="flex flex-wrap gap-1">' + bankCells.join('') + '</div>';
@@ -1591,7 +1601,7 @@
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<div class="flex items-baseline justify-between gap-3 mb-2">' +
           '<h3 class="text-sm text-slate-300">Bank</h3>' +
-          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots + '</p>' +
+          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots + ' · click an item to sell it</p>' +
         '</div>' +
         bank +
       '</section>' +
@@ -1604,6 +1614,34 @@
     root.querySelectorAll('[data-crate]').forEach((btn) => {
       btn.addEventListener('click', () => buyCrate(spoopKey(spoop), btn.getAttribute('data-crate'), spoop.gold));
     });
+    root.querySelectorAll('[data-sell]').forEach((slot) => {
+      const sell = () => sellBankPiece(spoopKey(spoop), slot.getAttribute('data-sell'));
+      slot.addEventListener('click', sell);
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        sell();
+      });
+    });
+  }
+
+  let selling = false;
+
+  async function sellBankPiece(name, itemId) {
+    if (selling || itemId == null) return;
+    selling = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sell', name, item: itemId }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      selling = false;
+    }
   }
 
   function statIcon(kind) {
