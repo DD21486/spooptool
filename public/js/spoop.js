@@ -1451,7 +1451,7 @@
     }
     const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
     const sellAttr = sell && item
-      ? ' data-sell="' + item.id + '" role="button" aria-label="Sell ' + escapeHtml(item.name) + ' for ' + Number(item.value || 0).toLocaleString() + ' gold"'
+      ? ' data-sell="' + item.id + '" data-name="' + escapeHtml(item.name) + '" data-value="' + Number(item.value || 0) + '" role="button" aria-label="Sell ' + escapeHtml(item.name) + ' for ' + Number(item.value || 0).toLocaleString() + ' gold"'
       : '';
     return '<div class="spoop-slot"' + sellAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
@@ -1612,10 +1612,21 @@
 
     drawSpoop(document.getElementById('spoop-hero'), spoop);
     root.querySelectorAll('[data-crate]').forEach((btn) => {
-      btn.addEventListener('click', () => buyCrate(spoopKey(spoop), btn.getAttribute('data-crate'), spoop.gold));
+      const crateId = btn.getAttribute('data-crate');
+      btn.addEventListener('click', () => buyCrate(spoopKey(spoop), crateId, spoop.gold));
+      btn.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        const crate = (state.crates || []).find((row) => row.id === crateId);
+        if (crate) openCrateMenu(ev, crate);
+      });
     });
     root.querySelectorAll('[data-sell]').forEach((slot) => {
-      const sell = () => sellBankPiece(spoopKey(spoop), slot.getAttribute('data-sell'));
+      const sell = () => sellBankPiece(
+        spoopKey(spoop),
+        slot.getAttribute('data-sell'),
+        slot.getAttribute('data-name'),
+        slot.getAttribute('data-value')
+      );
       slot.addEventListener('click', sell);
       slot.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Enter' && ev.key !== ' ') return;
@@ -1627,8 +1638,146 @@
 
   let selling = false;
 
-  async function sellBankPiece(name, itemId) {
+  function askConfirm(opts) {
+    return new Promise((resolve) => {
+      const overlay = document.createElement('div');
+      overlay.className = 'roll-overlay';
+      const yes = opts.yes
+        ? '<button type="button" data-yes class="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-sm font-medium text-slate-950">' + escapeHtml(opts.yes) + '</button>'
+        : '';
+      overlay.innerHTML =
+        '<div class="roll-modal sell-ask" role="dialog" aria-modal="true" aria-labelledby="ask-title">' +
+          '<h2 id="ask-title" class="text-lg text-slate-100">' + escapeHtml(opts.title) + '</h2>' +
+          '<p class="mt-2 text-sm text-slate-300">' + opts.detail + '</p>' +
+          '<div class="mt-4 flex justify-end gap-2">' +
+            '<button type="button" data-cancel class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm">' + (opts.yes ? 'Cancel' : 'Close') + '</button>' +
+            yes +
+          '</div>' +
+        '</div>';
+      let done = false;
+      const finish = (accepted) => {
+        if (done) return;
+        done = true;
+        document.removeEventListener('keydown', onKey);
+        overlay.remove();
+        resolve(!!accepted);
+      };
+      const onKey = (ev) => {
+        if (ev.key === 'Escape') finish(false);
+        if (ev.key === 'Enter' && opts.yes) {
+          ev.preventDefault();
+          finish(true);
+        }
+      };
+      overlay.addEventListener('click', (ev) => {
+        if (ev.target === overlay || ev.target.closest('[data-cancel]')) finish(false);
+        else if (opts.yes && ev.target.closest('[data-yes]')) finish(true);
+      });
+      document.addEventListener('keydown', onKey);
+      document.body.appendChild(overlay);
+      const focus = overlay.querySelector(opts.yes ? '[data-yes]' : '[data-cancel]');
+      if (focus) focus.focus();
+    });
+  }
+
+  function confirmSale(itemName, price) {
+    const gold = Number(price || 0).toLocaleString();
+    return askConfirm({
+      title: 'Sell ' + itemName + '?',
+      detail: 'This pays <span class="text-amber-200 tabular-nums">' + gold + ' gold</span>.',
+      yes: 'Sell',
+    });
+  }
+
+  let crateMenu = null;
+
+  function closeCrateMenu() {
+    if (!crateMenu) return;
+    crateMenu.remove();
+    crateMenu = null;
+    document.removeEventListener('mousedown', onCrateMenuAway, true);
+    document.removeEventListener('keydown', onCrateMenuKey);
+  }
+
+  function onCrateMenuAway(ev) {
+    if (crateMenu && crateMenu.contains(ev.target)) return;
+    closeCrateMenu();
+  }
+
+  function onCrateMenuKey(ev) {
+    if (ev.key === 'Escape') closeCrateMenu();
+  }
+
+  function openCrateMenu(ev, crate) {
+    closeCrateMenu();
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = '<button type="button" role="menuitem" data-view>View contents</button>';
+    menu.style.left = ev.clientX + 'px';
+    menu.style.top = ev.clientY + 'px';
+    document.body.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth - 8) menu.style.left = Math.max(8, window.innerWidth - rect.width - 8) + 'px';
+    if (rect.bottom > window.innerHeight - 8) menu.style.top = Math.max(8, window.innerHeight - rect.height - 8) + 'px';
+    menu.querySelector('[data-view]').addEventListener('click', () => {
+      closeCrateMenu();
+      showCrateLoot(crate);
+    });
+    crateMenu = menu;
+    document.addEventListener('mousedown', onCrateMenuAway, true);
+    document.addEventListener('keydown', onCrateMenuKey);
+    menu.querySelector('[data-view]').focus();
+  }
+
+  function showCrateLoot(crate) {
+    const loot = crate.loot || { groups: [], quality: '' };
+    const groups = (loot.groups || []).map((group) => {
+      const cards = (group.items || []).map((item) => {
+        const icon = item.osrsId
+          ? '<img src="/api/spoops?icon=1&id=' + Number(item.osrsId) + '" alt="" width="32" height="32">'
+          : '';
+        const rare = item.rare ? '<span class="rare">Rare</span>' : '';
+        return '<div class="loot-card">' + icon + '<span>' + escapeHtml(item.name) + '</span>' + rare + '</div>';
+      }).join('');
+      return '<h3 class="text-sm text-slate-300 mt-4 mb-2">' + escapeHtml(group.label) + '</h3><div class="loot-grid">' + cards + '</div>';
+    }).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'roll-overlay';
+    overlay.innerHTML =
+      '<div class="roll-modal loot-sheet" role="dialog" aria-modal="true" aria-labelledby="loot-title">' +
+        '<div class="flex items-start justify-between gap-3">' +
+          '<div>' +
+            '<h2 id="loot-title" class="text-lg text-slate-100">' + escapeHtml(crate.name) + '</h2>' +
+            '<p class="mt-1 text-xs text-slate-400">' + escapeHtml(loot.quality || 'One piece from this list.') + '</p>' +
+          '</div>' +
+          '<button type="button" data-cancel class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>' +
+        '</div>' +
+        (groups || '<p class="mt-3 text-sm text-slate-400">Contents are unavailable.</p>') +
+      '</div>';
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') finish();
+    };
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay || ev.target.closest('[data-cancel]')) finish();
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const close = overlay.querySelector('[data-cancel]');
+    if (close) close.focus();
+  }
+
+  async function sellBankPiece(name, itemId, itemName, price) {
     if (selling || itemId == null) return;
+    const yes = await confirmSale(itemName, price);
+    if (!yes) return;
     selling = true;
     try {
       const data = await api('/api/spoops', {
@@ -1784,12 +1933,29 @@
     });
   }
 
+  let buyingCrate = false;
+  let askingCrate = false;
+
   async function buyCrate(name, crateId, purse) {
     const crate = (lastState && lastState.crates || []).find((c) => c.id === crateId);
-    if (crate && purse < crate.cost) {
-      window.alert('Need ' + crate.cost.toLocaleString() + ' gold');
-      return;
+    if (!crate || askingCrate || buyingCrate) return;
+    const afford = purse >= crate.cost;
+    const cost = Number(crate.cost || 0).toLocaleString();
+    askingCrate = true;
+    let yes = false;
+    try {
+      yes = await askConfirm({
+        title: 'Open ' + crate.name + '?',
+        detail: afford
+          ? 'This spends <span class="text-amber-200 tabular-nums">' + cost + ' gold</span>.'
+          : 'This costs <span class="text-amber-200 tabular-nums">' + cost + ' gold</span>. You have ' + Number(purse || 0).toLocaleString() + '.',
+        yes: afford ? 'Open' : null,
+      });
+    } finally {
+      askingCrate = false;
     }
+    if (!yes || !afford) return;
+    buyingCrate = true;
     try {
       const data = await api('/api/spoops', {
         method: 'POST',
@@ -1801,6 +1967,8 @@
       render(fresh);
     } catch (err) {
       window.alert(err.message);
+    } finally {
+      buyingCrate = false;
     }
   }
 
