@@ -1178,6 +1178,7 @@
     body = body.replace(/\s*[A-Z][A-Za-z']*(?: [A-Za-z']+)* is now level \d+\.?/g, ' ');
     body = body.replace(/\s*[+\-][\d,]+ gold\.?/g, ' ');
     body = body.replace(/\s*Staked [\d,]+ gold, took [\d,]+ from the pot\.?/gi, ' ');
+    body = body.replace(/\s*Took [\d,]+ from the pot\.?/gi, ' ');
     body = body.replace(/\s*Skilling paid [\d,]+ extra\.?/gi, ' ');
     body = body.replace(/(?:\s*\.){2,}/g, '.').replace(/\s{2,}/g, ' ').trim();
     body = body.replace(/^\.\s*/, '').replace(/\s+\./g, '.').replace(/\.\s*$/, '.');

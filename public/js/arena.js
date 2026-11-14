@@ -39,6 +39,8 @@
   let logHidden = false;
   try { logHidden = localStorage.getItem(LOG_KEY) === 'off'; } catch (err) { logHidden = false; }
   let nextLabel = '';
+  let nextTitle = 'Tournament';
+  let nextDetail = '';
   let fetchingNight = false;
   let retryAt = 0;
   const SEEN = 'spoop-arena-seen';
@@ -1878,10 +1880,10 @@
   function showNightWait(text) {
     countdownEl.classList.remove('is-pk');
     waitEl.classList.remove('is-pk');
-    if (waitKicker) waitKicker.textContent = 'Next Tournament';
-    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next Tournament ' + text;
+    if (waitKicker) waitKicker.textContent = 'Next ' + nextTitle;
+    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next ' + nextTitle + ' ' + text;
     waitClock.textContent = text;
-    waitWhen.textContent = nextLabel || '';
+    waitWhen.textContent = [nextLabel, nextDetail].filter(Boolean).join(' · ');
   }
 
   function tickCountdown() {
@@ -1903,8 +1905,8 @@
     if (!nextAtMs) {
       countdownEl.classList.remove('is-pk');
       waitEl.classList.remove('is-pk');
-      if (waitKicker) waitKicker.textContent = 'Next Tournament';
-      countdownEl.textContent = 'Next Tournament';
+      if (waitKicker) waitKicker.textContent = 'Next ' + nextTitle;
+      countdownEl.textContent = 'Next ' + nextTitle;
       waitClock.textContent = '--:--:--';
       return;
     }
@@ -2528,6 +2530,8 @@
       clockOffset = worldNowMs - Date.now();
       nextAtMs = data.nextAt ? Date.parse(data.nextAt) : 0;
       nextLabel = data.nextLabel || '';
+      nextTitle = data.nextTitle || 'Tournament';
+      nextDetail = data.nextDetail || '';
       pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
       pkA = data.pk ? data.pk.a || '' : '';
       pkB = data.pk ? data.pk.b || '' : '';
