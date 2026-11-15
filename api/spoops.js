@@ -118,6 +118,8 @@ async function handlePost(req) {
       text: result.text,
       discord: result.discord,
       kind: 'crate',
+      icon: result.icon,
+      stats: result.stats,
     }], state)) {
       await save(state, state.clock);
     }
