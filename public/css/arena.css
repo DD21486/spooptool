@@ -618,7 +618,7 @@
 .odds-card {
   width: min(540px, 48vw);
   max-height: calc(100% - 8px);
-  overflow: auto;
+  overflow: hidden;
   text-align: left;
   pointer-events: auto;
   flex: 0 1 auto;
@@ -629,7 +629,7 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 .odds-card[hidden] { display: none; }
-.odds-scroll { overflow-x: auto; margin-top: 4px; }
+.odds-scroll { overflow: hidden; margin-top: 4px; }
 .odds-table {
   width: 100%;
   border-collapse: collapse;
@@ -690,8 +690,8 @@
 .odds-chart { position: relative; min-height: 168px; }
 .odds-chart svg { display: block; width: 100%; height: auto; }
 .odds-tip {
-  position: absolute;
-  z-index: 2;
+  position: fixed;
+  z-index: 30;
   min-width: 148px;
   max-width: 220px;
   padding: 6px 8px;

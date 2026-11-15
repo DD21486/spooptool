@@ -2278,14 +2278,21 @@
         if (Math.abs(chartX(col.x) - px) < Math.abs(chartX(nearest.x) - px)) nearest = col;
       });
       nearest.rows.sort((a, b) => a.american - b.american);
-      tip.hidden = false;
       tip.innerHTML = '<strong>' + escapeHtml(nearest.label) + '</strong>' + nearest.rows.map((row) => (
         '<div class="tip-row"><span class="tip-name" style="color:' + row.color + '">' + escapeHtml(row.name) + '</span><span class="tip-price">' + row.price + '</span></div>'
       )).join('');
-      const tipX = Math.min(rect.width - 160, Math.max(8, event.clientX - rect.left + 12));
-      const tipY = Math.max(4, event.clientY - rect.top - tip.offsetHeight - 8);
-      tip.style.left = tipX + 'px';
-      tip.style.top = tipY + 'px';
+      tip.hidden = false;
+      const card = oddsEl.getBoundingClientRect();
+      const pad = 8;
+      const box = tip.getBoundingClientRect();
+      let left = event.clientX + 14;
+      let top = event.clientY - box.height - 12;
+      if (left + box.width > card.right - pad) left = event.clientX - box.width - 14;
+      left = Math.max(card.left + pad, Math.min(left, card.right - pad - box.width));
+      if (top < card.top + pad) top = event.clientY + 14;
+      top = Math.max(card.top + pad, Math.min(top, card.bottom - pad - box.height));
+      tip.style.left = Math.round(left) + 'px';
+      tip.style.top = Math.round(top) + 'px';
     });
     hover.addEventListener('mouseleave', () => { tip.hidden = true; });
   }
