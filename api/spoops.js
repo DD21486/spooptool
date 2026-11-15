@@ -113,7 +113,12 @@ async function handlePost(req) {
     const result = openCrate(spoop, body.crate, now, rng);
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
-    if (saved && await publishEvents([{ name: spoop.name, text: result.text }], state)) {
+    if (saved && await publishEvents([{
+      name: spoop.name,
+      text: result.text,
+      discord: result.discord,
+      kind: 'crate',
+    }], state)) {
       await save(state, state.clock);
     }
     const payload = presentWorld(state, debug, [result.text]);
