@@ -184,14 +184,13 @@ body[data-page="list"] #spoop-root {
 
 .spoop-top {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 22px;
 }
 
-.spoop-back,
-.spoop-arena {
+.spoop-back {
   color: #9aa6b5;
   font-size: 12px;
   letter-spacing: 0.14em;
@@ -199,8 +198,38 @@ body[data-page="list"] #spoop-root {
   text-decoration: none;
 }
 
-.spoop-back:hover,
-.spoop-arena:hover { color: #f4f7fb; }
+.spoop-back:hover { color: #f4f7fb; }
+
+.spoop-arena {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 22px 12px 14px;
+  border: 2px solid #f0d878;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #6a4a16 0%, #2a1c0c 100%);
+  color: #ffe58a;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(255, 214, 90, 0.35), 0 0 24px rgba(255, 176, 32, 0.55);
+}
+
+.spoop-arena img {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+  mix-blend-mode: screen;
+}
+
+.spoop-arena:hover {
+  color: #fff8d6;
+  background: linear-gradient(180deg, #8a641c 0%, #3a280f 100%);
+  box-shadow: 0 0 0 1px #ffe58a, 0 0 32px rgba(255, 196, 48, 0.85);
+}
 
 .spoop-top h1 {
   margin: 6px 0 0;
