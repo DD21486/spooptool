@@ -12,6 +12,8 @@
   const recapEl = document.getElementById('arena-recap');
   const waitClock = document.getElementById('arena-wait-clock');
   const waitWhen = document.getElementById('arena-wait-when');
+  const oddsEl = document.getElementById('arena-odds');
+  const oddsList = document.getElementById('arena-odds-list');
 
   const PACE = 0.55;
   const ARENA_SPEED = 1.5;
@@ -40,6 +42,8 @@
   try { logHidden = localStorage.getItem(LOG_KEY) === 'off'; } catch (err) { logHidden = false; }
   let nextLabel = '';
   let nextTitle = 'Tournament';
+  let oddsBoard = null;
+  let oddsMarkup = '';
   let nextDetail = '';
   let fetchingNight = false;
   let retryAt = 0;
@@ -1875,6 +1879,7 @@
     countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'PK ' + text;
     waitClock.textContent = text;
     waitWhen.textContent = pkA + ' vs ' + pkB + (pkReason ? ' — ' + pkReason : '');
+    paintOdds(true);
   }
 
   function showNightWait(text) {
@@ -1884,6 +1889,117 @@
     countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'Next ' + nextTitle + ' ' + text;
     waitClock.textContent = text;
     waitWhen.textContent = [nextLabel, nextDetail].filter(Boolean).join(' · ');
+    paintOdds(false);
+  }
+
+  // Fair line from combat and gear. A duel is a logistic on that strength.
+  // The bracket is the same shuffle the night uses, then the final is best of 3.
+  function oddsStrength(row) {
+    return Number(row.gear) + Math.max(0, Number(row.combat) - 1) * 1.5;
+  }
+
+  function oddsAmerican(p) {
+    if (!(p > 0)) return '—';
+    if (p >= 0.999) return '-100000';
+    if (p >= 0.5) return '-' + Math.round((100 * p) / (1 - p));
+    return '+' + Math.round((100 * (1 - p)) / p);
+  }
+
+  function oddsBeat(a, b) {
+    return 1 / (1 + Math.pow(10, (b - a) / 16));
+  }
+
+  function oddsSeries(p, bestOf) {
+    if (bestOf !== 3) return p;
+    return p * p * (3 - 2 * p);
+  }
+
+  function oddsPow2(n) {
+    let p = 1;
+    while (p * 2 <= n) p *= 2;
+    return p;
+  }
+
+  function oddsSide(names) {
+    let slots = names.map((name) => ({ name: name }));
+    if (slots.length <= 1) return slots[0] || null;
+    for (let guard = 0; slots.length > 1 && guard < 8; guard++) {
+      const power = oddsPow2(slots.length);
+      const shrinking = slots.length === power;
+      const pairMatches = shrinking ? slots.length / 2 : slots.length - power;
+      const byeCount = shrinking ? 0 : power - pairMatches;
+      const toCenter = pairMatches + byeCount === 1;
+      const next = [];
+      let cursor = 0;
+      for (let i = 0; i < pairMatches; i++) {
+        const match = { a: slots[cursor++], b: slots[cursor++], bestOf: 1 };
+        if (toCenter) return match;
+        next.push(match);
+      }
+      for (let i = 0; i < byeCount; i++) next.push(slots[cursor++]);
+      slots = next;
+    }
+    return slots[0] || null;
+  }
+
+  function oddsDist(node, score) {
+    if (!node) return new Map();
+    if (node.name) return new Map([[node.name, 1]]);
+    const left = oddsDist(node.a, score);
+    const right = oddsDist(node.b, score);
+    const out = new Map();
+    left.forEach((pa, a) => {
+      right.forEach((pb, b) => {
+        const win = oddsSeries(oddsBeat(score.get(a) || 0, score.get(b) || 0), node.bestOf);
+        out.set(a, (out.get(a) || 0) + pa * pb * win);
+        out.set(b, (out.get(b) || 0) + pa * pb * (1 - win));
+      });
+    });
+    return out;
+  }
+
+  function priceNight(board) {
+    const field = board.field || [];
+    const score = new Map(field.map((row) => [row.name, oddsStrength(row)]));
+    let probs;
+    if (board.kind === 'ffa') {
+      const weights = field.map((row) => Math.exp(oddsStrength(row) / 12));
+      const sum = weights.reduce((total, weight) => total + weight, 0) || 1;
+      probs = new Map(field.map((row, i) => [row.name, weights[i] / sum]));
+    } else {
+      const cast = Array.isArray(board.cast) && board.cast.length === field.length
+        ? board.cast
+        : field.map((row) => row.name);
+      const mid = Math.ceil(cast.length / 2);
+      probs = oddsDist({
+        a: oddsSide(cast.slice(0, mid)),
+        b: oddsSide(cast.slice(mid)),
+        bestOf: 3,
+      }, score);
+    }
+    return field.map((row) => ({
+      name: row.name,
+      p: probs.get(row.name) || 0,
+    })).sort((a, b) => b.p - a.p || a.name.localeCompare(b.name));
+  }
+
+  function paintOdds(pkSoon) {
+    if (!oddsEl || !oddsList) return;
+    const board = !pkSoon && oddsBoard && Array.isArray(oddsBoard.field) && oddsBoard.field.length >= 2
+      ? oddsBoard
+      : null;
+    if (!board) {
+      oddsEl.hidden = true;
+      return;
+    }
+    const html = priceNight(board).map((row) => (
+      '<li><span>' + escapeHtml(row.name) + '</span><b>' + oddsAmerican(row.p) + '</b></li>'
+    )).join('');
+    if (html !== oddsMarkup) {
+      oddsMarkup = html;
+      oddsList.innerHTML = html;
+    }
+    oddsEl.hidden = false;
   }
 
   function tickCountdown() {
@@ -2532,6 +2648,7 @@
       nextLabel = data.nextLabel || '';
       nextTitle = data.nextTitle || 'Tournament';
       nextDetail = data.nextDetail || '';
+      oddsBoard = data.odds || null;
       pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
       pkA = data.pk ? data.pk.a || '' : '';
       pkB = data.pk ? data.pk.b || '' : '';
