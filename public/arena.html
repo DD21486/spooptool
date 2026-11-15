@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
-  <link rel="stylesheet" href="/css/arena.css?v=pot" />
+  <link rel="stylesheet" href="/css/arena.css?v=daychart" />
 </head>
 <body class="arena-page">
   <header class="arena-bar">
@@ -52,10 +52,15 @@
                 <th>MAG</th>
                 <th>PRY</th>
                 <th>Odds</th>
+                <th class="odds-trend">1h</th>
               </tr>
             </thead>
-            <tbody id="arena-odds-list"></tbody>
+            <tbody id="arena-odds-list">            </tbody>
           </table>
+        </div>
+        <div class="odds-chart-wrap">
+          <p class="wait-kicker">Since 9am</p>
+          <div id="arena-odds-chart" class="odds-chart"></div>
         </div>
       </aside>
     </div>
@@ -63,6 +68,6 @@
   </div>
 
   <script src="/js/spoop.js"></script>
-  <script src="/js/arena.js?v=pot"></script>
+  <script src="/js/arena.js?v=daychart"></script>
 </body>
 </html>

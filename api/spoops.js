@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, testArena } = require('../lib/spoop/engine');
+const { advance, openCrate, sellBankItem, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -203,6 +203,9 @@ async function proxySprite(req, res) {
 async function worldNow() {
   await syncWorld(false);
   const state = await load();
+  if (!state.useSim && noteOddsHour(state, new Date(state.clock))) {
+    await save(state, state.clock);
+  }
   return arenaSnapshot(state);
 }
 

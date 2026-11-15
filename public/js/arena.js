@@ -14,6 +14,7 @@
   const waitWhen = document.getElementById('arena-wait-when');
   const oddsEl = document.getElementById('arena-odds');
   const oddsList = document.getElementById('arena-odds-list');
+  const oddsChart = document.getElementById('arena-odds-chart');
 
   const PACE = 0.55;
   const ARENA_SPEED = 1.5;
@@ -43,7 +44,9 @@
   let nextLabel = '';
   let nextTitle = 'Tournament';
   let oddsBoard = null;
+  let oddsTrail = [];
   let oddsMarkup = '';
+  let oddsChartSig = '';
   let nextDetail = '';
   let fetchingNight = false;
   let retryAt = 0;
@@ -2012,6 +2015,281 @@
     return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
   }
 
+  const ODDS_TREND_KEY = 'spoop-odds-trend';
+  const ODDS_TREND_MS = 60 * 60 * 1000;
+  let oddsTrendAt = 0;
+
+  function readOddsTrend() {
+    const cutoff = Date.now() - ODDS_TREND_MS;
+    try {
+      const saved = JSON.parse(localStorage.getItem(ODDS_TREND_KEY) || 'null');
+      if (!saved || saved.night !== nextAtMs || !Array.isArray(saved.samples)) return [];
+      return saved.samples.filter((row) => row && row.t >= cutoff && row.p);
+    } catch (err) {
+      return [];
+    }
+  }
+
+  function noteOddsTrend(rows) {
+    const now = Date.now();
+    const samples = readOddsTrend();
+    const last = samples[samples.length - 1];
+    if (last && now - last.t < 20000) return samples;
+    const probs = {};
+    rows.forEach((row) => { probs[row.name] = Math.round(row.p * 10000) / 10000; });
+    samples.push({ t: now, p: probs });
+    const cutoff = now - ODDS_TREND_MS;
+    const kept = samples.filter((row) => row.t >= cutoff).slice(-180);
+    try {
+      localStorage.setItem(ODDS_TREND_KEY, JSON.stringify({ night: nextAtMs, samples: kept }));
+    } catch (err) { /* storage full or private mode */ }
+    oddsTrendAt = now;
+    return kept;
+  }
+
+  function oddsTrend(name, samples, current) {
+    if (!samples.length || !(current > 0)) return 'flat';
+    const oldest = samples[0];
+    if (!oldest || Date.now() - oldest.t < 5 * 60 * 1000) return 'flat';
+    const then = oldest.p[name];
+    if (!(then > 0)) return 'flat';
+    const delta = current - then;
+    if (Math.abs(delta) < 0.004) return 'flat';
+    return delta > 0 ? 'up' : 'down';
+  }
+
+  function trendMark(kind) {
+    if (kind === 'up') {
+      return '<span class="trend trend-up" title="More likely over the last hour"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M1.5 11.5 6 7l3 2.5L14.5 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/><path d="M9.5 3H14.5V8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>';
+    }
+    if (kind === 'down') {
+      return '<span class="trend trend-down" title="Less likely over the last hour"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path d="M1.5 4.5 6 9l3-2.5L14.5 13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/><path d="M9.5 13H14.5V8" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" stroke-linecap="round"/></svg></span>';
+    }
+    return '<span class="trend trend-flat" title="Little change over the last hour">~</span>';
+  }
+
+  const LINE_COLORS = ['#fde68a', '#4ade80', '#38bdf8', '#f472b6', '#fb923c', '#a78bfa', '#f87171', '#2dd4bf', '#e879f9', '#93c5fd'];
+  const ODDS_CAP = 10000;
+  const CHART = { w: 520, h: 176, l: 52, r: 10, t: 8, b: 22 };
+
+  function etClock(ms) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/New_York',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(ms));
+    const get = (type) => {
+      const part = parts.find((row) => row.type === type);
+      return part ? part.value : '';
+    };
+    return {
+      day: get('year') + '-' + get('month') + '-' + get('day'),
+      hour: Number(get('hour')),
+      minute: Number(get('minute')),
+    };
+  }
+
+  function americanNumber(p) {
+    if (!(p > 0)) return 100000;
+    if (p >= 0.999) return -100000;
+    if (p >= 0.5) return -Math.round((100 * p) / (1 - p));
+    return Math.round((100 * (1 - p)) / p);
+  }
+
+  function scoreFromAmerican(american) {
+    const shown = Math.min(american, ODDS_CAP);
+    if (shown >= 100) return Math.log(shown) / Math.LN10;
+    return 2 - (100 - shown) / 500;
+  }
+
+  function hourWords(hour, minute) {
+    const h = hour % 12 || 12;
+    const suffix = hour >= 12 ? 'pm' : 'am';
+    if (!minute) return h + suffix;
+    return h + ':' + String(minute).padStart(2, '0') + suffix;
+  }
+
+  function chartBoard(row) {
+    return {
+      kind: row.kind,
+      cast: row.cast,
+      field: (row.field || []).map((spoop) => ({
+        name: spoop.name,
+        gear: spoop.gear,
+        combat: spoop.combat,
+        hp: 0,
+        atk: 0,
+        str: 0,
+        def: 0,
+        rng: 0,
+        mag: 0,
+        pry: 0,
+      })),
+    };
+  }
+
+  function daySeries(board, priced) {
+    const byName = new Map();
+    function add(name, hour, minute, p) {
+      if (!byName.has(name)) byName.set(name, []);
+      const x = hour + minute / 60;
+      const pts = byName.get(name);
+      const prev = pts.find((pt) => Math.abs(pt.x - x) < 0.02);
+      if (prev) {
+        prev.p = p;
+        prev.american = americanNumber(p);
+        prev.minute = minute;
+        return;
+      }
+      pts.push({ hour: hour, minute: minute, x: x, p: p, american: americanNumber(p) });
+    }
+    (oddsTrail || []).forEach((row) => {
+      if (!row || !Array.isArray(row.field) || row.field.length < 2) return;
+      priceNight(chartBoard(row)).forEach((spoop) => add(spoop.name, row.hour, 0, spoop.p));
+    });
+    const now = worldMs();
+    const clock = etClock(now);
+    const fight = nextAtMs ? etClock(nextAtMs) : null;
+    if (fight && clock.day === fight.day && clock.hour >= 9 && clock.hour < 21) {
+      priced.forEach((spoop) => add(spoop.name, clock.hour, clock.minute, spoop.p));
+    }
+    const names = Array.from(byName.keys()).sort((a, b) => a.localeCompare(b));
+    return names.map((name, index) => ({
+      name: name,
+      color: LINE_COLORS[index % LINE_COLORS.length],
+      pts: byName.get(name).sort((a, b) => a.x - b.x),
+    }));
+  }
+
+  function chartScale(series) {
+    const shown = [];
+    let pinned = false;
+    series.forEach((line) => {
+      line.pts.forEach((pt) => {
+        if (pt.american > ODDS_CAP) pinned = true;
+        else shown.push(scoreFromAmerican(pt.american));
+      });
+    });
+    let minS = shown.length ? Math.min.apply(null, shown) : scoreFromAmerican(200);
+    let maxS = shown.length ? Math.max.apply(null, shown) : scoreFromAmerican(2000);
+    if (maxS - minS < 0.18) {
+      const mid = (minS + maxS) / 2;
+      minS = mid - 0.12;
+      maxS = mid + 0.12;
+    }
+    const pad = (maxS - minS) * 0.14;
+    const gutter = pinned ? 16 : 0;
+    const plotBottom = CHART.h - CHART.b - gutter;
+    return {
+      minS: minS - pad,
+      maxS: maxS + pad,
+      pinned: pinned,
+      plotBottom: plotBottom,
+      gutterY: CHART.h - CHART.b - 6,
+    };
+  }
+
+  function chartX(hour) {
+    return CHART.l + ((hour - 9) / 12) * (CHART.w - CHART.l - CHART.r);
+  }
+
+  function chartY(american, scale) {
+    if (american > ODDS_CAP) return scale.gutterY;
+    const t = (scoreFromAmerican(american) - scale.minS) / (scale.maxS - scale.minS);
+    return CHART.t + Math.max(0, Math.min(1, t)) * (scale.plotBottom - CHART.t);
+  }
+
+  function paintChart(board, priced) {
+    if (!oddsChart) return;
+    const series = daySeries(board, priced);
+    const clock = etClock(worldMs());
+    const sig = clock.hour + ':' + clock.minute + '|' + series.map((line) => (
+      line.name + ':' + line.pts.map((pt) => pt.x.toFixed(2) + '=' + pt.american).join(',')
+    )).join(';');
+    if (sig === oddsChartSig) return;
+    oddsChartSig = sig;
+    if (!series.length) {
+      oddsChart.innerHTML = '<p class="wait-when">The line fills in each hour from 9am until the fight.</p>';
+      return;
+    }
+    const scale = chartScale(series);
+    const ticks = [-500, -200, -110, 150, 200, 300, 500, 800, 1000, 1500, 2000, 3000, 5000, 10000];
+    const yTicks = [];
+    ticks.forEach((american) => {
+      if (american > ODDS_CAP) return;
+      const y = chartY(american, scale);
+      if (y < CHART.t + 2 || y > scale.plotBottom - 2) return;
+      if (yTicks.some((tick) => Math.abs(tick.y - y) < 14)) return;
+      yTicks.push({ y: y, label: american > 0 ? '+' + american : String(american) });
+    });
+    const xTicks = [9, 12, 15, 18, 21].map((hour) => ({
+      x: chartX(hour),
+      label: hourWords(hour, 0).replace('am', 'a').replace('pm', 'p'),
+    }));
+    const paths = series.map((line) => {
+      const d = line.pts.map((pt, i) => (
+        (i ? 'L' : 'M') + chartX(pt.x).toFixed(1) + ' ' + chartY(pt.american, scale).toFixed(1)
+      )).join(' ');
+      const dots = line.pts.map((pt) => (
+        '<circle cx="' + chartX(pt.x).toFixed(1) + '" cy="' + chartY(pt.american, scale).toFixed(1) + '" r="2.4" fill="' + line.color + '"/>'
+      )).join('');
+      return '<path d="' + d + '" fill="none" stroke="' + line.color + '" stroke-width="1.8" stroke-linejoin="round" stroke-linecap="round"/>' + dots;
+    }).join('');
+    const hoverCols = [];
+    series.forEach((line) => {
+      line.pts.forEach((pt) => {
+        const key = pt.hour + ':' + pt.minute;
+        let col = hoverCols.find((row) => row.key === key);
+        if (!col) {
+          col = { key: key, x: pt.x, label: hourWords(pt.hour, pt.minute), rows: [] };
+          hoverCols.push(col);
+        }
+        col.rows.push({ name: line.name, color: line.color, price: oddsAmerican(pt.p), american: pt.american });
+      });
+    });
+    hoverCols.sort((a, b) => a.x - b.x);
+    const floor = scale.pinned
+      ? '<line x1="' + CHART.l + '" y1="' + (scale.plotBottom + 1) + '" x2="' + (CHART.w - CHART.r) + '" y2="' + (scale.plotBottom + 1) + '" stroke="rgba(148,163,184,0.45)" stroke-dasharray="3 3"/>'
+      : '';
+    oddsChart.innerHTML =
+      '<svg viewBox="0 0 ' + CHART.w + ' ' + CHART.h + '" role="img" aria-label="Odds since 9am">' +
+      yTicks.map((tick) => (
+        '<text x="' + (CHART.l - 6) + '" y="' + (tick.y + 3) + '" text-anchor="end" fill="#94a3b8" font-size="10">' + tick.label + '</text>'
+      )).join('') +
+      xTicks.map((tick) => (
+        '<text x="' + tick.x + '" y="' + (CHART.h - 6) + '" text-anchor="middle" fill="#94a3b8" font-size="10">' + tick.label + '</text>'
+      )).join('') +
+      floor + paths +
+      '<rect class="odds-hover" x="' + CHART.l + '" y="' + CHART.t + '" width="' + (CHART.w - CHART.l - CHART.r) + '" height="' + (CHART.h - CHART.t - CHART.b) + '" fill="transparent"/></svg>' +
+      '<div class="odds-tip" hidden></div>';
+    const svg = oddsChart.querySelector('svg');
+    const tip = oddsChart.querySelector('.odds-tip');
+    const hover = oddsChart.querySelector('.odds-hover');
+    if (!svg || !tip || !hover) return;
+    hover.addEventListener('mousemove', (event) => {
+      const rect = svg.getBoundingClientRect();
+      const px = ((event.clientX - rect.left) / rect.width) * CHART.w;
+      let nearest = hoverCols[0];
+      hoverCols.forEach((col) => {
+        if (Math.abs(chartX(col.x) - px) < Math.abs(chartX(nearest.x) - px)) nearest = col;
+      });
+      nearest.rows.sort((a, b) => a.american - b.american);
+      tip.hidden = false;
+      tip.innerHTML = '<strong>' + escapeHtml(nearest.label) + '</strong>' + nearest.rows.map((row) => (
+        '<div class="tip-row"><span class="tip-name" style="color:' + row.color + '">' + escapeHtml(row.name) + '</span><span class="tip-price">' + row.price + '</span></div>'
+      )).join('');
+      const tipX = Math.min(rect.width - 160, Math.max(8, event.clientX - rect.left + 12));
+      const tipY = Math.max(4, event.clientY - rect.top - tip.offsetHeight - 8);
+      tip.style.left = tipX + 'px';
+      tip.style.top = tipY + 'px';
+    });
+    hover.addEventListener('mouseleave', () => { tip.hidden = true; });
+  }
+
   function paintOdds(pkSoon) {
     if (!oddsEl || !oddsList) return;
     const board = !pkSoon && oddsBoard && Array.isArray(oddsBoard.field) && oddsBoard.field.length >= 2
@@ -2019,9 +2297,12 @@
       : null;
     if (!board) {
       oddsEl.hidden = true;
+      oddsChartSig = '';
       return;
     }
-    const html = priceNight(board).map((row) => (
+    const priced = priceNight(board);
+    const samples = nextAtMs && Date.now() - oddsTrendAt >= 20000 ? noteOddsTrend(priced) : readOddsTrend();
+    const html = priced.map((row) => (
       '<tr><td>' + escapeHtml(row.name) + '</td>' +
       '<td>' + oddsGear(row.gear) + '</td>' +
       '<td>' + oddsNum(row.hp) + '</td>' +
@@ -2031,12 +2312,14 @@
       '<td>' + oddsNum(row.rng) + '</td>' +
       '<td>' + oddsNum(row.mag) + '</td>' +
       '<td>' + oddsNum(row.pry) + '</td>' +
-      '<td class="odds-price">' + oddsAmerican(row.p) + '</td></tr>'
+      '<td class="odds-price">' + oddsAmerican(row.p) + '</td>' +
+      '<td class="odds-trend">' + trendMark(oddsTrend(row.name, samples, row.p)) + '</td></tr>'
     )).join('');
     if (html !== oddsMarkup) {
       oddsMarkup = html;
       oddsList.innerHTML = html;
     }
+    paintChart(board, priced);
     oddsEl.hidden = false;
   }
 
@@ -2687,6 +2970,7 @@
       nextTitle = data.nextTitle || 'Tournament';
       nextDetail = data.nextDetail || '';
       oddsBoard = data.odds || null;
+      oddsTrail = Array.isArray(data.oddsTrail) ? data.oddsTrail : [];
       pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
       pkA = data.pk ? data.pk.a || '' : '';
       pkB = data.pk ? data.pk.b || '' : '';
