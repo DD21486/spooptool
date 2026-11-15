@@ -7,7 +7,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
-  <link rel="stylesheet" href="/css/arena.css?v=odds" />
+  <link rel="stylesheet" href="/css/arena.css?v=pot" />
 </head>
 <body class="arena-page">
   <header class="arena-bar">
@@ -38,13 +38,31 @@
       </div>
       <aside id="arena-odds" class="odds-card" hidden>
         <p class="wait-kicker">To win</p>
-        <ol id="arena-odds-list" class="odds-list"></ol>
+        <div class="odds-scroll">
+          <table class="odds-table">
+            <thead>
+              <tr>
+                <th>Spoop</th>
+                <th>GS</th>
+                <th>HP</th>
+                <th>ATK</th>
+                <th>STR</th>
+                <th>DEF</th>
+                <th>RNG</th>
+                <th>MAG</th>
+                <th>PRY</th>
+                <th>Odds</th>
+              </tr>
+            </thead>
+            <tbody id="arena-odds-list"></tbody>
+          </table>
+        </div>
       </aside>
     </div>
     <div id="arena-recap" class="recap" hidden></div>
   </div>
 
   <script src="/js/spoop.js"></script>
-  <script src="/js/arena.js?v=odds"></script>
+  <script src="/js/arena.js?v=pot"></script>
 </body>
 </html>

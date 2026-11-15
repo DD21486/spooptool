@@ -384,7 +384,10 @@
     pot.id = 'arena-pot';
     pot.className = 'arena-pot';
     pot.hidden = true;
-    pot.innerHTML = '<span class="pot-kicker">Pot</span><strong id="arena-pot-value">0</strong><span class="pot-meta" id="arena-pot-meta"></span>';
+    pot.innerHTML = '<img class="pot-coins" src="/assets/Coins_5.webp" alt="">' +
+      '<span class="pot-copy"><span class="pot-kicker">Tonight\'s pot</span>' +
+      '<strong id="arena-pot-value">0</strong><span class="pot-gold">gold</span>' +
+      '<span class="pot-meta" id="arena-pot-meta"></span></span>';
     bar.insertBefore(pot, rosterEl);
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -730,7 +733,13 @@
       return;
     }
     el.hidden = false;
-    value.textContent = Number(purse.gold).toLocaleString();
+    const gold = Number(purse.gold) || 0;
+    value.textContent = gold.toLocaleString('en-US');
+    const coins = el.querySelector('.pot-coins');
+    if (coins) {
+      const pile = gold >= 20000 ? 5 : gold >= 5000 ? 4 : gold >= 1000 ? 3 : gold >= 100 ? 2 : 1;
+      coins.src = '/assets/Coins_' + pile + '.webp';
+    }
     if (meta) {
       const bits = [];
       if (purse.avgLevel) bits.push('avg ' + purse.avgLevel);
@@ -1979,8 +1988,28 @@
     }
     return field.map((row) => ({
       name: row.name,
+      gear: row.gear,
+      hp: row.hp,
+      atk: row.atk,
+      str: row.str,
+      def: row.def,
+      rng: row.rng,
+      mag: row.mag,
+      pry: row.pry,
       p: probs.get(row.name) || 0,
     })).sort((a, b) => b.p - a.p || a.name.localeCompare(b.name));
+  }
+
+  function oddsNum(value) {
+    const n = Number(value);
+    return Number.isFinite(n) ? String(n) : '–';
+  }
+
+  function oddsGear(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '–';
+    const rounded = Math.round(n * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
   }
 
   function paintOdds(pkSoon) {
@@ -1993,7 +2022,16 @@
       return;
     }
     const html = priceNight(board).map((row) => (
-      '<li><span>' + escapeHtml(row.name) + '</span><b>' + oddsAmerican(row.p) + '</b></li>'
+      '<tr><td>' + escapeHtml(row.name) + '</td>' +
+      '<td>' + oddsGear(row.gear) + '</td>' +
+      '<td>' + oddsNum(row.hp) + '</td>' +
+      '<td>' + oddsNum(row.atk) + '</td>' +
+      '<td>' + oddsNum(row.str) + '</td>' +
+      '<td>' + oddsNum(row.def) + '</td>' +
+      '<td>' + oddsNum(row.rng) + '</td>' +
+      '<td>' + oddsNum(row.mag) + '</td>' +
+      '<td>' + oddsNum(row.pry) + '</td>' +
+      '<td class="odds-price">' + oddsAmerican(row.p) + '</td></tr>'
     )).join('');
     if (html !== oddsMarkup) {
       oddsMarkup = html;
