@@ -2045,19 +2045,28 @@
   height: 92px;
 }
 
+.actor.is-minion.is-rat .sprite-wrap { width: 58px; height: 50px; }
+
 .actor.is-rat .boss-sprite { image-rendering: auto; }
 
 .actor.is-rat .hud { width: 92px; }
 
+.actor.is-minion.is-rat .hud { width: 58px; }
+
 .actor.is-rat .hud-name { max-width: 88px; font-size: 10px; }
+
+.actor.is-minion.is-rat .hud-name { max-width: 54px; font-size: 9px; }
 
 .actor.is-rat .hud-cb,
 .actor.is-minion .hud-cb { display: none; }
 
 .actor.is-cow .sprite-wrap { width: 112px; height: 78px; }
+.actor.is-minion.is-cow .sprite-wrap { width: 62px; height: 44px; }
 .actor.is-cow .boss-sprite { image-rendering: auto; }
 .actor.is-cow .hud { width: 84px; }
+.actor.is-minion.is-cow .hud { width: 60px; }
 .actor.is-cow .hud-name { max-width: 80px; font-size: 10px; }
+.actor.is-minion.is-cow .hud-name { max-width: 56px; font-size: 9px; }
 
 .actor.is-rat.is-nip .boss-sprite { animation: rat-nip 0.28s ease-out; }
 
