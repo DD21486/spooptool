@@ -438,7 +438,7 @@
     if (!pit || pit.querySelector('.pit-stage')) return;
     const stage = document.createElement('div');
     stage.className = 'pit-stage';
-    const stay = new Set([banner, waitEl, recapEl, document.getElementById('arena-log')].filter(Boolean));
+    const stay = new Set([banner, waitEl, recapEl, document.getElementById('arena-log'), document.getElementById('raid-loot')].filter(Boolean));
     Array.from(pit.children).forEach((child) => {
       if (!stay.has(child)) stage.appendChild(child);
     });
@@ -677,6 +677,7 @@
     for (const f of bout.fighters) {
       const view = actors.get(f.id);
       if (!view || view.dead || !view.target) continue;
+      if (bout.formation === 'raid' && f.monster) continue;
       const other = actors.get(view.target);
       if (!other || other.dead) continue;
       const dx = (other.x - view.x) * sx;
@@ -826,8 +827,8 @@
         : '';
       return '<li class="tile" data-id="' + f.id + '">' +
         '<div class="tile-name" title="' + escapeHtml(f.name) + '">' + escapeHtml(f.name) + '</div>' +
-        (f.monster === 'dragon'
-          ? '<img class="tile-dragon" alt="" src="/assets/dragon/idle.png">'
+        (f.monster
+          ? '<img class="tile-dragon" alt="" src="' + (f.monster === 'dragon' ? '/assets/dragon/idle.png' : escapeHtml(f.sprite || '/assets/bosses/Brutus.png')) + '">'
           : '<canvas width="16" height="24" data-spoop="' + escapeHtml(f.name) + '"></canvas>') +
         '<div class="tile-hp"><span></span></div>' +
         pray +
@@ -851,7 +852,8 @@
     (fight.tracks || []).forEach((tr) => { tracks[tr.id] = tr.pts || []; });
     fight.fighters.forEach((f) => {
       const el = document.createElement('div');
-      el.className = 'actor' + (f.monster ? ' is-boss' : '');
+      const bossKind = f.monster && f.monster !== 'dragon' ? ' is-' + String(f.monster).replace(/[^a-z0-9-]/g, '') : '';
+      el.className = 'actor' + (f.monster ? ' is-boss' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '');
       el.setAttribute('data-id', f.id);
       const pray = !f.monster && f.prayer
         ? '<div class="pray" title="' + escapeHtml(f.prayer.name) + '">' +
@@ -859,9 +861,11 @@
             '<div class="pray-track"><span></span></div>' +
           '</div>'
         : '';
-      const sprite = f.monster
+      const sprite = f.monster === 'dragon'
         ? '<div class="sprite-wrap"><img class="dragon-sprite" alt="" src="/assets/dragon/idle.png"></div>'
-        : '<div class="sprite-wrap"><div class="sprite-motion">' +
+        : f.monster
+          ? '<div class="sprite-wrap"><img class="boss-sprite" alt="" src="' + escapeHtml(f.sprite || '/assets/bosses/Brutus.png') + '"></div>'
+          : '<div class="sprite-wrap"><div class="sprite-motion">' +
           '<canvas class="body-layer" width="28" height="24"></canvas>' +
           '<canvas class="weapon-glow" width="28" height="24"></canvas>' +
           '<canvas class="weapon-layer" width="28" height="24"></canvas>' +
@@ -959,6 +963,7 @@
       setDragonFrame(view, 'idle');
       return;
     }
+    if (view.monster) return;
     if (!view.bodyCanvas) return;
     if (!window.SpoopArt) return;
     const common = {
@@ -1117,6 +1122,16 @@
     const gen = (view.attackGen || 0) + 1;
     view.attackGen = gen;
     if (view.attackRaf) cancelAnimationFrame(view.attackRaf);
+    if (view.monster && view.monster !== 'dragon') {
+      const cls = style === 'charge' ? 'is-charge' : style === 'toss' ? 'is-toss' : 'is-stomp';
+      view.el.classList.remove('is-stomp', 'is-charge', 'is-toss');
+      void view.el.offsetWidth;
+      view.el.classList.add(cls);
+      window.setTimeout(() => {
+        if (view.el) view.el.classList.remove(cls);
+      }, 460);
+      return;
+    }
     if (view.monster === 'dragon') {
       const fire = style === 'fire';
       const seq = fire
@@ -1196,13 +1211,21 @@
       pushFeed(escapeHtml(attacker.name) + ' breathes fire on ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
     }
     else if (hit.attack === 'claw') pushFeed(escapeHtml(attacker.name) + (miss ? ' claws at ' : ' claws ') + escapeHtml(victim.name) + (miss ? '' : ' ' + hit.amount), miss ? 'miss' : 'hit');
+    else if (hit.verb) {
+      pushFeed(
+        miss
+          ? escapeHtml(attacker.name) + ' ' + escapeHtml(hit.verb) + ' ' + escapeHtml(victim.name) + '. Dodged.'
+          : escapeHtml(attacker.name) + ' ' + escapeHtml(hit.verb) + ' ' + escapeHtml(victim.name) + ' ' + hit.amount,
+        miss ? 'miss' : 'hit'
+      );
+    }
     else if (miss) pushFeed(escapeHtml(attacker.name) + ' misses ' + escapeHtml(victim.name), 'miss');
     else pushFeed(escapeHtml(attacker.name) + ' hits ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
     if (!from) return;
     faceView(from, to);
-    const swing = hit.attack === 'fire' ? 'fire' : hit.attack === 'claw' ? 'melee' : hit.style;
+    const swing = hit.verb ? hit.attack : hit.attack === 'fire' ? 'fire' : hit.attack === 'claw' ? 'melee' : hit.style;
     playAttack(from, swing, to);
-    if (from.monster || swing === 'melee') return;
+    if (from.monster || swing === 'melee' || hit.verb) return;
     const color = swing === 'fire' ? '#fb923c' : from.glow && from.glow.color;
     const bright = swing === 'fire' || !!(from.weapon && (from.weapon.quality === 'tempered' || from.weapon.quality === 'masterwork'));
     const wait = swing === 'fire' ? 80 : hit.style === 'magic' ? 120 : 140;
@@ -1255,12 +1278,39 @@
     return Math.max(1, n);
   }
 
+  function clearHazards() {
+    const svg = document.getElementById('arena-hazards');
+    if (svg) svg.innerHTML = '';
+  }
+
+  function drawHazards(t) {
+    const svg = document.getElementById('arena-hazards');
+    if (!svg || !bout || bout.formation !== 'raid') return;
+    const list = bout.hazards || [];
+    let markup = '';
+    for (const hz of list) {
+      if (t < hz.t0 || t > hz.t1 + 0.45) continue;
+      const cls = t >= hz.t1 ? 'is-hit' : t >= hz.t1 - 0.16 ? 'is-hot' : 'is-warn';
+      if (hz.kind === 'lane') {
+        markup += '<line class="' + cls + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
+      } else {
+        markup += '<circle class="' + cls + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
+      }
+      const lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
+      const ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
+      markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
+    }
+    svg.innerHTML = markup;
+  }
+
   function finish() {
     playing = false;
     cancelAnimationFrame(raf);
+    clearHazards();
     const named = (bout.winnerIds || []).map((id) => bout.fighters.find((f) => f.id === id)).filter((f) => f && !f.monster);
     const single = !named.length ? bout.fighters.find((f) => f.id === bout.winnerId) : null;
-    const dragonWin = !!(single && single.monster);
+    const bossWin = !!(single && single.monster);
+    const dragonWin = bossWin && single.monster === 'dragon';
     const playerWin = !!(single && !single.monster);
     if (!tourneyBusy) {
       if (named.length || playerWin) playVictoryMusic();
@@ -1272,13 +1322,16 @@
       if (view) view.el.classList.add('is-winner');
       if (view && view.card) view.card.classList.add('is-winner');
     });
-    if (named.length || dragonWin || playerWin) {
+    if (named.length || bossWin || playerWin) {
       banner.hidden = false;
       if (named.length) {
         banner.innerHTML = '<span class="text-xs uppercase tracking-wide">' + (named.length === 1 ? 'Survivor' : 'Survivors') + '</span><strong>' +
           escapeHtml(named.map((f) => f.name).join(', ')) + '</strong>';
       } else if (dragonWin) {
         banner.innerHTML = '<span class="text-xs uppercase tracking-wide">Dragon</span><strong>The dragon wins</strong>';
+      } else if (bossWin) {
+        banner.innerHTML = '<span class="text-xs uppercase tracking-wide">Boss</span><strong>' + escapeHtml(single.name) + ' wins</strong>' +
+          (bout.called ? '<span class="text-sm text-slate-300">Time called</span>' : '');
       } else {
         const note = bout.pkNote ? ' · ' + bout.pkNote : '';
         banner.innerHTML = '<span class="text-xs uppercase tracking-wide">Winner</span><strong>' +
@@ -1290,6 +1343,7 @@
     statusEl.textContent = named.length
       ? named.map((f) => f.name).join(', ') + (named.length === 1 ? ' survives.' : ' survive.')
       : dragonWin ? 'The dragon wins.'
+      : bossWin ? single.name + (bout.called ? ' wins. Time called.' : ' wins.')
       : playerWin ? single.name + ' wins.'
       : 'The pit is empty.';
     const done = onFightDone;
@@ -1328,11 +1382,13 @@
       applyDeath(bout.deaths[shownDeath]);
       shownDeath += 1;
     }
+    drawHazards(t);
     drawAims();
     const endAt = tourneyBusy
       ? Math.max(Number(bout.duration) || 0, lastEventTime(bout.hits), lastEventTime(bout.deaths))
       : Number(bout.duration) || 0;
-    const stillGoing = tourneyBusy ? t < endAt : (t < endAt && standingCount(t) > 1);
+    const raidFight = bout.formation === 'raid';
+    const stillGoing = tourneyBusy ? t < endAt : (t < endAt && (raidFight || standingCount(t) > 1));
     if (stillGoing) {
       statusEl.textContent = fightTitle;
       raf = requestAnimationFrame(frame);
@@ -1362,6 +1418,7 @@
     shownHit = 0;
     shownDeath = 0;
     clearFeed();
+    clearHazards();
     renderRoster(fight);
     mountActors(fight);
     const call = pit && pit.querySelector('.fight-call');
@@ -1592,6 +1649,7 @@
     actors.clear();
     actorsEl.innerHTML = '';
     fxEl.innerHTML = '';
+    clearHazards();
     if (linesEl) {
       linesEl.innerHTML = '';
       linesEl.style.visibility = '';
@@ -3057,15 +3115,17 @@
     }
   }
 
-  if (document.body.getAttribute('data-page') === 'pit') {
+  const labPage = document.body.getAttribute('data-page');
+  if (labPage === 'pit' || labPage === 'raid') {
     window.ArenaPit = {
-      play(fight, speed) {
+      play(fight, speed, done) {
         if (waitEl) waitEl.hidden = true;
-        nightDone = null;
-        arm(fight, 'Test fight');
+        nightDone = typeof done === 'function' ? done : null;
+        const title = labPage === 'raid' ? (fight && fight.bossName) || 'Raid' : 'Test fight';
+        arm(fight, title);
         const next = Number(speed);
         playSpeed = next > 0 ? next : ARENA_SPEED;
-        beginFight(true);
+        beginFight(labPage !== 'raid');
       },
       playTournament(tourney, speed) {
         if (waitEl) waitEl.hidden = true;

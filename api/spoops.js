@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena } = require('../lib/spoop/engine');
+const { advance, openCrate, sellBankItem, applyWearRules, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -96,6 +96,14 @@ async function handlePost(req) {
     const seed = String(body.seed || '').trim().slice(0, 80) || String(Date.now());
     const names = Array.isArray(body.names) ? body.names.slice(0, 16) : [];
     const result = testArena(state, names, seed, body.formation);
+    if (result.error) return { status: 400, payload: { error: result.error } };
+    return { status: 200, payload: result };
+  }
+  if (action === 'raid-test') {
+    const state = await load();
+    const seed = String(body.seed || '').trim().slice(0, 80) || String(Date.now());
+    const names = Array.isArray(body.names) ? body.names.slice(0, 16) : [];
+    const result = testRaid(state, names, seed, body.boss);
     if (result.error) return { status: 400, payload: { error: result.error } };
     return { status: 200, payload: result };
   }

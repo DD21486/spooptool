@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>Raid – SpoopTool</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { darkMode: 'class' };</script>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <link rel="stylesheet" href="/css/arena.css?v=raid" />
+</head>
+<body class="arena-page" data-page="raid">
+  <header class="arena-bar">
+    <a href="/spoops.html" class="text-xs text-sky-400 hover:text-sky-300">Spoops</a>
+    <div id="pit-picks" class="pit-picks"></div>
+    <div class="pit-controls">
+      <label>Boss
+        <select id="raid-boss">
+          <option value="brutus" selected>Brutus</option>
+        </select>
+      </label>
+      <label>Seed <input id="pit-seed" type="text" autocomplete="off" spellcheck="false" /></label>
+      <label>Speed
+        <select id="pit-speed">
+          <option value="0.75">Slow</option>
+          <option value="1.5" selected>Normal</option>
+          <option value="3">Fast</option>
+        </select>
+      </label>
+      <button type="button" id="pit-fight">Fight</button>
+      <button type="button" id="pit-replay">Replay</button>
+      <p id="arena-status" class="text-xs text-slate-400">Pick the party and send them in.</p>
+    </div>
+  </header>
+  <p id="pit-notes" class="pit-notes">One boss. Orange marks are the hit. Anyone who dies stays down. The living split the gold, then the table rolls, then a spooply.</p>
+  <ul id="arena-roster" class="roster"></ul>
+  <div id="arena-pit" class="pit" aria-label="Raid">
+    <div class="pit-post pit-post-nw"></div>
+    <div class="pit-post pit-post-ne"></div>
+    <div class="pit-post pit-post-sw"></div>
+    <div class="pit-post pit-post-se"></div>
+    <svg id="arena-lines" class="aim-lines" viewBox="0 0 100 72" preserveAspectRatio="none"></svg>
+    <svg id="arena-hazards" class="raid-hazards" viewBox="0 0 100 72" preserveAspectRatio="none"></svg>
+    <div id="arena-actors"></div>
+    <div id="arena-fx"></div>
+    <div id="arena-banner" class="arena-banner" hidden></div>
+    <div id="arena-wait" class="wait-card" hidden></div>
+    <div id="raid-loot" class="raid-loot" hidden>
+      <div class="raid-card">
+        <p id="raid-kicker" class="raid-kicker"></p>
+        <p id="raid-gold" class="raid-gold"></p>
+        <div id="raid-shares" class="raid-row"></div>
+        <p id="raid-table-label" class="raid-kicker" hidden>Loot table</p>
+        <div id="raid-table" class="raid-row"></div>
+        <p id="raid-spooply-label" class="raid-kicker" hidden>Spooply</p>
+        <div id="raid-spooply" class="raid-row"></div>
+        <p id="raid-take" class="raid-take"></p>
+      </div>
+    </div>
+  </div>
+  <script src="/js/spoop.js"></script>
+  <script src="/js/arena.js?v=raid"></script>
+  <script src="/js/raid.js?v=raid"></script>
+</body>
+</html>
