@@ -2233,6 +2233,8 @@
       const weights = field.map((row) => Math.exp(oddsStrength(row) / 12));
       const sum = weights.reduce((total, weight) => total + weight, 0) || 1;
       probs = new Map(field.map((row, i) => [row.name, weights[i] / sum]));
+    } else if (board.kind === 'raid') {
+      probs = new Map(field.map((row) => [row.name, 0]));
     } else {
       const cast = Array.isArray(board.cast) && board.cast.length === field.length
         ? board.cast
@@ -3248,8 +3250,8 @@
       replayLast = last && (last.bout || last.tournament) ? last : null;
       const waiting = !!(pkAtMs && worldMs() < pkAtMs);
       const pkLive = !!(lastPk && lastPk.bout && !waiting && holdPk !== lastPk.at && seenPk() !== lastPk.at && liveFor(Date.parse(lastPk.at), lastPk.bout, PK_SPEED));
-      const showMs = last && last.tournament ? last.tournament.showMs : 0;
-      const nightLive = !!(last && (last.tournament || last.bout) && !waiting && !pkLive && holdNight !== last.at && seenAt() !== last.at && liveFor(Date.parse(last.at), last.bout, ARENA_SPEED, showMs));
+      const showMs = last && last.tournament ? last.tournament.showMs : (last && last.showMs) || 0;
+      const nightLive = !!(last && (last.tournament || last.bout || last.raid) && !waiting && !pkLive && holdNight !== last.at && seenAt() !== last.at && liveFor(Date.parse(last.at), last.bout, ARENA_SPEED, showMs));
       if (pkLive) {
         resultsEl.hidden = true;
         waitEl.hidden = true;
@@ -3265,6 +3267,10 @@
         };
         arm(lastPk.bout, 'PK');
         beginFight(worldMs() - Date.parse(lastPk.at) < 15000);
+      } else if (nightLive && last.raid) {
+        markSeen(last.at);
+        window.location.href = '/raid.html?live=1';
+        return;
       } else if (nightLive && last.tournament) {
         resultsEl.hidden = true;
         waitEl.hidden = true;
@@ -3299,9 +3305,11 @@
         tickCountdown();
       } else {
         restPit();
-        statusEl.textContent = last && last.winner
-          ? last.winner + (last.tournament ? ' won the last Tournament.' : ' won the last Spoopfight.')
-          : 'Waiting for 9:00pm ET.';
+        statusEl.textContent = last && last.kind === 'raid'
+          ? (last.cleared ? 'The party cleared the last raid.' : 'The last raid ended.')
+          : last && last.winner
+            ? last.winner + (last.tournament ? ' won the last Tournament.' : ' won the last Spoopfight.')
+            : 'Waiting for 9:00pm ET.';
         syncReplay();
         tickCountdown();
       }

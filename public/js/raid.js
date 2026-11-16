@@ -524,6 +524,18 @@
     if (last) play(last);
   });
 
+  if (new URLSearchParams(location.search).has('live')) {
+    fetch('/api/arena')
+      .then((res) => res.json())
+      .then((data) => {
+        const raid = data.last && data.last.raid;
+        if (raid) play(raid);
+      })
+      .catch(() => {
+        statusEl.textContent = 'Could not load tonight\'s raid.';
+      });
+  }
+
   fetch('/api/spoops')
     .then((res) => res.json())
     .then((data) => {
