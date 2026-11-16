@@ -27,6 +27,7 @@
   let playFrom = 0;
   let shownHit = 0;
   let shownDeath = 0;
+  let rageShown = false;
   let nightDone = null;
   let onFightDone = null;
   let tourneyBusy = false;
@@ -1433,6 +1434,7 @@
     playing = false;
     cancelAnimationFrame(raf);
     clearHazards();
+    if (pit) pit.classList.remove('is-enraged');
     const named = (bout.winnerIds || []).map((id) => bout.fighters.find((f) => f.id === id)).filter((f) => f && !f.monster);
     const single = !named.length ? bout.fighters.find((f) => f.id === bout.winnerId) : null;
     const bossWin = !!(single && single.monster);
@@ -1486,9 +1488,16 @@
   function frame(now) {
     if (!playing || !bout) return;
     const t = playFrom + ((now - playOrigin) / 1000) * playSpeed * PACE;
+    const enraged = !!(bout.rageAt && t >= bout.rageAt);
+    if (pit) pit.classList.toggle('is-enraged', enraged);
+    if (enraged && !rageShown) {
+      rageShown = true;
+      pushFeed(escapeHtml(bout.bossName || 'The boss') + ' is enraged', 'hit');
+    }
     for (const f of bout.fighters) {
       const view = actors.get(f.id);
       if (!view || view.dead) continue;
+      if (f.monster && f.monster !== 'rat') view.el.classList.toggle('is-enraged', enraged);
       const pos = sampleTrack(view.pts, t);
       view.el.classList.toggle('is-hidden', !!pos.hidden);
       if (pos.hidden) continue;
@@ -1546,6 +1555,8 @@
     playSpeed = (title || '') === 'PK' ? PK_SPEED : ARENA_SPEED;
     shownHit = 0;
     shownDeath = 0;
+    rageShown = false;
+    if (pit) pit.classList.remove('is-enraged');
     clearFeed();
     clearHazards();
     paintRaidScene(fight);

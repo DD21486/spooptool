@@ -384,62 +384,40 @@
 
 .pit.is-lair {
   background: #140e0a;
-  box-shadow: inset 0 0 0 6px #3a2416, inset 0 0 90px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 6px #3a2416;
+}
+
+.pit.is-lair .pit-stage,
+.pit.is-pasture .pit-stage,
+.pit.is-sewer .pit-stage {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
 }
 
 .pit.is-lair .pit-stage {
-  background:
-    radial-gradient(ellipse at 50% 0%, rgba(176, 206, 122, 0.75) 0%, rgba(176, 206, 122, 0) 18%),
-    radial-gradient(ellipse at 50% 58%, #6d4a30 0%, #3a2418 42%, #160e0a 74%, #070504 100%);
-}
-
-.pit.is-lair .pit-stage::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(ellipse at 22% 72%, rgba(0, 0, 0, 0.32), transparent 18%),
-    radial-gradient(ellipse at 76% 34%, rgba(0, 0, 0, 0.26), transparent 16%),
-    linear-gradient(118deg, transparent 40%, rgba(70, 38, 18, 0.7) 40.6%, transparent 41.4%),
-    linear-gradient(64deg, transparent 68%, rgba(54, 30, 14, 0.65) 68.5%, transparent 69.4%);
+  background-color: #3a2414;
+  background-image: url('/assets/bosses/mole-lair.jpg');
 }
 
 .pit.is-pasture {
-  background: #245018;
-  box-shadow: inset 0 0 0 6px #6b4424, inset 0 0 40px rgba(20, 40, 8, 0.28);
+  background: #3a2414;
+  box-shadow: inset 0 0 0 6px #6b4424;
 }
 
 .pit.is-pasture .pit-stage {
-  background-color: #3d742c;
-  background-image:
-    linear-gradient(#8ec8ef, #d7eef8),
-    repeating-linear-gradient(90deg, #5c3b22 0 7px, transparent 7px 78px),
-    linear-gradient(#6b4423, #d8c098),
-    radial-gradient(ellipse at 50% 64%, #d2b56a 0 20%, #8fb84a 42%, #3f7a2c 100%);
-  background-size: 100% 13%, 100% 20px, 100% 6px, 100% 100%;
-  background-position: top, left 11.5%, left 12.6%, center;
-  background-repeat: no-repeat;
+  background-color: #5a3a1c;
+  background-image: url('/assets/bosses/brutus-pasture.jpg');
 }
 
 .pit.is-sewer {
   background: #141618;
-  box-shadow: inset 0 0 0 6px #3e444c, inset 0 0 80px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 6px #3e444c;
 }
 
 .pit.is-sewer .pit-stage {
-  background-color: #6a645c;
-  background-image:
-    radial-gradient(circle at 16% 16%, rgba(255, 168, 64, 0.55), transparent 8%),
-    radial-gradient(circle at 84% 20%, rgba(255, 150, 48, 0.4), transparent 7%),
-    repeating-linear-gradient(90deg, #5a534c 0 26px, #3a342e 26px 29px, #4a443c 29px 52px, #2e2a26 52px 55px),
-    linear-gradient(180deg, rgba(120, 160, 90, 0.35), #1a3a2c 40%, #10261c),
-    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 52px),
-    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 44px);
-  background-size: 160px 160px, 140px 140px, 100% 18%, 100% 16%, 100% 100%, 100% 100%;
-  background-position: 16% 8%, 84% 10%, top, bottom, center, center;
-  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+  background-color: #1c2218;
+  background-image: url('/assets/bosses/scurrius-sewer.jpg');
 }
 
 .pit-zoom {
@@ -1933,8 +1911,22 @@
 .actor.is-brutus.is-dead .boss-sprite { animation: none; }
 
 .actor.is-mole .sprite-wrap {
-  width: 128px;
-  height: 86px;
+  width: 176px;
+  height: 100px;
+}
+
+.actor.is-mole .boss-sprite { image-rendering: auto; }
+
+.actor.is-boss.is-enraged .boss-sprite {
+  filter: drop-shadow(0 0 10px rgba(220, 38, 38, 0.9));
+}
+
+.actor.is-boss.is-enraged .sprite-wrap.is-walk .boss-sprite {
+  animation-duration: 0.12s;
+}
+
+.pit.is-enraged .pit-stage {
+  box-shadow: inset 0 0 90px rgba(180, 24, 16, 0.45);
 }
 
 .actor.is-mole .hud { width: 148px; }
@@ -2562,6 +2554,70 @@
 .raid-room strong { color: #fff6c8; font-size: 15px; text-align: center; }
 
 .raid-room span { color: #d6c4a8; font-size: 13px; }
+
+.raid-intro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 0 2px;
+}
+
+.raid-boss-art {
+  width: min(320px, 70vw);
+  height: 190px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.raid-loot.is-intro .raid-phase {
+  font-size: 36px;
+  line-height: 1.1;
+}
+
+.raid-diff-label {
+  margin: 8px 0 0;
+  color: #d6c4a8;
+  font-size: 12px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.raid-diff,
+.raid-tier {
+  margin: 0;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.raid-diff { font-size: 40px; line-height: 1; }
+
+.raid-tier { font-size: 14px; }
+
+.raid-diff.is-trivial,
+.raid-tier.is-trivial { color: #94a3b8; }
+
+.raid-diff.is-easy,
+.raid-tier.is-easy { color: #86efac; }
+
+.raid-diff.is-medium,
+.raid-tier.is-medium { color: #fde047; }
+
+.raid-diff.is-tough,
+.raid-tier.is-tough { color: #fb923c; }
+
+.raid-diff.is-hard,
+.raid-tier.is-hard { color: #f87171; }
+
+.raid-diff.is-elite,
+.raid-tier.is-elite { color: #c4b5fd; }
+
+.raid-diff.is-master,
+.raid-tier.is-master { color: #f472b6; }
+
+.raid-diff.is-god,
+.raid-tier.is-god { color: #fbbf24; }
 
 .raid-next {
   margin: 12px 0 0;

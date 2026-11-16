@@ -44,9 +44,16 @@
   }
 
   function clearLoot() {
-    if (lootEl) lootEl.hidden = true;
+    if (lootEl) {
+      lootEl.hidden = true;
+      lootEl.classList.remove('is-intro');
+    }
     if (stageEl) stageEl.innerHTML = '';
     if (phaseEl) phaseEl.textContent = '';
+  }
+
+  function tierSlug(name) {
+    return String(name || 'medium').toLowerCase().replace(/[^a-z]/g, '');
   }
 
   function hideLoot() {
@@ -298,12 +305,33 @@
           '<p class="raid-room-num">' + (i + 1) + '</p>' +
           (boss.sprite ? '<img alt="" src="' + escapeHtml(boss.sprite) + '">' : '') +
           '<strong>' + escapeHtml(boss.name || 'Boss') + '</strong>' +
-          '<span>' + escapeHtml(boss.tierName || '') + '</span>' +
+          '<span class="raid-tier is-' + tierSlug(boss.tierName) + '">' + escapeHtml(boss.tierName || '') + '</span>' +
         '</div>'
       )).join('') + '</div>';
       lootEl.hidden = false;
       if (banner) banner.hidden = true;
       window.setTimeout(() => resolve(token === rollToken), 4500);
+    });
+  }
+
+  function showFightCard(boss, index, token) {
+    return new Promise((resolve) => {
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      const tier = (boss && boss.tierName) || 'Medium';
+      if (kickerEl) kickerEl.textContent = 'Raid Fight ' + (index + 1);
+      if (phaseEl) phaseEl.textContent = (boss && boss.name) || 'Boss';
+      stageEl.innerHTML = '<div class="raid-intro">' +
+        (boss && boss.sprite ? '<img class="raid-boss-art" alt="" src="' + escapeHtml(boss.sprite) + '">' : '') +
+        '<p class="raid-diff-label">Difficulty</p>' +
+        '<p class="raid-diff is-' + tierSlug(tier) + '">' + escapeHtml(tier) + '</p>' +
+      '</div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => resolve(token === rollToken), 3200);
     });
   }
 
@@ -343,6 +371,9 @@
       if (notesEl) notesEl.textContent = bossLine(boss);
       if (statusEl) statusEl.textContent = (i + 1) + ' / ' + lineup.length + ' · ' + (boss.name || 'Boss');
       paintScene(boss);
+      const card = await showFightCard(boss, i, token);
+      if (!card || token !== rollToken) return;
+      clearLoot();
       await playBout(room.bout);
       if (token !== rollToken) return;
       const more = i < rooms.length - 1;
@@ -360,7 +391,7 @@
     if (scene) pit.classList.add(scene);
   }
 
-  function play(data) {
+  async function play(data) {
     if (data && data.raid) {
       runRaid(data);
       return;
@@ -368,6 +399,7 @@
     paintScene(data && data.boss);
     last = data;
     hideLoot();
+    const token = rollToken;
     const boss = data.boss;
     if (notesEl) {
       notesEl.textContent = boss
@@ -375,6 +407,9 @@
         : 'Step out of the orange.';
     }
     statusEl.textContent = boss ? boss.name : 'Raid';
+    const shown = await showFightCard(boss, 0, token);
+    if (!shown || token !== rollToken) return;
+    clearLoot();
     if (window.ArenaPit) {
       window.ArenaPit.play(data.bout, speedEl.value, function () {
         showLoot(data);
