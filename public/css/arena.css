@@ -2051,7 +2051,13 @@
 
 .actor.is-rat .hud-name { max-width: 88px; font-size: 10px; }
 
-.actor.is-rat .hud-cb { display: none; }
+.actor.is-rat .hud-cb,
+.actor.is-minion .hud-cb { display: none; }
+
+.actor.is-cow .sprite-wrap { width: 112px; height: 78px; }
+.actor.is-cow .boss-sprite { image-rendering: auto; }
+.actor.is-cow .hud { width: 84px; }
+.actor.is-cow .hud-name { max-width: 80px; font-size: 10px; }
 
 .actor.is-rat.is-nip .boss-sprite { animation: rat-nip 0.28s ease-out; }
 
@@ -2680,6 +2686,43 @@
 
 .raid-diff.is-god,
 .raid-tier.is-god { color: #fbbf24; }
+
+.raid-diff.is-light,
+.raid-tier.is-light { color: #93c5fd; }
+
+.raid-map {
+  width: 100%;
+  height: min(280px, 42vh);
+  display: block;
+}
+
+.raid-map .map-path {
+  fill: none;
+  stroke: #8a6840;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.raid-map .map-node {
+  fill: #1a120c;
+  stroke: #f0d878;
+  stroke-width: 0.7;
+}
+
+.raid-map .map-q {
+  fill: #ffe58a;
+  font-size: 6px;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  font-family: "RuneScape", sans-serif;
+}
+
+.raid-map .map-token {
+  fill: #f87171;
+  stroke: #fff6c8;
+  stroke-width: 0.45;
+}
 
 .raid-next {
   margin: 12px 0 0;

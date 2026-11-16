@@ -750,23 +750,38 @@
     const el = bossBarEl();
     if (!el) return;
     const boss = fight && fight.formation === 'raid'
-      ? (fight.fighters || []).find((f) => f.monster && f.monster !== 'rat')
+      ? (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat')
       : null;
-    if (!boss) {
+    const pack = fight && fight.formation === 'raid' ? fight.pack : null;
+    if (!boss && !pack) {
       el.hidden = true;
       return;
     }
     el.hidden = false;
-    el.querySelector('.boss-bar-name').textContent = boss.name || 'Boss';
-    el.querySelector('.boss-bar-lvl').textContent = boss.combat ? 'Level ' + boss.combat : '';
-    setBossBar(boss, boss.maxHp);
+    el.querySelector('.boss-bar-name').textContent = (boss && boss.name) || (pack && pack.name) || 'Boss';
+    const level = (boss && boss.combat) || (pack && pack.level) || 0;
+    el.querySelector('.boss-bar-lvl').textContent = level ? 'Level ' + level : '';
+    setBossBar(boss || { monster: 'pack', maxHp: 1 }, boss ? boss.maxHp : 1);
   }
 
   function setBossBar(fighter, hp) {
-    if (!bout || bout.formation !== 'raid' || !fighter || !fighter.monster || fighter.monster === 'rat') return;
+    if (!bout || bout.formation !== 'raid') return;
     const el = document.getElementById('boss-bar');
-    if (!el) return;
-    const pct = fighter.maxHp ? Math.max(0, hp) / fighter.maxHp : 0;
+    if (!el || el.hidden) return;
+    let pct = 0;
+    if (bout.pack) {
+      let cur = 0;
+      let max = 0;
+      (bout.fighters || []).forEach((f) => {
+        if (!f.monster) return;
+        max += f.maxHp || 0;
+        const view = actors.get(f.id);
+        cur += view ? Math.max(0, view.hp) : 0;
+      });
+      pct = max ? cur / max : 0;
+    } else if (fighter && fighter.monster && !fighter.minion && fighter.monster !== 'rat') {
+      pct = fighter.maxHp ? Math.max(0, hp) / fighter.maxHp : 0;
+    } else return;
     const span = el.querySelector('.boss-bar-track > span');
     if (!span) return;
     span.style.width = (pct * 100) + '%';
@@ -866,7 +881,7 @@
   }
 
   function renderRoster(fight) {
-    const shown = (fight.fighters || []).filter((f) => f.monster !== 'rat');
+    const shown = (fight.fighters || []).filter((f) => f.monster !== 'rat' && !f.minion);
     rosterEl.innerHTML = shown.map((f) => {
       const pray = f.prayer
         ? '<div class="tile-pray" title="' + escapeHtml(f.prayer.name) + '"><span></span></div>'
@@ -899,7 +914,7 @@
     fight.fighters.forEach((f) => {
       const el = document.createElement('div');
       const bossKind = f.monster && f.monster !== 'dragon' ? ' is-' + String(f.monster).replace(/[^a-z0-9-]/g, '') : '';
-      el.className = 'actor' + (f.monster ? ' is-boss' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '');
+      el.className = 'actor' + (f.monster ? ' is-boss' : '') + (f.minion ? ' is-minion' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '');
       el.setAttribute('data-id', f.id);
       const pray = !f.monster && f.prayer
         ? '<div class="pray" title="' + escapeHtml(f.prayer.name) + '">' +
@@ -907,7 +922,7 @@
             '<div class="pray-track"><span></span></div>' +
           '</div>'
         : '';
-      const rank = f.monster === 'rat'
+      const rank = (f.monster === 'rat' || f.minion)
         ? ''
         : (f.monster ? escapeHtml(f.tierName || 'Boss') : 'Cb ' + f.combat);
       const sprite = f.monster === 'dragon'
@@ -1365,8 +1380,8 @@
     if (!pit) return;
     pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
     if (!fight || fight.formation !== 'raid') return;
-    const boss = (fight.fighters || []).find((f) => f.monster && f.monster !== 'rat');
-    const scene = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && boss.monster];
+    const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
+    const scene = fight.scene || { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
 
@@ -1447,7 +1462,7 @@
     }
     svg.innerHTML = markup;
     drawFalls(t);
-    const fighter = (bout.fighters || []).find((f) => f.monster && f.monster !== 'dragon' && f.monster !== 'rat');
+    const fighter = (bout.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'dragon' && f.monster !== 'rat');
     const view = fighter ? actors.get(fighter.id) : null;
     if (!view || !view.el) return;
     const active = list.find((hz) => t >= hz.t0 && t < hz.t1);

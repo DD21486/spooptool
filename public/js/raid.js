@@ -292,25 +292,76 @@
     return cleared && token === rollToken;
   }
 
-  function showLineup(lineup, token) {
+  function drawMap(nodes, rooms, revealed, tokenPos) {
+    const pts = (nodes || []).map((node) => node.x + ',' + node.y).join(' ');
+    let marks = '';
+    (nodes || []).forEach((node, i) => {
+      const room = rooms && rooms[i];
+      const sprite = i < revealed && room && room.boss && room.boss.sprite;
+      marks += '<circle class="map-node" cx="' + node.x + '" cy="' + node.y + '" r="6.2"></circle>';
+      if (sprite) {
+        marks += '<image href="' + escapeHtml(sprite) + '" x="' + (node.x - 4.4) + '" y="' + (node.y - 4.4) + '" width="8.8" height="8.8"></image>';
+      } else {
+        marks += '<text class="map-q" x="' + node.x + '" y="' + (node.y + 0.6) + '">?</text>';
+      }
+    });
+    const tokenMark = tokenPos
+      ? '<circle class="map-token" cx="' + tokenPos.x.toFixed(2) + '" cy="' + tokenPos.y.toFixed(2) + '" r="2.15"></circle>'
+      : '';
+    stageEl.innerHTML = '<svg class="raid-map" viewBox="0 0 100 64" role="img" aria-label="Raid map">' +
+      '<polyline class="map-path" points="' + pts + '"></polyline>' +
+      marks + tokenMark + '</svg>';
+  }
+
+  function showOpening(data, token) {
     return new Promise((resolve) => {
       if (!lootEl || !stageEl) {
         resolve(token === rollToken);
         return;
       }
       if (kickerEl) kickerEl.textContent = 'Tonight';
-      if (phaseEl) phaseEl.textContent = 'The run';
-      stageEl.innerHTML = '<div class="raid-lineup">' + (lineup || []).map((boss, i) => (
-        '<div class="raid-room">' +
-          '<p class="raid-room-num">' + (i + 1) + '</p>' +
-          (boss.sprite ? '<img alt="" src="' + escapeHtml(boss.sprite) + '">' : '') +
-          '<strong>' + escapeHtml(boss.name || 'Boss') + '</strong>' +
-          '<span class="raid-tier is-' + tierSlug(boss.tierName) + '">' + escapeHtml(boss.tierName || '') + '</span>' +
-        '</div>'
-      )).join('') + '</div>';
+      if (phaseEl) phaseEl.textContent = data.name || 'The raid';
+      const nodes = data.map || [];
+      const start = nodes[0] ? { x: Math.max(3, nodes[0].x - 9), y: nodes[0].y } : null;
+      drawMap(nodes, data.rooms, 0, start);
+      lootEl.classList.add('is-intro');
       lootEl.hidden = false;
       if (banner) banner.hidden = true;
-      window.setTimeout(() => resolve(token === rollToken), 4500);
+      window.setTimeout(() => resolve(token === rollToken), 3200);
+    });
+  }
+
+  function showTravel(data, fromIndex, token) {
+    return new Promise((resolve) => {
+      const nodes = data.map || [];
+      const a = nodes[fromIndex];
+      const b = nodes[fromIndex + 1];
+      if (!lootEl || !stageEl || !a || !b) {
+        resolve(token === rollToken);
+        return;
+      }
+      if (kickerEl) kickerEl.textContent = 'Tonight';
+      if (phaseEl) phaseEl.textContent = data.name || 'The raid';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      const started = performance.now();
+      function frame(now) {
+        if (token !== rollToken) {
+          resolve(false);
+          return;
+        }
+        const u = Math.min(1, (now - started) / 5000);
+        const ease = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+        drawMap(nodes, data.rooms, fromIndex + 1, {
+          x: a.x + (b.x - a.x) * ease,
+          y: a.y + (b.y - a.y) * ease,
+        });
+        if (u < 1) requestAnimationFrame(frame);
+        else resolve(true);
+      }
+      drawMap(nodes, data.rooms, fromIndex + 1, { x: a.x, y: a.y });
+      requestAnimationFrame(frame);
     });
   }
 
@@ -347,7 +398,8 @@
 
   function bossLine(boss) {
     if (!boss) return 'Step out of the orange.';
-    return boss.name + ' · ' + (boss.tierName || 'Medium') + ' · for ' + (boss.forLevel || boss.level || 1) + ' · party ' + (boss.level || 1) + ' · ' + (boss.hp || 0) + ' hp · hits ' + (boss.maxHit || 0);
+    if (boss.skirmish) return boss.name + ' · ' + (boss.tierName || 'Light') + ' · level ' + (boss.level || 1);
+    return boss.name + ' · ' + (boss.tierName || 'Medium') + ' · level ' + (boss.level || 1) + ' · ' + (boss.hp || 0) + ' hp · hits ' + (boss.maxHit || 0);
   }
 
   async function runRaid(data) {
@@ -355,30 +407,34 @@
     hideLoot();
     const token = rollToken;
     const rooms = data.rooms || [];
-    const lineup = data.lineup && data.lineup.length ? data.lineup : rooms.map((room) => room.boss || {});
-    if (statusEl) statusEl.textContent = 'Tonight';
-    if (notesEl) {
-      notesEl.textContent = lineup.map((boss, i) => (i + 1) + '. ' + (boss.name || 'Boss') + ' · ' + (boss.tierName || '')).join('    ');
+    const total = (data.map && data.map.length) || rooms.length;
+    if (statusEl) statusEl.textContent = data.name || 'Tonight';
+    if (notesEl) notesEl.textContent = total + ' rooms. The path stays hidden until you arrive. Anyone who dies stays down.';
+    if (data.map && data.map.length) {
+      const opened = await showOpening(data, token);
+      if (!opened || token !== rollToken) return;
+      clearLoot();
     }
-    paintScene(lineup[0]);
-    const shown = await showLineup(lineup, token);
-    if (!shown || token !== rollToken) return;
-    clearLoot();
     for (let i = 0; i < rooms.length; i++) {
       if (token !== rollToken) return;
       const room = rooms[i];
       const boss = room.boss || {};
-      if (notesEl) notesEl.textContent = bossLine(boss);
-      if (statusEl) statusEl.textContent = (i + 1) + ' / ' + lineup.length + ' · ' + (boss.name || 'Boss');
+      if (statusEl) statusEl.textContent = (i + 1) + ' / ' + total + ' · ' + (data.name || 'Tonight');
+      if (notesEl) notesEl.textContent = 'Room ' + (i + 1) + ' of ' + total;
       paintScene(boss);
       const card = await showFightCard(boss, i, token);
       if (!card || token !== rollToken) return;
+      if (notesEl) notesEl.textContent = bossLine(boss);
       clearLoot();
       await playBout(room.bout);
       if (token !== rollToken) return;
       const more = i < rooms.length - 1;
       const cleared = await showLoot(room, { wait: more, closing: !more });
       if (!cleared || !more || token !== rollToken) return;
+      if (data.map && data.map.length > i + 1) {
+        const moved = await showTravel(data, i, token);
+        if (!moved || token !== rollToken) return;
+      }
       clearLoot();
     }
   }
@@ -387,7 +443,8 @@
     const pit = document.getElementById('arena-pit');
     if (!pit) return;
     pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
-    const scene = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && (boss.id || boss.monster)];
+    const known = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', cows: 'is-pasture', rats: 'is-sewer' };
+    const scene = (boss && known[boss.id]) || (boss && boss.scene) || known[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
 
