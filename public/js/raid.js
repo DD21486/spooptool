@@ -43,11 +43,15 @@
     }).join('');
   }
 
-  function hideLoot() {
-    rollToken += 1;
+  function clearLoot() {
     if (lootEl) lootEl.hidden = true;
     if (stageEl) stageEl.innerHTML = '';
     if (phaseEl) phaseEl.textContent = '';
+  }
+
+  function hideLoot() {
+    rollToken += 1;
+    clearLoot();
   }
 
   function iconHtml(osrsId, size) {
@@ -134,18 +138,29 @@
     });
   }
 
-  function renderSummary(loot, party) {
+  function renderSummary(loot, party, bout) {
     const goldById = new Map((loot.shares || []).map((row) => [row.id, row.gold]));
     const takerId = loot.spooply && loot.spooply.id;
     const drop = loot.drop;
+    const dealt = new Map();
+    const monsters = new Set(((bout && bout.fighters) || []).filter((f) => f.monster).map((f) => f.id));
+    ((bout && bout.hits) || []).forEach((hit) => {
+      if (!hit || !(hit.amount > 0) || monsters.has(hit.from)) return;
+      dealt.set(hit.from, (dealt.get(hit.from) || 0) + hit.amount);
+    });
+    let top = 0;
+    dealt.forEach((amount) => { if (amount > top) top = amount; });
     const shares = party.map((row) => {
       const share = goldById.get(row.id);
+      const amount = dealt.get(row.id) || 0;
       const taker = row.alive && row.id === takerId ? ' is-taker' : '';
+      const best = top > 0 && amount === top ? ' is-top' : '';
+      const dmg = '<em class="raid-dmg">' + amount.toLocaleString('en-US') + ' dmg</em>';
       if (!row.alive) {
-        return '<div class="raid-share is-down' + taker + '"><strong>' + escapeHtml(row.name) + '</strong><span>Down</span></div>';
+        return '<div class="raid-share is-down' + taker + best + '"><strong>' + escapeHtml(row.name) + '</strong><span>Down</span>' + dmg + '</div>';
       }
       const gold = share ? share.toLocaleString('en-US') + ' gp' : '0 gp';
-      return '<div class="raid-share' + taker + '"><strong>' + escapeHtml(row.name) + '</strong><span>' + gold + '</span></div>';
+      return '<div class="raid-share' + taker + best + '"><strong>' + escapeHtml(row.name) + '</strong><span>' + gold + '</span>' + dmg + '</div>';
     }).join('');
     let prize = '';
     if (!loot.wiped && drop) {
@@ -169,12 +184,13 @@
     '</div>';
   }
 
-  async function showLoot(data) {
+  async function showLoot(data, opt) {
+    opt = opt || {};
     const token = rollToken;
     const bout = data && data.bout;
     const loot = bout && bout.loot;
     const party = (bout && bout.party) || [];
-    if (!lootEl || !loot || !stageEl) return;
+    if (!lootEl || !loot || !stageEl) return false;
     if (banner) banner.hidden = true;
     const bossName = (data.boss && data.boss.name) || bout.bossName || 'Boss';
     const alive = party.filter((row) => row.alive);
@@ -192,10 +208,11 @@
         ? (alive.length ? bossName + ' wins.' : 'The party fell.')
         : bossName + ' is down.';
     }
+    const cleared = !loot.wiped && alive.length > 0;
     if (loot.wiped || !loot.drop || !loot.spooply) {
-      phaseEl.textContent = loot.wiped ? 'No loot' : bossName;
-      renderSummary(loot, party);
-      return;
+      phaseEl.textContent = loot.wiped ? 'No loot' : 'The split';
+      renderSummary(loot, party, bout);
+      return finishCard(opt, token, cleared);
     }
     const living = alive.length ? alive : [loot.spooply];
     phaseEl.textContent = 'Who loots';
@@ -212,29 +229,138 @@
     let who = living.findIndex((person) => person.id === loot.spooply.id);
     if (who < 0) who = 0;
     await spin(spoopNodes, who, token);
-    if (token !== rollToken) return;
+    if (token !== rollToken) return false;
     const chosen = document.createElement('p');
     chosen.className = 'raid-chosen';
     chosen.textContent = loot.spooply.name + ' is up.';
     stageEl.appendChild(chosen);
     await wait(2000);
-    if (token !== rollToken) return;
+    if (token !== rollToken) return false;
     phaseEl.textContent = 'The drop';
     await playReel(loot.drop, token);
-    if (token !== rollToken) return;
+    if (token !== rollToken) return false;
     await wait(900);
-    if (token !== rollToken) return;
+    if (token !== rollToken) return false;
     phaseEl.textContent = 'The split';
-    renderSummary(loot, party);
+    renderSummary(loot, party, bout);
+    return finishCard(opt, token, true);
+  }
+
+  function stamp(text) {
+    if (!text || !stageEl) return;
+    const line = document.createElement('p');
+    line.className = 'raid-next';
+    line.textContent = text;
+    const box = stageEl.querySelector('.raid-summary');
+    (box || stageEl).appendChild(line);
+    return line;
+  }
+
+  function countdown(seconds, token) {
+    return new Promise((resolve) => {
+      let left = seconds;
+      const line = stamp('Next fight in ' + left);
+      const timer = window.setInterval(() => {
+        if (token !== rollToken) {
+          window.clearInterval(timer);
+          resolve(false);
+          return;
+        }
+        left -= 1;
+        if (left <= 0) {
+          window.clearInterval(timer);
+          if (line) line.textContent = 'Next fight';
+          resolve(true);
+        } else if (line) {
+          line.textContent = 'Next fight in ' + left;
+        }
+      }, 1000);
+    });
+  }
+
+  async function finishCard(opt, token, cleared) {
+    if (token !== rollToken) return false;
+    if (opt && opt.wait && cleared) return countdown(10, token);
+    if (opt && opt.closing) stamp(cleared ? 'Raid complete.' : 'The raid ends here.');
+    return cleared && token === rollToken;
+  }
+
+  function showLineup(lineup, token) {
+    return new Promise((resolve) => {
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      if (kickerEl) kickerEl.textContent = 'Tonight';
+      if (phaseEl) phaseEl.textContent = 'The run';
+      stageEl.innerHTML = '<div class="raid-lineup">' + (lineup || []).map((boss, i) => (
+        '<div class="raid-room">' +
+          '<p class="raid-room-num">' + (i + 1) + '</p>' +
+          (boss.sprite ? '<img alt="" src="' + escapeHtml(boss.sprite) + '">' : '') +
+          '<strong>' + escapeHtml(boss.name || 'Boss') + '</strong>' +
+          '<span>' + escapeHtml(boss.tierName || '') + '</span>' +
+        '</div>'
+      )).join('') + '</div>';
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => resolve(token === rollToken), 4500);
+    });
+  }
+
+  function playBout(bout) {
+    return new Promise((resolve) => {
+      if (!window.ArenaPit) {
+        resolve();
+        return;
+      }
+      window.ArenaPit.play(bout, speedEl.value, () => resolve());
+    });
+  }
+
+  function bossLine(boss) {
+    if (!boss) return 'Step out of the orange.';
+    return boss.name + ' · ' + (boss.tierName || 'Medium') + ' · for ' + (boss.forLevel || boss.level || 1) + ' · party ' + (boss.level || 1) + ' · ' + (boss.hp || 0) + ' hp · hits ' + (boss.maxHit || 0);
+  }
+
+  async function runRaid(data) {
+    last = data;
+    hideLoot();
+    const token = rollToken;
+    const rooms = data.rooms || [];
+    const lineup = data.lineup && data.lineup.length ? data.lineup : rooms.map((room) => room.boss || {});
+    if (statusEl) statusEl.textContent = 'Tonight';
+    if (notesEl) {
+      notesEl.textContent = lineup.map((boss, i) => (i + 1) + '. ' + (boss.name || 'Boss') + ' · ' + (boss.tierName || '')).join('    ');
+    }
+    const shown = await showLineup(lineup, token);
+    if (!shown || token !== rollToken) return;
+    clearLoot();
+    for (let i = 0; i < rooms.length; i++) {
+      if (token !== rollToken) return;
+      const room = rooms[i];
+      const boss = room.boss || {};
+      if (notesEl) notesEl.textContent = bossLine(boss);
+      if (statusEl) statusEl.textContent = (i + 1) + ' / ' + lineup.length + ' · ' + (boss.name || 'Boss');
+      await playBout(room.bout);
+      if (token !== rollToken) return;
+      const more = i < rooms.length - 1;
+      const cleared = await showLoot(room, { wait: more, closing: !more });
+      if (!cleared || !more || token !== rollToken) return;
+      clearLoot();
+    }
   }
 
   function play(data) {
+    if (data && data.raid) {
+      runRaid(data);
+      return;
+    }
     last = data;
     hideLoot();
     const boss = data.boss;
     if (notesEl) {
       notesEl.textContent = boss
-        ? boss.name + ' · ' + (boss.tierName || 'Medium') + ' · party level ' + (boss.level || 1) + ' · ' + boss.hp + ' hp · hits ' + (boss.maxHit || 0)
+        ? boss.name + ' · ' + (boss.tierName || 'Medium') + ' · for ' + (boss.forLevel || boss.level || 1) + ' · party ' + (boss.level || 1) + ' · ' + boss.hp + ' hp · hits ' + (boss.maxHit || 0)
         : 'Step out of the orange.';
     }
     statusEl.textContent = boss ? boss.name : 'Raid';
@@ -279,6 +405,16 @@
       fightBtn.disabled = false;
     }
   }
+
+  function syncTier() {
+    if (!bossEl || !tierEl) return;
+    const tonight = bossEl.value === 'raid';
+    tierEl.disabled = tonight;
+    tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
+  }
+
+  if (bossEl) bossEl.addEventListener('change', syncTier);
+  syncTier();
 
   fightBtn.addEventListener('click', () => fight());
   replayBtn.addEventListener('click', () => {

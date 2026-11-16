@@ -1859,6 +1859,132 @@
 .actor.is-brutus.is-toss .boss-sprite { animation: bull-toss 0.52s ease-out; }
 .actor.is-brutus.is-dead .boss-sprite { animation: none; }
 
+.actor.is-mole .sprite-wrap {
+  width: 128px;
+  height: 86px;
+}
+
+.actor.is-mole .hud { width: 148px; }
+
+.actor.is-mole .hud-name { max-width: 140px; }
+
+.actor.is-mole .sprite-wrap.is-walk .boss-sprite {
+  animation: mole-waddle 0.26s ease-in-out infinite;
+}
+
+.actor.is-mole.is-wind-claw .sprite-wrap .boss-sprite { animation: mole-cock 0.28s ease-out forwards; }
+.actor.is-mole.is-wind-dirt .sprite-wrap .boss-sprite { animation: mole-scoop 0.34s ease-in-out infinite; }
+.actor.is-mole.is-wind-burrow .sprite-wrap .boss-sprite { animation: mole-sink 0.42s ease-in forwards; }
+
+.actor.is-mole.is-claw .sprite-wrap .boss-sprite { animation: mole-swipe 0.5s ease-out; }
+.actor.is-mole.is-dirt .sprite-wrap .boss-sprite { animation: mole-fling 0.46s ease-out; }
+.actor.is-mole.is-burrow .sprite-wrap .boss-sprite { animation: mole-pop 0.55s cubic-bezier(.15, .9, .2, 1); }
+.actor.is-mole.is-burrowed .sprite-wrap .boss-sprite { opacity: 0; animation: none; }
+.actor.is-mole.is-dead .boss-sprite { animation: none; }
+
+.actor.is-scurrius .sprite-wrap {
+  width: 176px;
+  height: 118px;
+}
+
+.actor.is-scurrius .hud { width: 160px; }
+
+.actor.is-scurrius .hud-name { max-width: 152px; }
+
+.actor.is-scurrius .sprite-wrap.is-walk .boss-sprite {
+  animation: scur-waddle 0.28s ease-in-out infinite;
+}
+
+.actor.is-scurrius.is-wind-bite .boss-sprite { animation: scur-rear 0.32s ease-out forwards; }
+.actor.is-scurrius.is-wind-rocks .boss-sprite { animation: scur-look 0.36s ease-in-out infinite; }
+.actor.is-scurrius.is-wind-barrage .boss-sprite { animation: scur-spit 0.28s ease-in-out infinite; }
+
+.actor.is-scurrius.is-bite .boss-sprite { animation: scur-lunge 0.5s ease-out; }
+.actor.is-scurrius.is-rocks .boss-sprite { animation: scur-hop 0.55s ease-out; }
+.actor.is-scurrius.is-barrage .boss-sprite { animation: scur-spit 0.64s ease-out; }
+.actor.is-scurrius.is-dead .boss-sprite { animation: none; }
+
+.actor.is-scurrius.is-bite .boss-shock {
+  width: 70px;
+  height: 20px;
+  margin-left: -35px;
+  border-radius: 50%;
+  border: 3px solid rgba(214, 176, 122, 0.9);
+  animation: bull-shock 0.48s ease-out;
+}
+
+.actor.is-rat .sprite-wrap {
+  width: 46px;
+  height: 32px;
+}
+
+.actor.is-rat .hud { width: 74px; }
+
+.actor.is-rat .hud-name { max-width: 70px; font-size: 10px; }
+
+.actor.is-rat .hud-cb { display: none; }
+
+.actor.is-rat.is-nip .boss-sprite { animation: rat-nip 0.28s ease-out; }
+
+@keyframes scur-waddle {
+  0%, 100% { transform: rotate(-3deg); }
+  50% { transform: rotate(3deg) translateY(-2px); }
+}
+
+@keyframes scur-rear {
+  0% { transform: translateY(0) rotate(0); }
+  100% { transform: translateY(-8px) rotate(-8deg); }
+}
+
+@keyframes scur-look {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px) rotate(5deg); }
+}
+
+@keyframes scur-spit {
+  0% { transform: translateX(0); }
+  40% { transform: translateX(10px) scale(1.04); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes scur-lunge {
+  0% { transform: translateX(0); }
+  35% { transform: translateX(16px) rotate(6deg); }
+  100% { transform: translateX(0); }
+}
+
+@keyframes scur-hop {
+  0%, 100% { transform: translateY(0); }
+  40% { transform: translateY(-12px); }
+}
+
+@keyframes rat-nip {
+  0% { transform: translateY(0) scale(1); }
+  40% { transform: translateY(-6px) scale(1.08); }
+  100% { transform: translateY(0) scale(1); }
+}
+
+.actor.is-mole.is-burrow .boss-shock,
+.actor.is-mole.is-claw .boss-shock {
+  width: 72px;
+  height: 22px;
+  margin-left: -36px;
+  border-radius: 50%;
+  border: 3px solid rgba(214, 176, 122, 0.9);
+  box-shadow: 0 0 12px rgba(120, 72, 32, 0.65);
+  animation: bull-shock 0.48s ease-out;
+}
+
+.actor.is-mole.is-dirt .boss-dust,
+.actor.is-mole.is-wind-burrow .boss-dust {
+  width: 40px;
+  height: 14px;
+  margin-left: -20px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(92, 58, 24, 0.8), rgba(92, 58, 24, 0) 72%);
+  animation: bull-dust 0.42s ease-out;
+}
+
 .actor.is-brutus.is-stomp .boss-shock {
   width: 86px;
   height: 26px;
@@ -1941,6 +2067,46 @@
   100% { opacity: 0; transform: translateX(18px) scale(1.8); }
 }
 
+@keyframes mole-waddle {
+  0%, 100% { transform: translateX(-50%) translateY(0) rotate(-3deg); }
+  50% { transform: translateX(-50%) translateY(3px) rotate(4deg); }
+}
+
+@keyframes mole-cock {
+  0% { transform: translateX(-50%) rotate(0deg); }
+  100% { transform: translateX(-50%) translateY(-4px) rotate(-12deg) scale(1.06, 0.94); }
+}
+
+@keyframes mole-scoop {
+  0%, 100% { transform: translateX(-50%) rotate(0deg); }
+  50% { transform: translateX(-50%) translateY(5px) rotate(8deg) scale(1.04, 0.9); }
+}
+
+@keyframes mole-sink {
+  0% { transform: translateX(-50%) translateY(0) scale(1, 1); opacity: 1; }
+  55% { transform: translateX(-50%) translateY(10px) scale(1.08, 0.55); opacity: 1; }
+  100% { transform: translateX(-50%) translateY(18px) scale(0.7, 0.08); opacity: 0; }
+}
+
+@keyframes mole-swipe {
+  0% { transform: translateX(-50%) translateY(-4px) rotate(-12deg) scale(1.06, 0.94); }
+  35% { transform: translateX(calc(-50% - 16px)) rotate(14deg) scale(1.08, 0.92); }
+  100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+@keyframes mole-fling {
+  0% { transform: translateX(-50%) translateY(5px) rotate(8deg); }
+  40% { transform: translateX(-50%) translateY(-10px) rotate(-16deg) scale(1.04, 1.08); }
+  100% { transform: translateX(-50%) rotate(0deg) scale(1); }
+}
+
+@keyframes mole-pop {
+  0% { transform: translateX(-50%) translateY(16px) scale(0.6, 0.15); opacity: 0; }
+  28% { transform: translateX(-50%) translateY(-12px) scale(1.12, 1.16); opacity: 1; }
+  52% { transform: translateX(-50%) translateY(6px) scale(1.16, 0.82); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); opacity: 1; }
+}
+
 @keyframes spoop-hurt {
   0% { filter: sepia(1) saturate(9) hue-rotate(-35deg) brightness(1.45); }
   40% { filter: sepia(1) saturate(7) hue-rotate(-18deg) brightness(1.15); }
@@ -1988,6 +2154,13 @@
 .raid-hazards line.is-hit { stroke: rgba(255, 244, 214, 0.92); }
 
 .raid-hazards .is-warn { animation: hazard-pulse 0.4s ease-in-out infinite; }
+
+.raid-hazards circle.tone-rock { fill: rgba(120, 113, 108, 0.34); stroke: #d6d3d1; }
+.raid-hazards circle.tone-spine { fill: rgba(214, 190, 140, 0.34); stroke: #f5e6c8; }
+.raid-hazards circle.tone-bolt { fill: rgba(22, 163, 74, 0.32); stroke: #86efac; }
+.raid-hazards circle.tone-blast { fill: rgba(37, 99, 235, 0.32); stroke: #93c5fd; }
+.raid-hazards circle.is-hot { fill: rgba(248, 113, 113, 0.55); stroke: #fee2e2; }
+.raid-hazards circle.is-hit { fill: rgba(255, 247, 237, 0.7); stroke: #fff; }
 
 .raid-hazards .hazard-label {
   fill: #fff7ed;
@@ -2252,6 +2425,57 @@
 .raid-share.is-down { opacity: 0.42; }
 
 .raid-share.is-down span { color: #a89880; }
+
+.raid-share.is-top { border-color: #f87171; box-shadow: 0 0 0 1px rgba(248, 113, 113, 0.45); }
+
+.raid-dmg {
+  color: #fca5a5;
+  font-size: 12px;
+  font-style: normal;
+}
+
+.raid-lineup {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.raid-room {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 148px;
+  padding: 10px 8px 12px;
+  border: 1px solid #3f2e1c;
+  border-radius: 12px;
+  background: #1c140c;
+}
+
+.raid-room img {
+  width: 112px;
+  height: 78px;
+  object-fit: contain;
+}
+
+.raid-room-num {
+  margin: 0;
+  color: #ffe58a;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+}
+
+.raid-room strong { color: #fff6c8; font-size: 15px; text-align: center; }
+
+.raid-room span { color: #d6c4a8; font-size: 13px; }
+
+.raid-next {
+  margin: 12px 0 0;
+  color: #ffe58a;
+  font-size: 16px;
+  text-align: center;
+}
 
 .raid-share.is-taker {
   border-color: #ffe58a;

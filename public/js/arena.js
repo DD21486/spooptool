@@ -640,6 +640,7 @@
 
   function sampleTrack(pts, t) {
     if (!pts.length) return { x: 50, y: 36, moving: false, target: null };
+    if (t + 0.001 < pts[0][0]) return { hidden: true, x: pts[0][1], y: pts[0][2], moving: false, target: null };
     if (t <= pts[0][0]) return { x: pts[0][1], y: pts[0][2], moving: false, target: aimOf(pts[0]) };
     const last = pts[pts.length - 1];
     if (t >= last[0]) return { x: last[1], y: last[2], moving: false, target: aimOf(last) };
@@ -652,6 +653,9 @@
     }
     const a = pts[lo];
     const b = pts[hi];
+    if (b[4] === 'up') {
+      return { x: a[1], y: a[2], moving: false, buried: true, target: aimOf(a) };
+    }
     const span = b[0] - a[0] || 1;
     const u = (t - a[0]) / span;
     return {
@@ -821,7 +825,8 @@
   }
 
   function renderRoster(fight) {
-    rosterEl.innerHTML = fight.fighters.map((f) => {
+    const shown = (fight.fighters || []).filter((f) => f.monster !== 'rat');
+    rosterEl.innerHTML = shown.map((f) => {
       const pray = f.prayer
         ? '<div class="tile-pray" title="' + escapeHtml(f.prayer.name) + '"><span></span></div>'
         : '';
@@ -834,7 +839,7 @@
         pray +
       '</li>';
     }).join('');
-    fight.fighters.forEach((f) => {
+    shown.forEach((f) => {
       const canvas = rosterEl.querySelector('[data-id="' + f.id + '"] canvas');
       if (!canvas) return;
       if (window.SpoopArt) window.SpoopArt.drawSpoop(canvas, { name: f.name, equipped: f.equipped }, { clear: true });
@@ -861,6 +866,9 @@
             '<div class="pray-track"><span></span></div>' +
           '</div>'
         : '';
+      const rank = f.monster === 'rat'
+        ? ''
+        : (f.monster ? escapeHtml(f.tierName || 'Boss') : 'Cb ' + f.combat);
       const sprite = f.monster === 'dragon'
         ? '<div class="sprite-wrap"><img class="dragon-sprite" alt="" src="/assets/dragon/idle.png"></div>'
         : f.monster
@@ -875,7 +883,7 @@
         '<div class="hud">' +
           pray +
           '<div class="hud-name">' + escapeHtml(f.name) + '</div>' +
-          '<div class="hud-cb">' + (f.monster ? escapeHtml(f.tierName || 'Boss') : 'Cb ' + f.combat) + '</div>' +
+          '<div class="hud-cb">' + rank + '</div>' +
           '<div class="hp-track"><span></span></div>' +
         '</div>' +
         sprite +
@@ -918,6 +926,7 @@
       };
       actors.set(f.id, view);
       const start = sampleTrack(view.pts, 0);
+      if (start.hidden) el.classList.add('is-hidden');
       view.x = start.x;
       view.y = start.y;
       view.target = start.target || firstAim(view.pts);
@@ -1123,15 +1132,33 @@
     view.attackGen = gen;
     if (view.attackRaf) cancelAnimationFrame(view.attackRaf);
     if (view.monster && view.monster !== 'dragon') {
-      const cls = style === 'charge' ? 'is-charge' : style === 'toss' ? 'is-toss' : 'is-stomp';
-      view.el.classList.remove('is-stomp', 'is-charge', 'is-toss', 'is-wind-stomp', 'is-wind-charge', 'is-wind-toss');
+      if (view.monster === 'rat') {
+        view.el.classList.remove('is-nip');
+        void view.el.offsetWidth;
+        view.el.classList.add('is-nip');
+        window.setTimeout(() => {
+          if (view.el) view.el.classList.remove('is-nip');
+        }, 280);
+        return;
+      }
+      const poses = {
+        charge: 'is-charge', toss: 'is-toss', claw: 'is-claw', dirt: 'is-dirt', burrow: 'is-burrow',
+        bite: 'is-bite', rocks: 'is-rocks', barrage: 'is-barrage',
+      };
+      const cls = poses[style] || 'is-stomp';
+      view.el.classList.remove(
+        'is-stomp', 'is-charge', 'is-toss', 'is-claw', 'is-dirt', 'is-burrow', 'is-bite', 'is-rocks', 'is-barrage',
+        'is-wind-stomp', 'is-wind-charge', 'is-wind-toss', 'is-wind-claw', 'is-wind-dirt', 'is-wind-burrow',
+        'is-wind-bite', 'is-wind-rocks', 'is-wind-barrage'
+      );
       void view.el.offsetWidth;
       view.el.classList.add(cls);
-      const hold = style === 'charge' ? 620 : style === 'toss' ? 520 : 680;
-      if (style === 'toss' && victim) {
+      const hold = style === 'charge' ? 620 : style === 'barrage' || style === 'rocks' ? 640 : style === 'toss' || style === 'dirt' ? 520 : style === 'claw' || style === 'bite' ? 500 : 680;
+      if ((style === 'toss' || style === 'dirt' || style === 'barrage') && victim) {
+        const tint = style === 'dirt' ? '#a16207' : style === 'barrage' ? '#93c5fd' : '#f3e2a4';
         window.setTimeout(() => {
           if (!view.el.isConnected || !bout) return;
-          shot(view, victim, 'magic', '#f3e2a4', true);
+          shot(view, victim, 'magic', tint, true);
         }, 90);
       }
       window.setTimeout(() => {
@@ -1302,18 +1329,19 @@
       if (hz.kind === 'lane') {
         markup += '<line class="' + cls + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
       } else {
-        markup += '<circle class="' + cls + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
+        const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
+        markup += '<circle class="' + cls + tone + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
       }
       const lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
       const ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
       markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
     }
     svg.innerHTML = markup;
-    const fighter = (bout.fighters || []).find((f) => f.monster && f.monster !== 'dragon');
+    const fighter = (bout.fighters || []).find((f) => f.monster && f.monster !== 'dragon' && f.monster !== 'rat');
     const view = fighter ? actors.get(fighter.id) : null;
     if (!view || !view.el) return;
     const active = list.find((hz) => t >= hz.t0 && t < hz.t1);
-    ['stomp', 'toss', 'charge'].forEach((id) => {
+    ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage'].forEach((id) => {
       const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
       view.el.classList.toggle('is-wind-' + id, winding);
     });
@@ -1393,13 +1421,16 @@
       const view = actors.get(f.id);
       if (!view || view.dead) continue;
       const pos = sampleTrack(view.pts, t);
+      view.el.classList.toggle('is-hidden', !!pos.hidden);
+      if (pos.hidden) continue;
       const prevX = view.x;
       view.x = pos.x;
       view.y = pos.y;
       view.target = pos.target;
       place(view.el, pos.x, pos.y, bout.width, bout.height);
       view.wrap.classList.toggle('is-left', facingLeft(view, pos, prevX));
-      view.wrap.classList.toggle('is-walk', !!pos.moving);
+      view.wrap.classList.toggle('is-walk', !!pos.moving && !pos.buried);
+      view.el.classList.toggle('is-burrowed', !!pos.buried);
       setPrayer(view, t);
       setSpeed(view, t);
     }
