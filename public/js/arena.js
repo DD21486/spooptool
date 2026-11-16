@@ -726,10 +726,50 @@
     view.hp = hp;
     view.bar.style.width = Math.max(0, pct * 100) + '%';
     view.bar.style.background = hpColor(pct);
+    setBossBar(fighter, hp);
     if (view.cardBar) {
       view.cardBar.style.width = Math.max(0, pct * 100) + '%';
       view.cardBar.style.background = hpColor(pct);
     }
+  }
+
+  function bossBarEl() {
+    let el = document.getElementById('boss-bar');
+    if (el || !pit) return el;
+    el = document.createElement('div');
+    el.id = 'boss-bar';
+    el.className = 'boss-bar';
+    el.hidden = true;
+    el.innerHTML = '<div class="boss-bar-line"><strong class="boss-bar-name"></strong><span class="boss-bar-lvl"></span></div>' +
+      '<div class="boss-bar-track" aria-hidden="true"><span></span></div>';
+    pit.appendChild(el);
+    return el;
+  }
+
+  function paintBossBar(fight) {
+    const el = bossBarEl();
+    if (!el) return;
+    const boss = fight && fight.formation === 'raid'
+      ? (fight.fighters || []).find((f) => f.monster && f.monster !== 'rat')
+      : null;
+    if (!boss) {
+      el.hidden = true;
+      return;
+    }
+    el.hidden = false;
+    el.querySelector('.boss-bar-name').textContent = boss.name || 'Boss';
+    el.querySelector('.boss-bar-lvl').textContent = boss.combat ? 'Level ' + boss.combat : '';
+    setBossBar(boss, boss.maxHp);
+  }
+
+  function setBossBar(fighter, hp) {
+    if (!bout || bout.formation !== 'raid' || !fighter || !fighter.monster || fighter.monster === 'rat') return;
+    const el = document.getElementById('boss-bar');
+    if (!el) return;
+    const pct = fighter.maxHp ? Math.max(0, hp) / fighter.maxHp : 0;
+    const span = el.querySelector('.boss-bar-track > span');
+    if (!span) return;
+    span.style.width = (pct * 100) + '%';
   }
 
   function paintPot(purse) {
@@ -1562,6 +1602,7 @@
     paintRaidScene(fight);
     renderRoster(fight);
     mountActors(fight);
+    paintBossBar(fight);
     const call = pit && pit.querySelector('.fight-call');
     if (call) {
       call.classList.remove('is-on');

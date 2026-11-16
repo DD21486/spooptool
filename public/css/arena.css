@@ -420,6 +420,68 @@
   background-image: url('/assets/bosses/scurrius-sewer.jpg');
 }
 
+.boss-bar {
+  position: absolute;
+  z-index: 12;
+  top: 10px;
+  left: 12px;
+  right: 78px;
+  width: auto;
+  max-width: 640px;
+  margin-inline: auto;
+  pointer-events: none;
+}
+
+.boss-bar[hidden] { display: none; }
+
+.boss-bar-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 2px 3px;
+  color: #fff6c8;
+  font-size: 13px;
+  line-height: 1.1;
+  text-shadow: 0 1px 2px #000, 0 0 6px rgba(0, 0, 0, 0.85);
+}
+
+.boss-bar-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+.boss-bar-lvl {
+  flex: 0 0 auto;
+  color: #ffe58a;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.boss-bar-track {
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  border: 1px solid rgba(255, 246, 200, 0.45);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+}
+
+.boss-bar-track span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(#fca5a5, #dc2626 55%, #991b1b);
+}
+
+@media (max-width: 640px) {
+  .boss-bar { top: 8px; }
+  .boss-bar-line { font-size: 12px; }
+  .boss-bar-track { height: 6px; }
+}
+
 .pit-zoom {
   position: absolute;
   z-index: 8;
