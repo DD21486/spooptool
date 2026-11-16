@@ -1316,6 +1316,70 @@
   function clearHazards() {
     const svg = document.getElementById('arena-hazards');
     if (svg) svg.innerHTML = '';
+    const falls = pit && pit.querySelector('.raid-falls');
+    if (falls) falls.innerHTML = '';
+  }
+
+  function paintRaidScene(fight) {
+    if (!pit) return;
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
+    if (!fight || fight.formation !== 'raid') return;
+    const boss = (fight.fighters || []).find((f) => f.monster && f.monster !== 'rat');
+    const scene = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && boss.monster];
+    if (scene) pit.classList.add(scene);
+  }
+
+  function fallLayer() {
+    const stage = pit && pit.querySelector('.pit-stage');
+    if (!stage) return null;
+    let layer = stage.querySelector('.raid-falls');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'raid-falls';
+      stage.appendChild(layer);
+    }
+    return layer;
+  }
+
+  function drawFalls(t) {
+    const layer = fallLayer();
+    if (!layer) return;
+    if (!bout || bout.formation !== 'raid') {
+      layer.innerHTML = '';
+      return;
+    }
+    const live = [];
+    (bout.hazards || []).forEach((hz, i) => {
+      if (hz.attack !== 'rocks') return;
+      if (t < hz.t0 || t > hz.t1 + 0.5) return;
+      live.push(i);
+      let el = layer.querySelector('[data-rock="' + i + '"]');
+      if (!el) {
+        el = document.createElement('img');
+        el.className = 'fall-rock';
+        el.alt = '';
+        el.src = '/assets/bosses/rock.svg';
+        el.dataset.rock = String(i);
+        layer.appendChild(el);
+      }
+      const span = Math.max(0.25, Number(hz.t1) - Number(hz.t0));
+      const u = Math.max(0, Math.min(1, (t - hz.t0) / span));
+      const drop = u * u;
+      const landX = (hz.x / bout.width) * 100;
+      const landY = (hz.y / bout.height) * 100;
+      const y = -14 + (landY + 14) * drop;
+      const size = Math.max(34, Number(hz.r) * 8);
+      const spin = ((i * 37) % 50) - 25;
+      el.style.left = landX + '%';
+      el.style.top = y + '%';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+      el.style.transform = 'translate(-50%, -78%) rotate(' + spin + 'deg)' + (t >= hz.t1 ? ' scale(1.06)' : '');
+      el.style.opacity = t > hz.t1 ? String(Math.max(0, 1 - (t - hz.t1) / 0.5)) : '1';
+    });
+    layer.querySelectorAll('.fall-rock').forEach((el) => {
+      if (live.indexOf(Number(el.dataset.rock)) < 0) el.remove();
+    });
   }
 
   function drawHazards(t) {
@@ -1328,15 +1392,20 @@
       const cls = t >= hz.t1 ? 'is-hit' : t >= hz.t1 - 0.16 ? 'is-hot' : 'is-warn';
       if (hz.kind === 'lane') {
         markup += '<line class="' + cls + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
+      } else if (hz.attack === 'rocks') {
+        markup += '<ellipse class="' + cls + ' tone-shadow" cx="' + hz.x + '" cy="' + hz.y + '" rx="' + hz.r + '" ry="' + (Number(hz.r) * 0.42).toFixed(2) + '"></ellipse>';
       } else {
         const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
         markup += '<circle class="' + cls + tone + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
       }
-      const lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
-      const ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
-      markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
+      if (hz.attack !== 'rocks') {
+        const lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
+        const ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
+        markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
+      }
     }
     svg.innerHTML = markup;
+    drawFalls(t);
     const fighter = (bout.fighters || []).find((f) => f.monster && f.monster !== 'dragon' && f.monster !== 'rat');
     const view = fighter ? actors.get(fighter.id) : null;
     if (!view || !view.el) return;
@@ -1479,6 +1548,7 @@
     shownDeath = 0;
     clearFeed();
     clearHazards();
+    paintRaidScene(fight);
     renderRoster(fight);
     mountActors(fight);
     const call = pit && pit.querySelector('.fight-call');

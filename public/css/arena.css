@@ -369,6 +369,79 @@
     radial-gradient(ellipse at 50% 46%, #e4c98a 0%, #c4a15a 42%, #8d6733 78%, #5c4122 100%);
 }
 
+.pit.is-lair,
+.pit.is-pasture,
+.pit.is-sewer {
+  border-top-color: transparent;
+}
+
+.pit.is-lair .colosseum,
+.pit.is-pasture .colosseum,
+.pit.is-sewer .colosseum,
+.pit.is-lair .pit-post,
+.pit.is-pasture .pit-post,
+.pit.is-sewer .pit-post { display: none; }
+
+.pit.is-lair {
+  background: #140e0a;
+  box-shadow: inset 0 0 0 6px #3a2416, inset 0 0 90px rgba(0, 0, 0, 0.55);
+}
+
+.pit.is-lair .pit-stage {
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(176, 206, 122, 0.75) 0%, rgba(176, 206, 122, 0) 18%),
+    radial-gradient(ellipse at 50% 58%, #6d4a30 0%, #3a2418 42%, #160e0a 74%, #070504 100%);
+}
+
+.pit.is-lair .pit-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 22% 72%, rgba(0, 0, 0, 0.32), transparent 18%),
+    radial-gradient(ellipse at 76% 34%, rgba(0, 0, 0, 0.26), transparent 16%),
+    linear-gradient(118deg, transparent 40%, rgba(70, 38, 18, 0.7) 40.6%, transparent 41.4%),
+    linear-gradient(64deg, transparent 68%, rgba(54, 30, 14, 0.65) 68.5%, transparent 69.4%);
+}
+
+.pit.is-pasture {
+  background: #245018;
+  box-shadow: inset 0 0 0 6px #6b4424, inset 0 0 40px rgba(20, 40, 8, 0.28);
+}
+
+.pit.is-pasture .pit-stage {
+  background-color: #3d742c;
+  background-image:
+    linear-gradient(#8ec8ef, #d7eef8),
+    repeating-linear-gradient(90deg, #5c3b22 0 7px, transparent 7px 78px),
+    linear-gradient(#6b4423, #d8c098),
+    radial-gradient(ellipse at 50% 64%, #d2b56a 0 20%, #8fb84a 42%, #3f7a2c 100%);
+  background-size: 100% 13%, 100% 20px, 100% 6px, 100% 100%;
+  background-position: top, left 11.5%, left 12.6%, center;
+  background-repeat: no-repeat;
+}
+
+.pit.is-sewer {
+  background: #141618;
+  box-shadow: inset 0 0 0 6px #3e444c, inset 0 0 80px rgba(0, 0, 0, 0.55);
+}
+
+.pit.is-sewer .pit-stage {
+  background-color: #6a645c;
+  background-image:
+    radial-gradient(circle at 16% 16%, rgba(255, 168, 64, 0.55), transparent 8%),
+    radial-gradient(circle at 84% 20%, rgba(255, 150, 48, 0.4), transparent 7%),
+    repeating-linear-gradient(90deg, #5a534c 0 26px, #3a342e 26px 29px, #4a443c 29px 52px, #2e2a26 52px 55px),
+    linear-gradient(180deg, rgba(120, 160, 90, 0.35), #1a3a2c 40%, #10261c),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.04) 0 1px, transparent 1px 52px),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 44px);
+  background-size: 160px 160px, 140px 140px, 100% 18%, 100% 16%, 100% 100%, 100% 100%;
+  background-position: 16% 8%, 84% 10%, top, bottom, center, center;
+  background-repeat: no-repeat, no-repeat, no-repeat, no-repeat, repeat, repeat;
+}
+
 .pit-zoom {
   position: absolute;
   z-index: 8;
@@ -1914,13 +1987,15 @@
 }
 
 .actor.is-rat .sprite-wrap {
-  width: 46px;
-  height: 32px;
+  width: 104px;
+  height: 92px;
 }
 
-.actor.is-rat .hud { width: 74px; }
+.actor.is-rat .boss-sprite { image-rendering: auto; }
 
-.actor.is-rat .hud-name { max-width: 70px; font-size: 10px; }
+.actor.is-rat .hud { width: 92px; }
+
+.actor.is-rat .hud-name { max-width: 88px; font-size: 10px; }
 
 .actor.is-rat .hud-cb { display: none; }
 
@@ -1959,9 +2034,9 @@
 }
 
 @keyframes rat-nip {
-  0% { transform: translateY(0) scale(1); }
-  40% { transform: translateY(-6px) scale(1.08); }
-  100% { transform: translateY(0) scale(1); }
+  0% { transform: translateX(-50%) translateY(0) scale(1); }
+  40% { transform: translateX(-50%) translateY(-6px) scale(1.08); }
+  100% { transform: translateX(-50%) translateY(0) scale(1); }
 }
 
 .actor.is-mole.is-burrow .boss-shock,
@@ -2155,7 +2230,25 @@
 
 .raid-hazards .is-warn { animation: hazard-pulse 0.4s ease-in-out infinite; }
 
-.raid-hazards circle.tone-rock { fill: rgba(120, 113, 108, 0.34); stroke: #d6d3d1; }
+.raid-hazards ellipse.tone-shadow {
+  fill: rgba(0, 0, 0, 0.38);
+  stroke: rgba(20, 16, 12, 0.55);
+  stroke-width: 0.35;
+}
+
+.raid-falls {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.fall-rock {
+  position: absolute;
+  object-fit: contain;
+  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.28));
+}
 .raid-hazards circle.tone-spine { fill: rgba(214, 190, 140, 0.34); stroke: #f5e6c8; }
 .raid-hazards circle.tone-bolt { fill: rgba(22, 163, 74, 0.32); stroke: #86efac; }
 .raid-hazards circle.tone-blast { fill: rgba(37, 99, 235, 0.32); stroke: #93c5fd; }

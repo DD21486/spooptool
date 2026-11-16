@@ -332,6 +332,7 @@
     if (notesEl) {
       notesEl.textContent = lineup.map((boss, i) => (i + 1) + '. ' + (boss.name || 'Boss') + ' · ' + (boss.tierName || '')).join('    ');
     }
+    paintScene(lineup[0]);
     const shown = await showLineup(lineup, token);
     if (!shown || token !== rollToken) return;
     clearLoot();
@@ -341,6 +342,7 @@
       const boss = room.boss || {};
       if (notesEl) notesEl.textContent = bossLine(boss);
       if (statusEl) statusEl.textContent = (i + 1) + ' / ' + lineup.length + ' · ' + (boss.name || 'Boss');
+      paintScene(boss);
       await playBout(room.bout);
       if (token !== rollToken) return;
       const more = i < rooms.length - 1;
@@ -350,11 +352,20 @@
     }
   }
 
+  function paintScene(boss) {
+    const pit = document.getElementById('arena-pit');
+    if (!pit) return;
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
+    const scene = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && (boss.id || boss.monster)];
+    if (scene) pit.classList.add(scene);
+  }
+
   function play(data) {
     if (data && data.raid) {
       runRaid(data);
       return;
     }
+    paintScene(data && data.boss);
     last = data;
     hideLoot();
     const boss = data.boss;
