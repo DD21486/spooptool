@@ -103,7 +103,7 @@ async function handlePost(req) {
     const state = await load();
     const seed = String(body.seed || '').trim().slice(0, 80) || String(Date.now());
     const names = Array.isArray(body.names) ? body.names.slice(0, 16) : [];
-    const result = testRaid(state, names, seed, body.boss);
+    const result = testRaid(state, names, seed, body.boss, body.tier);
     if (result.error) return { status: 400, payload: { error: result.error } };
     return { status: 200, payload: result };
   }

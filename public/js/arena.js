@@ -864,7 +864,7 @@
       const sprite = f.monster === 'dragon'
         ? '<div class="sprite-wrap"><img class="dragon-sprite" alt="" src="/assets/dragon/idle.png"></div>'
         : f.monster
-          ? '<div class="sprite-wrap"><img class="boss-sprite" alt="" src="' + escapeHtml(f.sprite || '/assets/bosses/Brutus.png') + '"></div>'
+          ? '<div class="sprite-wrap"><img class="boss-sprite" alt="" src="' + escapeHtml(f.sprite || '/assets/bosses/Brutus.png') + '"><span class="boss-shock"></span><span class="boss-dust"></span></div>'
           : '<div class="sprite-wrap"><div class="sprite-motion">' +
           '<canvas class="body-layer" width="28" height="24"></canvas>' +
           '<canvas class="weapon-glow" width="28" height="24"></canvas>' +
@@ -875,7 +875,7 @@
         '<div class="hud">' +
           pray +
           '<div class="hud-name">' + escapeHtml(f.name) + '</div>' +
-          '<div class="hud-cb">' + (f.monster ? 'Boss' : 'Cb ' + f.combat) + '</div>' +
+          '<div class="hud-cb">' + (f.monster ? escapeHtml(f.tierName || 'Boss') : 'Cb ' + f.combat) + '</div>' +
           '<div class="hp-track"><span></span></div>' +
         '</div>' +
         sprite +
@@ -1124,12 +1124,19 @@
     if (view.attackRaf) cancelAnimationFrame(view.attackRaf);
     if (view.monster && view.monster !== 'dragon') {
       const cls = style === 'charge' ? 'is-charge' : style === 'toss' ? 'is-toss' : 'is-stomp';
-      view.el.classList.remove('is-stomp', 'is-charge', 'is-toss');
+      view.el.classList.remove('is-stomp', 'is-charge', 'is-toss', 'is-wind-stomp', 'is-wind-charge', 'is-wind-toss');
       void view.el.offsetWidth;
       view.el.classList.add(cls);
+      const hold = style === 'charge' ? 620 : style === 'toss' ? 520 : 680;
+      if (style === 'toss' && victim) {
+        window.setTimeout(() => {
+          if (!view.el.isConnected || !bout) return;
+          shot(view, victim, 'magic', '#f3e2a4', true);
+        }, 90);
+      }
       window.setTimeout(() => {
         if (view.el) view.el.classList.remove(cls);
-      }, 460);
+      }, hold);
       return;
     }
     if (view.monster === 'dragon') {
@@ -1204,6 +1211,7 @@
     } else {
       floater(to.x, to.y, hit.amount, false, bias);
       playHitSound(hit.hp <= 0 && !victim.monster);
+      if (!victim.monster) flashHurt(to);
     }
     if (hit.style === 'ranged') playBowSound();
     if (hit.attack === 'fire') {
@@ -1301,6 +1309,27 @@
       markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
     }
     svg.innerHTML = markup;
+    const fighter = (bout.fighters || []).find((f) => f.monster && f.monster !== 'dragon');
+    const view = fighter ? actors.get(fighter.id) : null;
+    if (!view || !view.el) return;
+    const active = list.find((hz) => t >= hz.t0 && t < hz.t1);
+    ['stomp', 'toss', 'charge'].forEach((id) => {
+      const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
+      view.el.classList.toggle('is-wind-' + id, winding);
+    });
+  }
+
+  function flashHurt(view) {
+    if (!view || view.dead) return;
+    const nodes = [view.el, view.card].filter(Boolean);
+    nodes.forEach((el) => {
+      el.classList.remove('is-hurt');
+      void el.offsetWidth;
+      el.classList.add('is-hurt');
+    });
+    window.setTimeout(() => {
+      nodes.forEach((el) => el.classList.remove('is-hurt'));
+    }, 320);
   }
 
   function finish() {

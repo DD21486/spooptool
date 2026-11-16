@@ -3,19 +3,15 @@
   const seedEl = document.getElementById('pit-seed');
   const speedEl = document.getElementById('pit-speed');
   const bossEl = document.getElementById('raid-boss');
+  const tierEl = document.getElementById('raid-tier');
   const fightBtn = document.getElementById('pit-fight');
   const replayBtn = document.getElementById('pit-replay');
   const statusEl = document.getElementById('arena-status');
   const notesEl = document.getElementById('pit-notes');
   const lootEl = document.getElementById('raid-loot');
   const kickerEl = document.getElementById('raid-kicker');
-  const goldEl = document.getElementById('raid-gold');
-  const sharesEl = document.getElementById('raid-shares');
-  const tableLabel = document.getElementById('raid-table-label');
-  const tableEl = document.getElementById('raid-table');
-  const spooplyLabel = document.getElementById('raid-spooply-label');
-  const spooplyEl = document.getElementById('raid-spooply');
-  const takeEl = document.getElementById('raid-take');
+  const phaseEl = document.getElementById('raid-phase');
+  const stageEl = document.getElementById('raid-stage');
   const banner = document.getElementById('arena-banner');
   let last = null;
   let busy = false;
@@ -50,33 +46,127 @@
   function hideLoot() {
     rollToken += 1;
     if (lootEl) lootEl.hidden = true;
-    if (tableEl) tableEl.innerHTML = '';
-    if (spooplyEl) spooplyEl.innerHTML = '';
-    if (sharesEl) sharesEl.innerHTML = '';
-    if (takeEl) takeEl.textContent = '';
-    if (tableLabel) tableLabel.hidden = true;
-    if (spooplyLabel) spooplyLabel.hidden = true;
+    if (stageEl) stageEl.innerHTML = '';
+    if (phaseEl) phaseEl.textContent = '';
   }
 
-  function chip(label, extra) {
-    const el = document.createElement('div');
-    el.className = 'raid-chip' + (extra || '');
-    el.textContent = label;
-    return el;
+  function iconHtml(osrsId, size) {
+    if (!osrsId) return '';
+    const px = size || 36;
+    return '<img src="/api/spoops?icon=1&id=' + Number(osrsId) + '" alt="" width="' + px + '" height="' + px + '">';
   }
 
   async function spin(nodes, landIndex, token) {
     if (!nodes.length) return;
-    const laps = nodes.length * 2 + landIndex;
-    for (let i = 0; i <= laps; i++) {
+    const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const laps = Math.max(nodes.length * 2, 8) + landIndex;
+    const steps = reduce ? 1 : laps;
+    for (let i = 0; i <= steps; i++) {
       if (token !== rollToken) return;
-      const idx = i === laps ? landIndex : i % nodes.length;
+      const idx = i === steps ? landIndex : i % nodes.length;
       nodes.forEach((node, n) => node.classList.toggle('is-on', n === idx));
-      const u = i / Math.max(1, laps);
-      await wait(34 + u * u * 240);
+      if (i === steps) break;
+      const u = i / Math.max(1, steps);
+      await wait(reduce ? 0 : 36 + u * u * 220);
     }
     if (token !== rollToken) return;
     nodes[landIndex].classList.add('is-landed');
+  }
+
+  function playReel(drop, token) {
+    return new Promise((resolve) => {
+      const reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const reel = (drop && drop.reel) || [];
+      const cards = reel.map((item, i) => {
+        const rare = item && item.rare ? ' is-rare' : '';
+        return '<div class="roll-card' + rare + '" data-i="' + i + '">' +
+          iconHtml(item && item.osrsId, 42) +
+          '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
+      }).join('');
+      stageEl.innerHTML = '<div class="roll-window"><div class="roll-marker"></div><div class="roll-strip">' + cards + '</div></div>' +
+        '<p class="raid-land"></p>';
+      const strip = stageEl.querySelector('.roll-strip');
+      const land = stageEl.querySelector('.raid-land');
+      const win = stageEl.querySelector('.roll-card[data-i="' + drop.winIndex + '"]');
+      if (!strip) {
+        resolve();
+        return;
+      }
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        if (token !== rollToken) {
+          resolve();
+          return;
+        }
+        if (win) win.classList.add('is-win');
+        if (land) land.textContent = drop.name || '';
+        resolve();
+      };
+      const view = stageEl.querySelector('.roll-window');
+      const viewW = (view && view.clientWidth) || 640;
+      const cardW = (win && win.offsetWidth ? win.offsetWidth : 112) + 8;
+      const jitter = reduce ? 0 : (Math.random() * 24 - 12);
+      const maxShift = Math.max(0, strip.scrollWidth - viewW);
+      const rawTarget = (win ? win.offsetLeft : drop.winIndex * cardW) - viewW / 2 + (win ? win.offsetWidth : 112) / 2 + jitter;
+      const target = Math.max(0, Math.min(maxShift, rawTarget));
+      const travel = Math.min(maxShift, target + cardW * 11);
+      if (reduce || token !== rollToken) {
+        strip.style.transform = 'translateX(' + (-target) + 'px)';
+        finish();
+        return;
+      }
+      strip.style.transform = 'translateX(' + (-travel) + 'px)';
+      void strip.offsetWidth;
+      requestAnimationFrame(() => {
+        if (token !== rollToken) {
+          finish();
+          return;
+        }
+        strip.style.transition = 'transform 5.1s cubic-bezier(0.05, 0.65, 0.05, 1)';
+        strip.style.transform = 'translateX(' + (-target) + 'px)';
+      });
+      strip.addEventListener('transitionend', (ev) => {
+        if (ev.target === strip && ev.propertyName === 'transform') finish();
+      });
+      window.setTimeout(finish, 5600);
+    });
+  }
+
+  function renderSummary(loot, party) {
+    const goldById = new Map((loot.shares || []).map((row) => [row.id, row.gold]));
+    const takerId = loot.spooply && loot.spooply.id;
+    const drop = loot.drop;
+    const shares = party.map((row) => {
+      const share = goldById.get(row.id);
+      const taker = row.alive && row.id === takerId ? ' is-taker' : '';
+      if (!row.alive) {
+        return '<div class="raid-share is-down' + taker + '"><strong>' + escapeHtml(row.name) + '</strong><span>Down</span></div>';
+      }
+      const gold = share ? share.toLocaleString('en-US') + ' gp' : '0 gp';
+      return '<div class="raid-share' + taker + '"><strong>' + escapeHtml(row.name) + '</strong><span>' + gold + '</span></div>';
+    }).join('');
+    let prize = '';
+    if (!loot.wiped && drop) {
+      const who = (loot.spooply && loot.spooply.name) || 'Someone';
+      const rare = drop.rare ? ' is-rare' : '';
+      prize = '<div class="raid-prize' + rare + '">' +
+        iconHtml(drop.osrsId, 64) +
+        (drop.rare ? '<p class="raid-rare-tag">Rare</p>' : '') +
+        '<p class="raid-take">' + escapeHtml(who) + ' takes the ' + escapeHtml(drop.name) + '.</p>' +
+      '</div>';
+    }
+    const goldLine = loot.wiped
+      ? (party.some((row) => row.alive)
+        ? 'Time called. <span>No kill, so no loot.</span>'
+        : 'The party fell. <span>No one is left to loot.</span>')
+      : (loot.gold || 0).toLocaleString('en-US') + ' gold <span>split by the living</span>';
+    stageEl.innerHTML = '<div class="raid-summary">' +
+      '<p class="raid-gold">' + goldLine + '</p>' +
+      prize +
+      '<div class="raid-shares">' + shares + '</div>' +
+    '</div>';
   }
 
   async function showLoot(data) {
@@ -84,33 +174,14 @@
     const bout = data && data.bout;
     const loot = bout && bout.loot;
     const party = (bout && bout.party) || [];
-    if (!lootEl || !loot) return;
+    if (!lootEl || !loot || !stageEl) return;
     if (banner) banner.hidden = true;
     const bossName = (data.boss && data.boss.name) || bout.bossName || 'Boss';
     const alive = party.filter((row) => row.alive);
     const dead = party.filter((row) => !row.alive);
     kickerEl.textContent = bossName;
-    sharesEl.innerHTML = '';
-    tableEl.innerHTML = '';
-    spooplyEl.innerHTML = '';
-    takeEl.textContent = '';
-    tableLabel.hidden = true;
-    spooplyLabel.hidden = true;
-    const goldById = new Map((loot.shares || []).map((row) => [row.id, row.gold]));
-    party.forEach((row) => {
-      const share = goldById.get(row.id);
-      const text = row.alive
-        ? row.name + (share ? ' · ' + share.toLocaleString('en-US') + ' gp' : '')
-        : row.name + ' · down';
-      sharesEl.appendChild(chip(text, row.alive ? '' : ' is-down'));
-    });
-    if (loot.wiped) {
-      goldEl.innerHTML = alive.length
-        ? 'Time called. <span>No kill, so no loot.</span>'
-        : 'The party fell. <span>No one is left to loot.</span>';
-    } else {
-      goldEl.innerHTML = (loot.gold || 0).toLocaleString('en-US') + ' gold <span>split by the living</span>';
-    }
+    phaseEl.textContent = '';
+    stageEl.innerHTML = '';
     lootEl.hidden = false;
     const deadNote = dead.length
       ? ' ' + dead.map((row) => row.name).join(', ') + (dead.length === 1 ? ' stays down.' : ' stay down.')
@@ -121,41 +192,40 @@
         ? (alive.length ? bossName + ' wins.' : 'The party fell.')
         : bossName + ' is down.';
     }
-    if (loot.wiped || !loot.drop || !loot.table || !loot.table.length) return;
-    await wait(700);
-    if (token !== rollToken) return;
-    tableLabel.hidden = false;
-    const tableNodes = loot.table.map((row) => {
+    if (loot.wiped || !loot.drop || !loot.spooply) {
+      phaseEl.textContent = loot.wiped ? 'No loot' : bossName;
+      renderSummary(loot, party);
+      return;
+    }
+    const living = alive.length ? alive : [loot.spooply];
+    phaseEl.textContent = 'Who loots';
+    const row = document.createElement('div');
+    row.className = 'raid-who';
+    const spoopNodes = living.map((person) => {
       const el = document.createElement('div');
-      el.className = 'raid-chip' + (row.rare ? ' is-rare' : '');
-      if (row.osrsId) {
-        const img = document.createElement('img');
-        img.alt = '';
-        img.src = '/api/spoops?icon=1&id=' + row.osrsId;
-        el.appendChild(img);
-      }
-      el.appendChild(document.createTextNode(row.name));
-      tableEl.appendChild(el);
+      el.className = 'raid-chip';
+      el.textContent = person.name;
+      row.appendChild(el);
       return el;
     });
-    const land = Math.max(0, Math.min(loot.table.length - 1, loot.drop.index || 0));
-    await spin(tableNodes, land, token);
-    if (token !== rollToken) return;
-    await wait(420);
-    if (token !== rollToken) return;
-    spooplyLabel.hidden = false;
-    const living = alive.length ? alive : [{ id: loot.spooply && loot.spooply.id, name: loot.spooply && loot.spooply.name }];
-    const spoopNodes = living.map((row) => {
-      const el = chip(row.name);
-      spooplyEl.appendChild(el);
-      return el;
-    });
-    let who = living.findIndex((row) => loot.spooply && row.id === loot.spooply.id);
+    stageEl.appendChild(row);
+    let who = living.findIndex((person) => person.id === loot.spooply.id);
     if (who < 0) who = 0;
     await spin(spoopNodes, who, token);
     if (token !== rollToken) return;
-    const taker = (loot.spooply && loot.spooply.name) || 'Someone';
-    takeEl.textContent = taker + ' takes the ' + loot.drop.name + '.';
+    const chosen = document.createElement('p');
+    chosen.className = 'raid-chosen';
+    chosen.textContent = loot.spooply.name + ' is up.';
+    stageEl.appendChild(chosen);
+    await wait(2000);
+    if (token !== rollToken) return;
+    phaseEl.textContent = 'The drop';
+    await playReel(loot.drop, token);
+    if (token !== rollToken) return;
+    await wait(900);
+    if (token !== rollToken) return;
+    phaseEl.textContent = 'The split';
+    renderSummary(loot, party);
   }
 
   function play(data) {
@@ -163,7 +233,9 @@
     hideLoot();
     const boss = data.boss;
     if (notesEl) {
-      notesEl.textContent = (boss ? boss.name + ' · ' + boss.hp + ' hp. ' : '') + 'Step out of the orange.';
+      notesEl.textContent = boss
+        ? boss.name + ' · ' + (boss.tierName || 'Medium') + ' · party level ' + (boss.level || 1) + ' · ' + boss.hp + ' hp · hits ' + (boss.maxHit || 0)
+        : 'Step out of the orange.';
     }
     statusEl.textContent = boss ? boss.name : 'Raid';
     if (window.ArenaPit) {
@@ -193,6 +265,7 @@
           names,
           seed: seedEl.value.trim(),
           boss: bossEl ? bossEl.value : 'brutus',
+          tier: tierEl ? tierEl.value : 'medium',
         }),
       });
       const data = await res.json().catch(() => ({}));
