@@ -46,7 +46,7 @@
   function clearLoot() {
     if (lootEl) {
       lootEl.hidden = true;
-      lootEl.classList.remove('is-intro');
+      lootEl.classList.remove('is-intro', 'is-recap');
     }
     if (stageEl) stageEl.innerHTML = '';
     if (phaseEl) phaseEl.textContent = '';
@@ -198,9 +198,15 @@
     const loot = bout && bout.loot;
     const party = (bout && bout.party) || [];
     if (!lootEl || !loot || !stageEl) return false;
+    const alive = party.filter((row) => row.alive);
+    if (opt.closing && party.length && !alive.length && last && Array.isArray(last.rooms)) {
+      showRaidRecap(last);
+      if (statusEl) statusEl.textContent = 'The party fell.';
+      if (notesEl) notesEl.textContent = (last.name || 'The raid') + ' is over.';
+      return false;
+    }
     if (banner) banner.hidden = true;
     const bossName = (data.boss && data.boss.name) || bout.bossName || 'Boss';
-    const alive = party.filter((row) => row.alive);
     const dead = party.filter((row) => !row.alive);
     kickerEl.textContent = bossName;
     phaseEl.textContent = '';
@@ -251,6 +257,111 @@
     phaseEl.textContent = 'The split';
     renderSummary(loot, party, bout);
     return finishCard(opt, token, true);
+  }
+
+  function joinNames(list) {
+    const names = (list || []).filter(Boolean);
+    if (!names.length) return '';
+    if (names.length === 1) return names[0];
+    if (names.length === 2) return names[0] + ' and ' + names[1];
+    return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+  }
+
+  function raidTallies(raid) {
+    const people = new Map();
+    function person(id, name) {
+      let row = people.get(id);
+      if (!row) {
+        row = { id: id, name: name || 'Spoop', damage: 0, gold: 0, drops: [], fell: '' };
+        people.set(id, row);
+      } else if (name) row.name = name;
+      return row;
+    }
+    (raid.rooms || []).forEach((room) => {
+      const bout = room.bout || {};
+      const bossName = (room.boss && room.boss.name) || 'the room';
+      const monsters = new Set(((bout.fighters || []).filter((f) => f.monster).map((f) => f.id)));
+      const named = new Map((bout.party || []).map((row) => [row.id, row.name]));
+      (bout.hits || []).forEach((hit) => {
+        if (!hit || !(hit.amount > 0) || monsters.has(hit.from) || !named.has(hit.from)) return;
+        person(hit.from, named.get(hit.from)).damage += hit.amount;
+      });
+      const loot = bout.loot || {};
+      (loot.shares || []).forEach((share) => {
+        if (!share) return;
+        person(share.id, share.name).gold += Number(share.gold) || 0;
+      });
+      if (!loot.wiped && loot.drop && loot.drop.name && loot.spooply && loot.spooply.name) {
+        person(loot.spooply.id, loot.spooply.name).drops.push({
+          name: loot.drop.name,
+          osrsId: loot.drop.osrsId,
+          rare: !!loot.drop.rare,
+          from: bossName,
+        });
+      }
+      (bout.party || []).forEach((row) => {
+        const entry = person(row.id, row.name);
+        if (!row.alive) entry.fell = bossName;
+      });
+    });
+    return Array.from(people.values());
+  }
+
+  function showRaidRecap(raid) {
+    if (!lootEl || !stageEl) return;
+    const rows = raidTallies(raid);
+    const rooms = raid.rooms || [];
+    const lastRoom = rooms[rooms.length - 1];
+    const fellTo = (lastRoom && lastRoom.boss && lastRoom.boss.name) || 'the raid';
+    const killed = rooms
+      .filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name)
+      .map((room) => room.boss.name);
+    const topDamage = rows.reduce((best, row) => Math.max(best, row.damage), 0);
+    const topGold = rows.reduce((best, row) => Math.max(best, row.gold), 0);
+    const byDamage = rows.slice().sort((a, b) => b.damage - a.damage || a.name.localeCompare(b.name));
+    const byGold = rows.slice().sort((a, b) => b.gold - a.gold || a.name.localeCompare(b.name));
+    const drops = [];
+    rows.forEach((row) => {
+      row.drops.forEach((drop) => drops.push({ who: row.name, drop: drop }));
+    });
+    const damageHtml = byDamage.map((row) => {
+      const best = topDamage > 0 && row.damage === topDamage ? ' is-best' : '';
+      const tag = best ? '<em>Most</em>' : '';
+      const where = row.fell ? '<span class="meta">Fell to ' + escapeHtml(row.fell) + '</span>' : '';
+      return '<li class="raid-recap-row' + best + '"><span class="who">' + escapeHtml(row.name) + tag + '</span>' +
+        '<span class="num">' + row.damage.toLocaleString('en-US') + '</span>' + where + '</li>';
+    }).join('');
+    const goldHtml = byGold.map((row) => {
+      const best = topGold > 0 && row.gold === topGold ? ' is-best' : '';
+      const tag = best ? '<em>Most</em>' : '';
+      return '<li class="raid-recap-row' + best + '"><span class="who">' + escapeHtml(row.name) + tag + '</span>' +
+        '<span class="num">' + row.gold.toLocaleString('en-US') + ' gp</span></li>';
+    }).join('');
+    const dropHtml = drops.length
+      ? drops.map((row) => {
+        const rare = row.drop.rare ? ' is-rare' : '';
+        return '<li class="raid-recap-drop' + rare + '">' + iconHtml(row.drop.osrsId, 36) +
+          '<span><strong>' + escapeHtml(row.who) + '</strong>' +
+          '<span>' + escapeHtml(row.drop.name) + '</span>' +
+          '<em>from ' + escapeHtml(row.drop.from) + '</em></span></li>';
+      }).join('')
+      : '<li class="raid-recap-empty">Nobody took a drop.</li>';
+    const path = killed.length
+      ? 'Killed ' + joinNames(killed) + '.'
+      : 'No room was cleared.';
+    if (kickerEl) kickerEl.textContent = 'Raid over';
+    if (phaseEl) phaseEl.textContent = raid.name || 'The raid';
+    stageEl.innerHTML = '<p class="raid-recap-fell">The party fell to ' + escapeHtml(fellTo) + '.</p>' +
+      '<p class="raid-recap-path">' + escapeHtml(path) + '</p>' +
+      '<div class="raid-recap-cols">' +
+        '<section><h3>Damage</h3><ol class="raid-recap-list">' + damageHtml + '</ol></section>' +
+        '<section><h3>Gold</h3><ol class="raid-recap-list">' + goldHtml + '</ol></section>' +
+        '<section><h3>Drops</h3><ol class="raid-recap-list">' + dropHtml + '</ol></section>' +
+      '</div>';
+    lootEl.classList.remove('is-intro');
+    lootEl.classList.add('is-recap');
+    lootEl.hidden = false;
+    if (banner) banner.hidden = true;
   }
 
   function stamp(text) {

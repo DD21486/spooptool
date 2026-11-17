@@ -2372,6 +2372,142 @@
 
 .raid-loot[hidden] { display: none; }
 
+.raid-loot.is-recap {
+  align-items: stretch;
+  padding: 12px;
+  background: rgba(8, 6, 4, 0.84);
+  pointer-events: auto;
+}
+
+.raid-loot.is-recap .raid-card {
+  width: min(1080px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  margin: auto;
+  text-align: left;
+  border-color: #f0d878;
+  padding: 22px 22px 18px;
+}
+
+.raid-loot.is-recap .raid-kicker,
+.raid-loot.is-recap .raid-phase { text-align: center; }
+
+.raid-loot.is-recap .raid-phase {
+  font-size: 32px;
+  line-height: 1.1;
+}
+
+.raid-recap-fell {
+  margin: 10px 0 4px;
+  text-align: center;
+  color: #fca5a5;
+  font-size: 18px;
+}
+
+.raid-recap-path {
+  margin: 0 0 16px;
+  text-align: center;
+  color: #e7d7b1;
+  font-size: 14px;
+}
+
+.raid-recap-cols {
+  display: grid;
+  grid-template-columns: 1.15fr 0.9fr 1fr;
+  gap: 16px;
+}
+
+.raid-recap-cols h3 {
+  margin: 0 0 8px;
+  text-align: center;
+  color: #f0d878;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.raid-recap-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.raid-recap-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  align-items: baseline;
+  padding: 7px 8px;
+  border-bottom: 1px solid rgba(111, 78, 46, 0.4);
+}
+
+.raid-recap-row.is-best {
+  background: rgba(240, 216, 120, 0.1);
+  border-radius: 8px;
+  border-bottom-color: transparent;
+}
+
+.raid-recap-row .who { color: #fff6c8; font-weight: 600; }
+
+.raid-recap-row .who em {
+  margin-left: 8px;
+  color: #f0d878;
+  font-style: normal;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.raid-recap-row .num {
+  color: #ffe58a;
+  font-variant-numeric: tabular-nums;
+}
+
+.raid-recap-row .meta {
+  grid-column: 1 / -1;
+  color: #a89880;
+  font-size: 12px;
+}
+
+.raid-recap-drop {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  border-bottom: 1px solid rgba(111, 78, 46, 0.4);
+}
+
+.raid-recap-drop img {
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  flex: none;
+}
+
+.raid-recap-drop strong { display: block; color: #fff6c8; }
+
+.raid-recap-drop span span { color: #ffe58a; }
+
+.raid-recap-drop em {
+  display: block;
+  color: #a89880;
+  font-style: normal;
+  font-size: 12px;
+}
+
+.raid-recap-drop.is-rare strong { color: #f5d0fe; }
+
+.raid-recap-empty {
+  padding: 8px;
+  color: #a89880;
+  text-align: center;
+}
+
+@media (max-width: 800px) {
+  .raid-recap-cols { grid-template-columns: 1fr; }
+  .raid-loot.is-recap .raid-phase { font-size: 24px; }
+}
+
 .raid-card {
   width: min(760px, 100%);
   background: rgba(18, 12, 8, 0.96);
