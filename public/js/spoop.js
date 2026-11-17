@@ -1550,7 +1550,17 @@
       '</button>';
     }).join('');
 
+    const build = spoop.build === 'ranged' || spoop.build === 'magic' ? spoop.build : 'melee';
+    const buildLabel = build === 'ranged' ? 'ranged' : build === 'magic' ? 'magic' : 'melee';
+    const buildTabs = ['ranged', 'melee', 'magic'].map((id) => {
+      const label = id === 'ranged' ? 'Ranged' : id === 'magic' ? 'Magic' : 'Melee';
+      const on = id === build;
+      return '<button type="button" class="build-tab is-' + id + (on ? ' is-on' : '') + '" data-build="' + id + '" role="tab" aria-selected="' + on + '">' + label + '</button>';
+    }).join('');
+
     root.innerHTML =
+      '<div class="build-tabs" role="tablist" aria-label="Combat style">' + buildTabs + '</div>' +
+      '<p class="build-note">Wearing the best ' + buildLabel + ' kit in the bank. A new drop only goes on if it is better for ' + buildLabel + '.</p>' +
       '<a href="/spoops.html" class="text-xs text-sky-400 hover:text-sky-300">All spoops</a>' +
       '<div class="mt-3 flex flex-wrap items-end gap-4">' +
         '<canvas id="spoop-hero" class="spoop-sprite" width="16" height="24"></canvas>' +
@@ -1621,6 +1631,9 @@
       '</section>';
 
     drawSpoop(document.getElementById('spoop-hero'), spoop);
+    root.querySelectorAll('[data-build]').forEach((btn) => {
+      btn.addEventListener('click', () => chooseBuild(spoopKey(spoop), btn.getAttribute('data-build'), build));
+    });
     root.querySelectorAll('[data-crate]').forEach((btn) => {
       const crateId = btn.getAttribute('data-crate');
       btn.addEventListener('click', () => buyCrate(spoopKey(spoop), crateId, spoop.gold));
@@ -1647,6 +1660,25 @@
   }
 
   let selling = false;
+  let settingBuild = false;
+
+  async function chooseBuild(name, style, current) {
+    if (settingBuild || !style || style === current) return;
+    settingBuild = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'build', name, style }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      settingBuild = false;
+    }
+  }
+
 
   function askConfirm(opts) {
     return new Promise((resolve) => {

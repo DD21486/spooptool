@@ -664,3 +664,45 @@ body[data-page="list"] #spoop-root {
   color: #6d7888;
   font-size: 13px;
 }
+
+.build-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.build-tab {
+  flex: 1;
+  max-width: 180px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.build-tab.is-on.is-melee {
+  border-color: #f0d878;
+  color: #fde68a;
+  background: #2a2112;
+}
+
+.build-tab.is-on.is-ranged {
+  border-color: #86efac;
+  color: #86efac;
+  background: #102418;
+}
+
+.build-tab.is-on.is-magic {
+  border-color: #93c5fd;
+  color: #93c5fd;
+  background: #101828;
+}
+
+.build-note {
+  margin: 0 0 14px;
+  color: #8b97a8;
+  font-size: 12px;
+}
