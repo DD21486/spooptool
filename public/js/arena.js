@@ -115,6 +115,28 @@
     introVoices.push(voice);
   }
   let introVoice = 0;
+  const chargeVoices = [];
+  for (let i = 0; i < 2; i++) {
+    const voice = new Audio('/audio/brutus-charge.ogg');
+    voice.preload = 'auto';
+    chargeVoices.push(voice);
+  }
+  let chargeVoice = 0;
+  const magicVoices = [];
+  for (let i = 0; i < 4; i++) {
+    const voice = new Audio('/audio/magic-atk.ogg');
+    voice.preload = 'auto';
+    magicVoices.push(voice);
+  }
+  let magicVoice = 0;
+  const moleVoices = [];
+  for (let i = 0; i < 2; i++) {
+    const voice = new Audio('/audio/mole-atk.ogg');
+    voice.preload = 'auto';
+    moleVoices.push(voice);
+  }
+  let moleVoice = 0;
+  let soundT = 0;
   let musicMode = 'off';
   let soundOn = true;
   try { soundOn = localStorage.getItem(SOUND_KEY) !== 'off'; } catch (err) { /* private mode */ }
@@ -126,6 +148,9 @@
     missVoices.forEach(function (audio) { audio.muted = !soundOn; });
     bowVoices.forEach(function (audio) { audio.muted = !soundOn; });
     introVoices.forEach(function (audio) { audio.muted = !soundOn; });
+    chargeVoices.forEach(function (audio) { audio.muted = !soundOn; });
+    magicVoices.forEach(function (audio) { audio.muted = !soundOn; });
+    moleVoices.forEach(function (audio) { audio.muted = !soundOn; });
   }
 
   function stopFightMusic() {
@@ -245,6 +270,31 @@
     if (pending) pending.catch(function () {});
   }
 
+  function playPooled(list, cursor, volume) {
+    if (!soundOn) return cursor;
+    const audio = list[cursor];
+    cursor = (cursor + 1) % list.length;
+    audio.pause();
+    audio.currentTime = 0;
+    audio.playbackRate = 1;
+    audio.volume = volume;
+    const pending = audio.play();
+    if (pending) pending.catch(function () {});
+    return cursor;
+  }
+
+  function playChargeSound() {
+    chargeVoice = playPooled(chargeVoices, chargeVoice, 0.9);
+  }
+
+  function playMagicSound() {
+    magicVoice = playPooled(magicVoices, magicVoice, 0.62);
+  }
+
+  function playMoleSound() {
+    moleVoice = playPooled(moleVoices, moleVoice, 0.85);
+  }
+
   function playFireSound() {
     if (!soundOn) return;
     const audio = fireVoices[fireVoice];
@@ -360,6 +410,28 @@
     primeBows();
     primeIntros();
     primeFires();
+    primeList(chargeVoices);
+    primeList(magicVoices);
+    primeList(moleVoices);
+  }
+
+  function primeList(list) {
+    list.forEach(function (audio) {
+      if (audio.dataset.primed) return;
+      const volume = audio.volume;
+      audio.volume = 0;
+      const pending = audio.play();
+      if (!pending) return;
+      pending.then(function () {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.volume = volume;
+        audio.playbackRate = 1;
+        audio.dataset.primed = '1';
+      }).catch(function () {
+        audio.volume = volume;
+      });
+    });
   }
 
   function paintSound() {
@@ -1298,6 +1370,7 @@
       if (!victim.monster) flashHurt(to);
     }
     if (hit.style === 'ranged') playBowSound();
+    if (!attacker.monster && hit.style === 'magic') playMagicSound();
     if (hit.attack === 'fire') {
       playFireSound();
       pushFeed(escapeHtml(attacker.name) + ' breathes fire on ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
@@ -1541,6 +1614,27 @@
     if (night) night();
   }
 
+  function cueBossSounds(t) {
+    const prev = soundT;
+    soundT = t;
+    if (!soundOn || !bout || !bout.hazards) return;
+    const mole = (bout.fighters || []).some((f) => f.monster === 'mole');
+    for (const hz of bout.hazards) {
+      if (!hz) continue;
+      let at = 0;
+      let play = null;
+      if (hz.attack === 'charge') {
+        at = hz.t0 + (hz.t1 - hz.t0) * 0.62;
+        play = playChargeSound;
+      } else if (mole && (hz.attack === 'claw' || hz.attack === 'dirt' || hz.attack === 'burrow')) {
+        at = hz.t1;
+        play = playMoleSound;
+      }
+      if (!play || !(at > prev && at <= t)) continue;
+      play();
+    }
+  }
+
   function frame(now) {
     if (!playing || !bout) return;
     const t = playFrom + ((now - playOrigin) / 1000) * playSpeed * PACE;
@@ -1577,6 +1671,7 @@
       shownDeath += 1;
     }
     drawHazards(t);
+    cueBossSounds(t);
     drawAims();
     const endAt = tourneyBusy
       ? Math.max(Number(bout.duration) || 0, lastEventTime(bout.hits), lastEventTime(bout.deaths))
@@ -1761,6 +1856,7 @@
     shownHit = 0;
     shownDeath = 0;
     playFrom = 0;
+    soundT = 0;
     playOrigin = performance.now();
     tourneySettleAt = 0;
     playing = true;
