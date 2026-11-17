@@ -44,6 +44,7 @@
   try { logHidden = localStorage.getItem(LOG_KEY) === 'off'; } catch (err) { logHidden = false; }
   let nextLabel = '';
   let nextTitle = 'Tournament';
+  let nextKind = '';
   let oddsBoard = null;
   let oddsTrail = [];
   let oddsMarkup = '';
@@ -1378,7 +1379,7 @@
 
   function paintRaidScene(fight) {
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-raid-wait');
     if (!fight || fight.formation !== 'raid') return;
     const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
     const scene = fight.scene || { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && boss.monster];
@@ -2147,6 +2148,7 @@
     waitClock.textContent = text;
     waitWhen.textContent = pkA + ' vs ' + pkB + (pkReason ? ' — ' + pkReason : '');
     paintOdds(true);
+    paintLobbyScene(true);
   }
 
   function showNightWait(text) {
@@ -2157,6 +2159,14 @@
     waitClock.textContent = text;
     waitWhen.textContent = [nextLabel, nextDetail].filter(Boolean).join(' · ');
     paintOdds(false);
+    paintLobbyScene(false);
+  }
+
+  function paintLobbyScene(pk) {
+    if (!pit) return;
+    const lobby = !!(waitEl && !waitEl.hidden) && !playing && !introducing;
+    pit.classList.toggle('is-raid-wait', lobby && !pk && nextKind === 'raid');
+    if (lobby) pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-enraged');
   }
 
   // Fair line from combat and gear. A duel is a logistic on that strength.
@@ -2561,9 +2571,14 @@
       : null;
     if (!board) {
       oddsEl.hidden = true;
+      oddsEl.classList.remove('is-raid');
       oddsChartSig = '';
       return;
     }
+    const raidBoard = board.kind === 'raid';
+    oddsEl.classList.toggle('is-raid', raidBoard);
+    const oddsKicker = oddsEl.querySelector('.wait-kicker');
+    if (oddsKicker) oddsKicker.textContent = raidBoard ? 'Party' : 'To win';
     const priced = priceNight(board);
     const samples = nextAtMs && Date.now() - oddsTrendAt >= 20000 ? noteOddsTrend(priced) : readOddsTrend();
     const html = priced.map((row) => (
@@ -2583,7 +2598,12 @@
       oddsMarkup = html;
       oddsList.innerHTML = html;
     }
-    paintChart(board, priced);
+    if (raidBoard) {
+      oddsChartSig = '';
+      if (oddsChart) oddsChart.innerHTML = '';
+    } else {
+      paintChart(board, priced);
+    }
     oddsEl.hidden = false;
   }
 
@@ -2609,6 +2629,7 @@
       if (waitKicker) waitKicker.textContent = 'Next ' + nextTitle;
       countdownEl.textContent = 'Next ' + nextTitle;
       waitClock.textContent = '--:--:--';
+      paintLobbyScene(false);
       return;
     }
     const remain = nextAtMs - nowMs;
@@ -3232,6 +3253,7 @@
       nextAtMs = data.nextAt ? Date.parse(data.nextAt) : 0;
       nextLabel = data.nextLabel || '';
       nextTitle = data.nextTitle || 'Tournament';
+      nextKind = data.nextKind || '';
       nextDetail = data.nextDetail || '';
       oddsBoard = data.odds || null;
       oddsTrail = Array.isArray(data.oddsTrail) ? data.oddsTrail : [];

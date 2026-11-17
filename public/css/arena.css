@@ -420,6 +420,23 @@
   background-image: url('/assets/bosses/scurrius-sewer.jpg');
 }
 
+.pit.is-raid-wait {
+  background: #1a100c;
+  border-top-color: transparent;
+  box-shadow: inset 0 0 0 6px #3a2416;
+}
+
+.pit.is-raid-wait .colosseum,
+.pit.is-raid-wait .pit-post { display: none; }
+
+.pit.is-raid-wait .pit-stage {
+  background-color: #1a100c;
+  background-image: url('/assets/bosses/raid-hall.jpg');
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
 .boss-bar {
   position: absolute;
   z-index: 12;
@@ -742,6 +759,9 @@
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
 }
 .odds-card[hidden] { display: none; }
+.odds-card.is-raid .odds-chart-wrap,
+.odds-card.is-raid .odds-price,
+.odds-card.is-raid .odds-trend { display: none; }
 .odds-scroll { overflow: hidden; margin-top: 4px; }
 .odds-table {
   width: 100%;
