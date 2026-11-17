@@ -553,8 +553,17 @@
   function paintScene(boss) {
     const pit = document.getElementById('arena-pit');
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer');
-    const known = { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', cows: 'is-pasture', rats: 'is-sewer' };
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool');
+    const known = {
+      mole: 'is-lair',
+      brutus: 'is-pasture',
+      scurrius: 'is-sewer',
+      cows: 'is-pasture',
+      rats: 'is-sewer',
+      elvarg: 'is-crandor',
+      chaos: 'is-wild',
+      leviathan: 'is-pool',
+    };
     const scene = (boss && known[boss.id]) || (boss && boss.scene) || known[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
@@ -625,6 +634,9 @@
     const tonight = bossEl.value === 'raid';
     tierEl.disabled = tonight;
     tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
+    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master' }[bossEl.value];
+    if (!tonight && home && bossEl.dataset.home !== bossEl.value) tierEl.value = home;
+    bossEl.dataset.home = bossEl.value;
   }
 
   if (bossEl) bossEl.addEventListener('change', syncTier);

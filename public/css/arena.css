@@ -420,6 +420,51 @@
   background-image: url('/assets/bosses/scurrius-sewer.jpg');
 }
 
+.pit.is-crandor,
+.pit.is-wild {
+  background: #120e0c;
+  box-shadow: inset 0 0 0 6px #3a2416;
+}
+
+.pit.is-crandor .colosseum,
+.pit.is-wild .colosseum,
+.pit.is-crandor .pit-post,
+.pit.is-wild .pit-post { display: none; }
+
+.pit.is-crandor .pit-stage,
+.pit.is-wild .pit-stage {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 100% 100%;
+}
+
+.pit.is-crandor .pit-stage {
+  background-color: #24180f;
+  background-image: url('/assets/bosses/elvarg-lair.jpg');
+}
+
+.pit.is-wild {
+  box-shadow: inset 0 0 0 6px #3b2460;
+}
+
+.pit.is-wild .pit-stage {
+  background-color: #1a1024;
+  background-image: url('/assets/bosses/chaos-wild.jpg');
+}
+
+.pit.is-pool {
+  box-shadow: inset 0 0 0 6px #0c3344;
+}
+
+.pit.is-pool .colosseum,
+.pit.is-pool .pit-post { display: none; }
+
+.pit.is-pool .pit-stage {
+  background-color: #07141c;
+  background-image: radial-gradient(ellipse 68% 60% at 50% 48%, #1c647c 0%, #0e3344 40%, #071018 74%);
+  background-size: 100% 100%;
+}
+
 .pit.is-raid-wait {
   background: #1a100c;
   border-top-color: transparent;
@@ -2045,6 +2090,16 @@
 .actor.is-scurrius.is-wind-bite .boss-sprite { animation: scur-rear 0.32s ease-out forwards; }
 .actor.is-scurrius.is-wind-rocks .boss-sprite { animation: scur-look 0.36s ease-in-out infinite; }
 .actor.is-scurrius.is-wind-barrage .boss-sprite { animation: scur-spit 0.28s ease-in-out infinite; }
+.actor.is-elvarg.is-wind-slash .boss-sprite { animation: bull-rear 0.32s ease-out forwards; }
+.actor.is-elvarg.is-wind-fire .boss-sprite { filter: saturate(1.4) brightness(1.25); }
+.actor.is-chaos.is-wind-discord .boss-sprite { animation: scur-spit 0.28s ease-in-out infinite; }
+.actor.is-chaos.is-wind-confusion .boss-sprite { animation: bull-paw 0.26s ease-in-out infinite; }
+.actor.is-chaos.is-wind-madness .boss-sprite { animation: bull-cock 0.34s ease-out forwards; }
+.actor.is-leviathan.is-wind-orb .boss-sprite { animation: scur-spit 0.28s ease-in-out infinite; }
+.actor.is-leviathan.is-wind-rocks .boss-sprite { animation: scur-look 0.36s ease-in-out infinite; }
+.actor.is-leviathan.is-wind-roar .boss-sprite { animation: bull-rear 0.32s ease-out forwards; }
+.actor.is-leviathan.is-wind-bite .boss-sprite { animation: bull-paw 0.26s ease-in-out infinite; }
+.actor.is-leviathan.is-wind-smoke .boss-sprite { filter: saturate(0.7) brightness(1.15); }
 
 .actor.is-scurrius.is-bite .boss-sprite { animation: scur-lunge 0.5s ease-out; }
 .actor.is-scurrius.is-rocks .boss-sprite { animation: scur-hop 0.55s ease-out; }
@@ -2333,16 +2388,39 @@
   overflow: visible;
 }
 
-.fall-rock {
+.fall-rock,
+.rubble-rock {
   position: absolute;
   object-fit: contain;
   filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.28));
 }
+.rubble-rock {
+  transform: translate(-50%, -78%);
+  pointer-events: none;
+  z-index: 2;
+}
 .raid-hazards circle.tone-spine { fill: rgba(214, 190, 140, 0.34); stroke: #f5e6c8; }
 .raid-hazards circle.tone-bolt { fill: rgba(22, 163, 74, 0.32); stroke: #86efac; }
 .raid-hazards circle.tone-blast { fill: rgba(37, 99, 235, 0.32); stroke: #93c5fd; }
+.raid-hazards circle.tone-fire { fill: rgba(234, 88, 12, 0.38); stroke: #fdba74; }
+.raid-hazards line.tone-fire { stroke: rgba(251, 146, 60, 0.9); }
+.raid-hazards circle.tone-discord-magic { fill: rgba(126, 34, 206, 0.36); stroke: #e9d5ff; }
+.raid-hazards circle.tone-discord-range { fill: rgba(22, 163, 74, 0.32); stroke: #86efac; }
+.raid-hazards circle.tone-discord-melee { fill: rgba(185, 28, 28, 0.34); stroke: #fca5a5; }
+.raid-hazards circle.tone-orb-magic { fill: rgba(14, 165, 233, 0.36); stroke: #7dd3fc; }
+.raid-hazards circle.tone-orb-range { fill: rgba(22, 163, 74, 0.34); stroke: #86efac; }
+.raid-hazards circle.tone-orb-melee { fill: rgba(234, 88, 12, 0.36); stroke: #fdba74; }
+.raid-hazards circle.tone-wave { fill: none; stroke: #7fd4ea; stroke-width: 1.6; }
+.raid-hazards circle.tone-smoke { fill: rgba(148, 163, 184, 0.16); stroke: #e2e8f0; }
 .raid-hazards circle.is-hot { fill: rgba(248, 113, 113, 0.55); stroke: #fee2e2; }
 .raid-hazards circle.is-hit { fill: rgba(255, 247, 237, 0.7); stroke: #fff; }
+.raid-hazards circle.tone-wave.is-hot,
+.raid-hazards circle.tone-wave.is-hit { fill: none; stroke: #e0f2fe; }
+.raid-hazards circle.tone-smoke.is-hot,
+.raid-hazards circle.tone-smoke.is-hit { fill: rgba(226, 232, 240, 0.22); stroke: #f8fafc; }
+.raid-hazards circle.tone-orb-magic.is-hot { fill: rgba(56, 189, 248, 0.55); stroke: #e0f2fe; }
+.raid-hazards circle.tone-orb-range.is-hot { fill: rgba(74, 222, 128, 0.55); stroke: #dcfce7; }
+.raid-hazards circle.tone-orb-melee.is-hot { fill: rgba(251, 146, 60, 0.55); stroke: #ffedd5; }
 
 .raid-hazards .hazard-label {
   fill: #fff7ed;

@@ -1360,18 +1360,31 @@
     if (!attacker || !victim || !to) return;
     setHp(victim, hit.hp);
     const bias = victim.monster ? splatBias(hit.from) : null;
-    const miss = hit.miss || !(hit.amount > 0);
-    if (miss) {
+    const miss = (hit.miss || !(hit.amount > 0)) && hit.effect !== 'disarm';
+    if (hit.effect !== 'disarm' && miss) {
       floater(to.x, to.y, 0, true, bias);
       playMissSound();
-    } else {
+    } else if (hit.effect !== 'disarm') {
       floater(to.x, to.y, hit.amount, false, bias);
       playHitSound(hit.hp <= 0 && !victim.monster);
       if (!victim.monster) flashHurt(to);
     }
     if (hit.style === 'ranged') playBowSound();
     if (!attacker.monster && hit.style === 'magic') playMagicSound();
-    if (hit.attack === 'fire') {
+    if (hit.effect === 'disarm') {
+      pushFeed(escapeHtml(attacker.name) + ' pulls the weapon off ' + escapeHtml(victim.name), 'hit');
+    } else if (hit.effect === 'wash') {
+      pushFeed(escapeHtml(attacker.name) + ' roars and washes ' + escapeHtml(victim.name) + ' to the edge', 'hit');
+    } else if (hit.attack === 'smoke' && miss) {
+      pushFeed(escapeHtml(victim.name) + ' gets behind a rock', 'miss');
+    } else if (hit.effect === 'blink') {
+      pushFeed(
+        miss
+          ? escapeHtml(attacker.name) + ' reaches for ' + escapeHtml(victim.name) + '. Dodged.'
+          : escapeHtml(attacker.name) + ' teleports ' + escapeHtml(victim.name) + (hit.amount ? ' ' + hit.amount : ''),
+        miss ? 'miss' : 'hit'
+      );
+    } else if (hit.attack === 'fire' && !miss) {
       playFireSound();
       pushFeed(escapeHtml(attacker.name) + ' breathes fire on ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
     }
@@ -1452,10 +1465,10 @@
 
   function paintRaidScene(fight) {
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-raid-wait');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-raid-wait');
     if (!fight || fight.formation !== 'raid') return;
     const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
-    const scene = fight.scene || { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer' }[boss && boss.monster];
+    const scene = fight.scene || { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', elvarg: 'is-crandor', chaos: 'is-wild', leviathan: 'is-pool' }[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
 
@@ -1512,6 +1525,34 @@
     });
   }
 
+  function drawRubble(t) {
+    const layer = fallLayer();
+    if (!layer) return;
+    const rocks = (bout && bout.rubble) || [];
+    const live = [];
+    rocks.forEach((rock, i) => {
+      if (t < rock.t) return;
+      live.push(i);
+      let el = layer.querySelector('[data-rubble="' + i + '"]');
+      if (!el) {
+        el = document.createElement('img');
+        el.className = 'rubble-rock';
+        el.alt = '';
+        el.src = '/assets/bosses/rock.svg';
+        el.dataset.rubble = String(i);
+        layer.appendChild(el);
+      }
+      const size = Math.max(36, Number(rock.r) * 9);
+      el.style.left = ((rock.x / bout.width) * 100) + '%';
+      el.style.top = ((rock.y / bout.height) * 100) + '%';
+      el.style.width = size + 'px';
+      el.style.height = size + 'px';
+    });
+    layer.querySelectorAll('.rubble-rock').forEach((el) => {
+      if (live.indexOf(Number(el.dataset.rubble)) < 0) el.remove();
+    });
+  }
+
   function drawHazards(t) {
     const svg = document.getElementById('arena-hazards');
     if (!svg || !bout || bout.formation !== 'raid') return;
@@ -1521,7 +1562,8 @@
       if (t < hz.t0 || t > hz.t1 + 0.45) continue;
       const cls = t >= hz.t1 ? 'is-hit' : t >= hz.t1 - 0.16 ? 'is-hot' : 'is-warn';
       if (hz.kind === 'lane') {
-        markup += '<line class="' + cls + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
+        const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
+        markup += '<line class="' + cls + tone + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
       } else if (hz.attack === 'rocks') {
         markup += '<ellipse class="' + cls + ' tone-shadow" cx="' + hz.x + '" cy="' + hz.y + '" rx="' + hz.r + '" ry="' + (Number(hz.r) * 0.42).toFixed(2) + '"></ellipse>';
       } else {
@@ -1536,11 +1578,12 @@
     }
     svg.innerHTML = markup;
     drawFalls(t);
+    drawRubble(t);
     const fighter = (bout.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'dragon' && f.monster !== 'rat');
     const view = fighter ? actors.get(fighter.id) : null;
     if (!view || !view.el) return;
     const active = list.find((hz) => t >= hz.t0 && t < hz.t1);
-    ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage'].forEach((id) => {
+    ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage', 'slash', 'fire', 'discord', 'confusion', 'madness', 'orb', 'roar', 'smoke'].forEach((id) => {
       const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
       view.el.classList.toggle('is-wind-' + id, winding);
     });
@@ -2262,7 +2305,7 @@
     if (!pit) return;
     const lobby = !!(waitEl && !waitEl.hidden) && !playing && !introducing;
     pit.classList.toggle('is-raid-wait', lobby && !pk && nextKind === 'raid');
-    if (lobby) pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-enraged');
+    if (lobby) pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-enraged');
   }
 
   // Fair line from combat and gear. A duel is a logistic on that strength.
