@@ -12,6 +12,12 @@
     raid: '#e6c15a',
   };
 
+  const HIDE_COLORS = {
+    green: '#2f9a3a',
+    blue: '#2d6fce',
+    black: '#3c4148',
+  };
+
   const QUALITY_RANK = {
     crude: 0, worn: 1, standard: 2, fine: 3, sharpened: 4, tempered: 5, masterwork: 6,
   };
@@ -95,7 +101,8 @@
     const eq = (spoop && spoop.equipped) || {};
     const body = eq.body;
     const bodyQ = body ? (QUALITY_RANK[body.quality] || 0) : -1;
-    const tierHex = body ? (TIER_COLORS[body.tier] || '#a56b3c') : null;
+    const bodyHide = body && HIDE_COLORS[body.hide];
+    const tierHex = body ? (bodyHide || TIER_COLORS[body.tier] || '#a56b3c') : null;
     const cloth = tierHex ? shiftColor(tierHex, bodyQ < 2 ? -32 : bodyQ >= 3 ? 18 : 0) : '#c48a52';
     const clothDk = tierHex ? shiftColor(tierHex, -52) : '#7a4e2c';
 
@@ -386,8 +393,9 @@
     }
     const gloves = eq.gloves;
     const gloveQ = gloves ? (QUALITY_RANK[gloves.quality] || 0) : -1;
+    const gloveHex = gloves ? (HIDE_COLORS[gloves.hide] || TIER_COLORS[gloves.tier] || '#8d5a34') : null;
     const hand = gloves
-      ? shiftColor(TIER_COLORS[gloves.tier] || '#8d5a34', gloveQ >= 3 ? 18 : -6)
+      ? shiftColor(gloveHex, gloveQ >= 3 ? 18 : -6)
       : skin;
     const handDk = gloves ? shiftColor(hand, -30) : skinDk;
     if (pose === 'idle') fill(2, 11, 2, 4, hand);
@@ -405,14 +413,25 @@
       put(4, 12, shiftColor(shaft, 24));
     }
 
-    if (bodyQ >= 4 && tierHex) {
+    if (bodyHide) {
+      put(7, 10, clothDk);
+      put(8, 10, clothDk);
+      put(6, 11, clothDk);
+      put(9, 11, clothDk);
+      put(7, 12, clothDk);
+      put(8, 13, clothDk);
+      if (bodyQ >= 5) {
+        put(5, 12, shiftColor(bodyHide, 28));
+        put(10, 12, shiftColor(bodyHide, 28));
+      }
+    } else if (bodyQ >= 4 && tierHex) {
       fill(2, 10, 2, 2, cloth);
       fill(12, 10, 2, 2, cloth);
       put(2, 10, clothDk);
       put(13, 10, clothDk);
     }
-    if (bodyQ >= 5 && tierHex) fill(4, 10, 8, 1, '#f0d878');
-    if (bodyQ >= 6 && tierHex) {
+    if (!bodyHide && bodyQ >= 5 && tierHex) fill(4, 10, 8, 1, '#f0d878');
+    if (!bodyHide && bodyQ >= 6 && tierHex) {
       put(7, 12, '#f0d878');
       put(8, 12, '#fff6c8');
     }
@@ -450,7 +469,8 @@
 
     const legs = eq.legs;
     const legQ = legs ? (QUALITY_RANK[legs.quality] || 0) : -1;
-    const legCol = legs ? shiftColor(TIER_COLORS[legs.tier] || '#5c3a28', legQ >= 3 ? 8 : -12) : '#5c3824';
+    const legHex = legs ? (HIDE_COLORS[legs.hide] || TIER_COLORS[legs.tier] || '#5c3a28') : '#5c3824';
+    const legCol = legs ? shiftColor(legHex, legQ >= 3 ? 8 : -12) : legHex;
     fill(5, 15, 2, 4, legCol);
     fill(9, 15, 2, 4, legCol);
     if (legQ >= 5) {
@@ -1605,7 +1625,7 @@
             '<h3 class="text-sm text-slate-300">Wearing</h3>' +
             '<p class="text-sm text-amber-200 tabular-nums" title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1. Each quality step adds 1, and each metal adds 10.">Gear ' + (spoop.gearRating || 0) + '</p>' +
           '</div>' +
-          '<div class="spoop-grid">' + grid + '</div>' +
+          '<div class="spoop-grid equip-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
       bossGrid(spoop) +
@@ -1657,6 +1677,140 @@
         sell();
       });
     });
+    bindEquipTips(root);
+  }
+
+  let equipTipSlot = null;
+  let equipTipListening = false;
+
+  function clearEquipTip(slot) {
+    if (!slot) return;
+    const tip = slot.querySelector('.spoop-tip');
+    if (tip) {
+      tip.style.position = '';
+      tip.style.left = '';
+      tip.style.top = '';
+      tip.style.right = '';
+      tip.style.bottom = '';
+      tip.style.transform = '';
+      tip.style.width = '';
+      tip.style.maxHeight = '';
+      tip.style.overflow = '';
+      tip.style.zIndex = '';
+      tip.style.pointerEvents = '';
+      tip.style.display = '';
+    }
+    slot.style.zIndex = '';
+  }
+
+  function pinEquipTip(slot, tip, width) {
+    const margin = 8;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const maxHeight = Math.max(120, Math.floor(vh * 0.6));
+    const wasHidden = window.getComputedStyle(tip).display === 'none';
+    if (wasHidden) tip.style.display = 'block';
+    tip.style.position = 'fixed';
+    tip.style.width = width + 'px';
+    tip.style.maxHeight = maxHeight + 'px';
+    tip.style.overflow = 'auto';
+    tip.style.transform = 'none';
+    tip.style.right = 'auto';
+    tip.style.bottom = 'auto';
+    tip.style.left = margin + 'px';
+    tip.style.top = margin + 'px';
+    tip.style.zIndex = '81';
+    tip.style.pointerEvents = 'auto';
+    const height = tip.getBoundingClientRect().height;
+    const slotRect = slot.getBoundingClientRect();
+    let left = slotRect.left + slotRect.width / 2 - width / 2;
+    left = Math.max(margin, Math.min(left, vw - width - margin));
+    let top = slotRect.bottom + 6;
+    if (top + height > vh - margin) {
+      const above = slotRect.top - 6 - height;
+      top = above >= margin ? above : margin;
+    }
+    tip.style.left = Math.round(left) + 'px';
+    tip.style.top = Math.round(top) + 'px';
+    slot.style.zIndex = '80';
+    if (wasHidden) tip.style.display = '';
+    equipTipSlot = slot;
+  }
+
+  function placeEquipTip(slot) {
+    if (!slot || !slot.isConnected) return;
+    const tip = slot.querySelector('.spoop-tip');
+    if (!tip) return;
+    clearEquipTip(slot);
+    const narrow = window.matchMedia('(max-width: 720px)').matches;
+    if (!narrow) {
+      const rect = tip.getBoundingClientRect();
+      const margin = 8;
+      if (!rect.width) return;
+      const overflows = rect.left < margin || rect.top < margin ||
+        rect.right > window.innerWidth - margin || rect.bottom > window.innerHeight - margin;
+      if (!overflows) return;
+      pinEquipTip(slot, tip, Math.min(rect.width, window.innerWidth - margin * 2));
+      return;
+    }
+    pinEquipTip(slot, tip, Math.min(240, window.innerWidth - 16));
+  }
+
+  function releaseEquipTip(slot) {
+    if (!slot) return;
+    const narrow = window.matchMedia('(max-width: 720px)').matches;
+    if (narrow && (slot.matches(':hover') || document.activeElement === slot)) return;
+    clearEquipTip(slot);
+    if (equipTipSlot === slot) equipTipSlot = null;
+  }
+
+  function bindEquipTips(root) {
+    const grid = root.querySelector('.equip-grid');
+    if (!grid) return;
+    const slotFrom = (ev) => {
+      const slot = ev.target.closest && ev.target.closest('.spoop-slot');
+      if (!slot || !grid.contains(slot) || !slot.querySelector('.spoop-tip')) return null;
+      return slot;
+    };
+    grid.addEventListener('pointerover', (ev) => {
+      const slot = slotFrom(ev);
+      if (!slot) return;
+      if (ev.relatedTarget && slot.contains(ev.relatedTarget)) return;
+      placeEquipTip(slot);
+    });
+    grid.addEventListener('pointerout', (ev) => {
+      const slot = slotFrom(ev);
+      if (!slot) return;
+      if (ev.relatedTarget && slot.contains(ev.relatedTarget)) return;
+      releaseEquipTip(slot);
+    });
+    grid.addEventListener('focusin', (ev) => {
+      const slot = slotFrom(ev);
+      if (slot) placeEquipTip(slot);
+    });
+    grid.addEventListener('focusout', (ev) => {
+      const slot = slotFrom(ev);
+      if (slot) releaseEquipTip(slot);
+    });
+    if (equipTipListening) return;
+    equipTipListening = true;
+    document.addEventListener('pointerdown', (ev) => {
+      if (!equipTipSlot || !equipTipSlot.isConnected) {
+        equipTipSlot = null;
+        return;
+      }
+      if (equipTipSlot.contains(ev.target)) return;
+      const slot = equipTipSlot;
+      clearEquipTip(slot);
+      const tip = slot.querySelector('.spoop-tip');
+      if (tip) tip.style.display = 'none';
+      equipTipSlot = null;
+    });
+    const reposition = () => {
+      if (equipTipSlot && equipTipSlot.isConnected) placeEquipTip(equipTipSlot);
+    };
+    window.addEventListener('scroll', reposition, true);
+    window.addEventListener('resize', reposition);
   }
 
   let selling = false;

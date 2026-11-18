@@ -124,6 +124,31 @@
     gloves: { def: { stab: 2, slash: 2, crush: 1, magic: 1, range: 2 } },
     cape: { def: { stab: 1, slash: 1, crush: 1, magic: 1, range: 1 } },
   };
+  const STYLE_SHEET = {
+    magic: {
+      head: { def: { magic: 6, range: 1 }, atk: { magic: 5 }, other: { magic: 1 } },
+      body: { def: { stab: 4, slash: 3, crush: 6, magic: 14 }, atk: { magic: 10 }, other: { magic: 1 } },
+      legs: { def: { stab: 3, slash: 2, crush: 4, magic: 8 }, atk: { magic: 6 } },
+    },
+    ranged: {
+      head: { def: { stab: 4, slash: 4, crush: 3, magic: 3, range: 8 }, atk: { range: 5 } },
+      body: { def: { stab: 6, slash: 5, crush: 6, magic: 6, range: 12 }, atk: { range: 8 } },
+      legs: { def: { stab: 4, slash: 3, crush: 4, magic: 4, range: 8 }, atk: { range: 5 } },
+      gloves: { def: { stab: 1, slash: 1, crush: 1, magic: 2, range: 3 }, atk: { range: 1 } },
+    },
+  };
+  const HIDE_COLORS = { green: '#2f9a3a', blue: '#2d6fce', black: '#3c4148' };
+  const DHIDE = [
+    { name: "green d'hide body", slot: 'body', tier: 'adamant', baseId: 'dhide-body', osrsId: 1135, hide: 'green' },
+    { name: "green d'hide chaps", slot: 'legs', tier: 'adamant', baseId: 'dhide-chaps', osrsId: 1099, hide: 'green' },
+    { name: "green d'hide vambraces", slot: 'gloves', tier: 'adamant', baseId: 'dhide-vambs', osrsId: 1065, hide: 'green' },
+    { name: "blue d'hide body", slot: 'body', tier: 'rune', baseId: 'dhide-body', osrsId: 2499, hide: 'blue' },
+    { name: "blue d'hide chaps", slot: 'legs', tier: 'rune', baseId: 'dhide-chaps', osrsId: 2493, hide: 'blue' },
+    { name: "blue d'hide vambraces", slot: 'gloves', tier: 'rune', baseId: 'dhide-vambs', osrsId: 2487, hide: 'blue' },
+    { name: "black d'hide body", slot: 'body', tier: 'dragon', baseId: 'dhide-body', osrsId: 2503, hide: 'black' },
+    { name: "black d'hide chaps", slot: 'legs', tier: 'dragon', baseId: 'dhide-chaps', osrsId: 2497, hide: 'black' },
+    { name: "black d'hide vambraces", slot: 'gloves', tier: 'dragon', baseId: 'dhide-vambs', osrsId: 2491, hide: 'black' },
+  ];
   const TIER_LEVEL = { bronze: 1, iron: 1, steel: 5, black: 10, mithril: 20, adamant: 30, rune: 40, dragon: 60, barrows: 70, raid: 75 };
   const SLOT_LABEL = {
     weapon: 'Weapon', shield: 'Shield', head: 'Head', body: 'Body', legs: 'Legs',
@@ -173,6 +198,16 @@
       catalog.push(makeItem('head', piece.id, piece.name, null, piece.tier, quality, { plainName: true, osrsId: piece.osrsId }));
     });
   });
+  DHIDE.forEach((piece) => {
+    QUALITIES.forEach((quality) => {
+      catalog.push(makeItem(piece.slot, piece.baseId, piece.name, null, piece.tier, quality, {
+        plainName: true,
+        osrsId: piece.osrsId,
+        hide: piece.hide,
+        gearStyle: 'ranged',
+      }));
+    });
+  });
   const byKey = new Map(catalog.map((item) => [item.key, item]));
 
   const levels = { attack: 40, strength: 40, defence: 40, hitpoints: 40, ranged: 40, magic: 40, prayer: 40 };
@@ -201,6 +236,8 @@
       quality,
       plainName: !!extra.plainName,
       osrsId: extra.osrsId || (OSRS[baseId] && OSRS[baseId][tier]) || null,
+      hide: extra.hide || null,
+      gearStyle: extra.gearStyle || null,
     };
   }
 
@@ -256,7 +293,8 @@
     } else if (item.slot === 'ammo') {
       bonuses.other.ranged += influence(7 * scale, item.quality);
     } else {
-      const sheet = ARMOR_SHEET[item.baseId];
+      const styled = item.gearStyle && STYLE_SHEET[item.gearStyle] && STYLE_SHEET[item.gearStyle][item.slot];
+      const sheet = styled || ARMOR_SHEET[item.baseId];
       if (sheet) {
         addSheet(bonuses.defence, sheet.def, item);
         addSheet(bonuses.attack, sheet.atk, item);
@@ -319,7 +357,7 @@
   function iconHtml(item, size) {
     const px = size || 36;
     if (!item) return '';
-    const color = tierById(item.tier).color;
+    const color = (item.hide && HIDE_COLORS[item.hide]) || tierById(item.tier).color;
     const letter = escapeHtml(item.baseName.charAt(0).toUpperCase());
     const img = item.osrsId
       ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="' + px + '" height="' + px + '" loading="lazy" onerror="this.remove()">'

@@ -58,6 +58,27 @@
     .spoop-slot:focus-visible .spoop-tip {
       display: block;
     }
+    @media (max-width: 720px) {
+      .equip-grid .spoop-slot:has(.spoop-tip):hover,
+      .equip-grid .spoop-slot:has(.spoop-tip):focus {
+        z-index: 80;
+        outline: none;
+      }
+      .equip-grid .spoop-slot:hover .spoop-tip,
+      .equip-grid .spoop-slot:focus .spoop-tip {
+        display: block;
+        position: fixed;
+        left: 8px;
+        right: 8px;
+        top: auto;
+        bottom: max(8px, env(safe-area-inset-bottom));
+        width: auto;
+        max-height: min(50vh, 320px);
+        transform: none;
+        overflow: auto;
+        z-index: 2;
+      }
+    }
     .spoop-slot img {
       width: 36px;
       height: 36px;
