@@ -18,6 +18,38 @@
     black: '#3c4148',
   };
 
+  const CLOTH_COLORS = {
+    wizard: '#3a4e9a',
+    zamorak: '#9a2424',
+    saradomin: '#d8dce8',
+    guthix: '#3d7a3a',
+    xeric: '#6d8f4a',
+    mystic: '#2c4f86',
+    darkmystic: '#4a2a6a',
+    infinity: '#d7c48a',
+    bloodbark: '#6a1c28',
+    void: '#d9d3c7',
+    proselyte: '#f2efe6',
+    obsidian: '#2a2a2e',
+    torso: '#8d3030',
+  };
+
+  const POINTY_HATS = {
+    'wizard-hat': ['#3a4e9a', '#7a92e0', '#243268'],
+    'ancestral-hat': ['#6a3aa0', '#c89ae8', '#3a1860'],
+    'xeric-hat': ['#6d8f4a', '#d4e8a4', '#3a5228'],
+    'mystic-hat': ['#2c4f86', '#8eb4e8', '#1a3058'],
+    'dark-mystic-hat': ['#4a2a6a', '#c9a0e8', '#2a1840'],
+    'infinity-hat': ['#d7c48a', '#fff6c8', '#8a7040'],
+    'bloodbark-helm': ['#6a1c28', '#e07080', '#3a1018'],
+  };
+
+  const HELM_TINTS = {
+    'obsidian-helm': '#2a2a2e',
+    'proselyte-sallet': '#f2efe6',
+    'initiate-sallet': '#d7d1c4',
+  };
+
   const QUALITY_RANK = {
     crude: 0, worn: 1, standard: 2, fine: 3, sharpened: 4, tempered: 5, masterwork: 6,
   };
@@ -101,16 +133,23 @@
     const eq = (spoop && spoop.equipped) || {};
     const body = eq.body;
     const bodyQ = body ? (QUALITY_RANK[body.quality] || 0) : -1;
+    const bodyCloth = body && CLOTH_COLORS[body.cloth];
     const bodyHide = body && HIDE_COLORS[body.hide];
-    const tierHex = body ? (bodyHide || TIER_COLORS[body.tier] || '#a56b3c') : null;
+    const bodyShape = (body && body.shape) || '';
+    const robe = bodyShape === 'robe';
+    const vest = bodyShape === 'vest';
+    const tierHex = body ? (bodyCloth || bodyHide || TIER_COLORS[body.tier] || '#a56b3c') : null;
     const cloth = tierHex ? shiftColor(tierHex, bodyQ < 2 ? -32 : bodyQ >= 3 ? 18 : 0) : '#c48a52';
     const clothDk = tierHex ? shiftColor(tierHex, -52) : '#7a4e2c';
 
     const helm = eq.head;
     const helmQ = helm ? (QUALITY_RANK[helm.quality] || 0) : -1;
-    const top = helm ? shiftColor(TIER_COLORS[helm.tier] || hair, helmQ >= 3 ? 14 : 0) : hair;
-    const topHi = helm ? shiftColor(TIER_COLORS[helm.tier] || hair, 48) : hairHi;
-    const topLo = helm ? shiftColor(TIER_COLORS[helm.tier] || hair, -42) : hairLo;
+    const helmHex = helm
+      ? (CLOTH_COLORS[helm.cloth] || HELM_TINTS[helm.baseId] || TIER_COLORS[helm.tier] || hair)
+      : hair;
+    const top = helm ? shiftColor(helmHex, helmQ >= 3 ? 14 : 0) : hair;
+    const topHi = helm ? shiftColor(helmHex, 48) : hairHi;
+    const topLo = helm ? shiftColor(helmHex, -42) : hairLo;
 
     if (layer !== 'weapon') {
     const cape = eq.cape;
@@ -178,17 +217,17 @@
     } else if (helmKind === 'full-helm') {
       paintVisor(top, topLo);
       metalTrim();
-    } else if (helmKind === 'wizard-hat' || helmKind === 'ancestral-hat') {
-      const hat = helmKind === 'ancestral-hat' ? '#6a3aa0' : '#3a4e9a';
-      const hatHi = helmKind === 'ancestral-hat' ? '#c89ae8' : '#7a92e0';
-      const hatLo = helmKind === 'ancestral-hat' ? '#3a1860' : '#243268';
+    } else if (POINTY_HATS[helmKind]) {
+      const hat = POINTY_HATS[helmKind][0];
+      const hatHi = POINTY_HATS[helmKind][1];
+      const hatLo = POINTY_HATS[helmKind][2];
       put(7, 0, hatHi);
       put(8, 0, hat);
       fill(6, 1, 4, 1, hat);
       fill(5, 2, 6, 1, hat);
       fill(3, 3, 10, 1, hatLo);
       fill(4, 4, 8, 1, hat);
-      if (helmKind === 'ancestral-hat') {
+      if (helmKind === 'ancestral-hat' || helmKind === 'infinity-hat') {
         put(7, 3, hatHi);
         put(8, 3, '#f3e6ff');
       }
@@ -385,8 +424,14 @@
       put(8, 9, shiftColor(gem, 40));
     }
 
-    fill(4, 10, 8, 5, cloth);
-    fill(6, 11, 4, 3, clothDk);
+    if (vest) {
+      fill(4, 10, 8, 3, cloth);
+      fill(5, 11, 6, 1, clothDk);
+      fill(4, 13, 8, 1, bodyCloth === CLOTH_COLORS.torso ? '#c4a46a' : clothDk);
+    } else {
+      fill(4, 10, 8, 5, cloth);
+      fill(6, 11, 4, 3, clothDk);
+    }
     if (!tierHex) {
       put(7, 11, skin);
       put(8, 11, skin);
@@ -413,7 +458,14 @@
       put(4, 12, shiftColor(shaft, 24));
     }
 
-    if (bodyHide) {
+    if (robe) {
+      put(7, 10, clothDk);
+      put(8, 10, clothDk);
+      put(6, 11, clothDk);
+      put(9, 11, clothDk);
+      put(7, 12, clothDk);
+      put(8, 12, clothDk);
+    } else if (bodyHide) {
       put(7, 10, clothDk);
       put(8, 10, clothDk);
       put(6, 11, clothDk);
@@ -424,14 +476,14 @@
         put(5, 12, shiftColor(bodyHide, 28));
         put(10, 12, shiftColor(bodyHide, 28));
       }
-    } else if (bodyQ >= 4 && tierHex) {
+    } else if (!robe && !vest && bodyQ >= 4 && tierHex) {
       fill(2, 10, 2, 2, cloth);
       fill(12, 10, 2, 2, cloth);
       put(2, 10, clothDk);
       put(13, 10, clothDk);
     }
-    if (!bodyHide && bodyQ >= 5 && tierHex) fill(4, 10, 8, 1, '#f0d878');
-    if (!bodyHide && bodyQ >= 6 && tierHex) {
+    if (!bodyHide && !robe && !vest && bodyQ >= 5 && tierHex) fill(4, 10, 8, 1, '#f0d878');
+    if (!bodyHide && !robe && !vest && bodyQ >= 6 && tierHex) {
       put(7, 12, '#f0d878');
       put(8, 12, '#fff6c8');
     }
@@ -469,11 +521,18 @@
 
     const legs = eq.legs;
     const legQ = legs ? (QUALITY_RANK[legs.quality] || 0) : -1;
-    const legHex = legs ? (HIDE_COLORS[legs.hide] || TIER_COLORS[legs.tier] || '#5c3a28') : '#5c3824';
+    const legCloth = legs && CLOTH_COLORS[legs.cloth];
+    const legHex = legs ? (legCloth || HIDE_COLORS[legs.hide] || TIER_COLORS[legs.tier] || '#5c3a28') : '#5c3824';
     const legCol = legs ? shiftColor(legHex, legQ >= 3 ? 8 : -12) : legHex;
-    fill(5, 15, 2, 4, legCol);
-    fill(9, 15, 2, 4, legCol);
-    if (legQ >= 5) {
+    const skirt = legs && legs.shape === 'skirt';
+    if (skirt) {
+      fill(4, 15, 8, 4, legCol);
+      fill(7, 15, 2, 4, shiftColor(legCol, -28));
+    } else {
+      fill(5, 15, 2, 4, legCol);
+      fill(9, 15, 2, 4, legCol);
+    }
+    if (legQ >= 5 && !legCloth && !skirt) {
       put(5, 15, '#f0d878');
       put(9, 15, '#f0d878');
     }

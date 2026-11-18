@@ -117,6 +117,13 @@
     'ancestral-hat': { def: { magic: 6 }, atk: { magic: 5 }, other: { magic: 1 } },
     'justiciar-helm': { def: { stab: 8, slash: 8, crush: 8, magic: 4, range: 7 }, other: { prayer: 2 } },
     'torva-helm': { def: { stab: 8, slash: 8, crush: 7, magic: 3, range: 7 }, other: { melee: 2 } },
+    'proselyte-hauberk': { def: { stab: 12, slash: 12, crush: 10, magic: 4, range: 10 }, other: { prayer: 3 } },
+    'proselyte-tasset': { def: { stab: 8, slash: 8, crush: 6, magic: 3, range: 7 }, other: { prayer: 2 } },
+    'fighter-torso': { def: { stab: 12, slash: 15, crush: 11, magic: -2, range: 12 }, other: { melee: 4 } },
+    'obsidian-platebody': { def: { stab: 14, slash: 14, crush: 14, magic: -2, range: 12 }, other: { melee: 3 } },
+    'obsidian-platelegs': { def: { stab: 9, slash: 9, crush: 9, magic: -1, range: 8 }, other: { melee: 2 } },
+    'void-top': { def: { stab: 10, slash: 10, crush: 10, magic: 10, range: 10 } },
+    'void-robe': { def: { stab: 7, slash: 7, crush: 7, magic: 7, range: 7 } },
     platebody: { def: { stab: 16, slash: 16, crush: 15, magic: -1, range: 16 }, atk: { magic: -6, range: -3 } },
     platelegs: { def: { stab: 10, slash: 9, crush: 8, magic: -1, range: 10 }, atk: { magic: -4, range: -2 } },
     kiteshield: { def: { stab: 9, slash: 10, crush: 8, magic: -1, range: 8 }, atk: { magic: -2, range: -1 } },
@@ -138,6 +145,43 @@
     },
   };
   const HIDE_COLORS = { green: '#2f9a3a', blue: '#2d6fce', black: '#3c4148' };
+  const CLOTH_COLORS = {
+    wizard: '#3a4e9a', zamorak: '#9a2424', saradomin: '#d8dce8', guthix: '#3d7a3a',
+    xeric: '#6d8f4a', mystic: '#2c4f86', darkmystic: '#4a2a6a', infinity: '#d7c48a',
+    bloodbark: '#6a1c28', void: '#d9d3c7', proselyte: '#f2efe6', obsidian: '#2a2a2e', torso: '#8d3030',
+  };
+  const CLOTH = [
+    { name: 'blue wizard robe', slot: 'body', tier: 'iron', baseId: 'wizard-robe', osrsId: 577, cloth: 'wizard', shape: 'robe', gearStyle: 'magic' },
+    { name: 'blue skirt', slot: 'legs', tier: 'iron', baseId: 'wizard-skirt', osrsId: 1011, cloth: 'wizard', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'zamorak robe top', slot: 'body', tier: 'black', baseId: 'zamorak-top', osrsId: 10460, cloth: 'zamorak', shape: 'robe', gearStyle: 'magic' },
+    { name: 'zamorak robe legs', slot: 'legs', tier: 'black', baseId: 'zamorak-legs', osrsId: 10468, cloth: 'zamorak', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'saradomin robe top', slot: 'body', tier: 'black', baseId: 'saradomin-top', osrsId: 10458, cloth: 'saradomin', shape: 'robe', gearStyle: 'magic' },
+    { name: 'saradomin robe legs', slot: 'legs', tier: 'black', baseId: 'saradomin-legs', osrsId: 10464, cloth: 'saradomin', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'guthix robe top', slot: 'body', tier: 'black', baseId: 'guthix-top', osrsId: 10462, cloth: 'guthix', shape: 'robe', gearStyle: 'magic' },
+    { name: 'guthix robe legs', slot: 'legs', tier: 'black', baseId: 'guthix-legs', osrsId: 10466, cloth: 'guthix', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'xerician hat', slot: 'head', tier: 'mithril', baseId: 'xeric-hat', osrsId: 13385, cloth: 'xeric', shape: 'hat', gearStyle: 'magic' },
+    { name: 'xerician top', slot: 'body', tier: 'mithril', baseId: 'xeric-top', osrsId: 13387, cloth: 'xeric', shape: 'robe', gearStyle: 'magic' },
+    { name: 'xerician robe', slot: 'legs', tier: 'mithril', baseId: 'xeric-robe', osrsId: 13389, cloth: 'xeric', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'mystic hat', slot: 'head', tier: 'adamant', baseId: 'mystic-hat', osrsId: 4089, cloth: 'mystic', shape: 'hat', gearStyle: 'magic' },
+    { name: 'mystic robe top', slot: 'body', tier: 'adamant', baseId: 'mystic-top', osrsId: 4091, cloth: 'mystic', shape: 'robe', gearStyle: 'magic' },
+    { name: 'mystic robe bottom', slot: 'legs', tier: 'adamant', baseId: 'mystic-bottom', osrsId: 4093, cloth: 'mystic', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'mystic hat (dark)', slot: 'head', tier: 'rune', baseId: 'dark-mystic-hat', osrsId: 4099, cloth: 'darkmystic', shape: 'hat', gearStyle: 'magic' },
+    { name: 'mystic robe top (dark)', slot: 'body', tier: 'rune', baseId: 'dark-mystic-top', osrsId: 4101, cloth: 'darkmystic', shape: 'robe', gearStyle: 'magic' },
+    { name: 'mystic robe bottom (dark)', slot: 'legs', tier: 'rune', baseId: 'dark-mystic-bottom', osrsId: 4103, cloth: 'darkmystic', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'infinity hat', slot: 'head', tier: 'dragon', baseId: 'infinity-hat', osrsId: 6918, cloth: 'infinity', shape: 'hat', gearStyle: 'magic' },
+    { name: 'infinity top', slot: 'body', tier: 'dragon', baseId: 'infinity-top', osrsId: 6916, cloth: 'infinity', shape: 'robe', gearStyle: 'magic' },
+    { name: 'infinity bottoms', slot: 'legs', tier: 'dragon', baseId: 'infinity-bottom', osrsId: 6924, cloth: 'infinity', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'bloodbark helm', slot: 'head', tier: 'dragon', baseId: 'bloodbark-helm', osrsId: 25413, cloth: 'bloodbark', shape: 'hat', gearStyle: 'magic' },
+    { name: 'bloodbark body', slot: 'body', tier: 'dragon', baseId: 'bloodbark-body', osrsId: 25404, cloth: 'bloodbark', shape: 'robe', gearStyle: 'magic' },
+    { name: 'bloodbark legs', slot: 'legs', tier: 'dragon', baseId: 'bloodbark-legs', osrsId: 25416, cloth: 'bloodbark', shape: 'skirt', gearStyle: 'magic' },
+    { name: 'void knight top', slot: 'body', tier: 'rune', baseId: 'void-top', osrsId: 8839, cloth: 'void', shape: 'robe' },
+    { name: 'void knight robe', slot: 'legs', tier: 'rune', baseId: 'void-robe', osrsId: 8840, cloth: 'void', shape: 'skirt' },
+    { name: 'proselyte hauberk', slot: 'body', tier: 'adamant', baseId: 'proselyte-hauberk', osrsId: 9674, cloth: 'proselyte', shape: 'plate', gearStyle: 'melee' },
+    { name: 'proselyte tasset', slot: 'legs', tier: 'adamant', baseId: 'proselyte-tasset', osrsId: 9678, cloth: 'proselyte', shape: 'skirt', gearStyle: 'melee' },
+    { name: 'fighter torso', slot: 'body', tier: 'rune', baseId: 'fighter-torso', osrsId: 10551, cloth: 'torso', shape: 'vest', gearStyle: 'melee' },
+    { name: 'obsidian platebody', slot: 'body', tier: 'dragon', baseId: 'obsidian-platebody', osrsId: 21301, cloth: 'obsidian', shape: 'plate', gearStyle: 'melee' },
+    { name: 'obsidian platelegs', slot: 'legs', tier: 'dragon', baseId: 'obsidian-platelegs', osrsId: 21304, cloth: 'obsidian', shape: 'pants', gearStyle: 'melee' },
+  ];
   const DHIDE = [
     { name: "green d'hide body", slot: 'body', tier: 'adamant', baseId: 'dhide-body', osrsId: 1135, hide: 'green' },
     { name: "green d'hide chaps", slot: 'legs', tier: 'adamant', baseId: 'dhide-chaps', osrsId: 1099, hide: 'green' },
@@ -208,6 +252,17 @@
       }));
     });
   });
+  CLOTH.forEach((piece) => {
+    QUALITIES.forEach((quality) => {
+      catalog.push(makeItem(piece.slot, piece.baseId, piece.name, null, piece.tier, quality, {
+        plainName: true,
+        osrsId: piece.osrsId,
+        cloth: piece.cloth,
+        shape: piece.shape,
+        gearStyle: piece.gearStyle || null,
+      }));
+    });
+  });
   const byKey = new Map(catalog.map((item) => [item.key, item]));
 
   const levels = { attack: 40, strength: 40, defence: 40, hitpoints: 40, ranged: 40, magic: 40, prayer: 40 };
@@ -237,6 +292,8 @@
       plainName: !!extra.plainName,
       osrsId: extra.osrsId || (OSRS[baseId] && OSRS[baseId][tier]) || null,
       hide: extra.hide || null,
+      cloth: extra.cloth || null,
+      shape: extra.shape || null,
       gearStyle: extra.gearStyle || null,
     };
   }
@@ -357,7 +414,7 @@
   function iconHtml(item, size) {
     const px = size || 36;
     if (!item) return '';
-    const color = (item.hide && HIDE_COLORS[item.hide]) || tierById(item.tier).color;
+    const color = (item.cloth && CLOTH_COLORS[item.cloth]) || (item.hide && HIDE_COLORS[item.hide]) || tierById(item.tier).color;
     const letter = escapeHtml(item.baseName.charAt(0).toUpperCase());
     const img = item.osrsId
       ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="' + px + '" height="' + px + '" loading="lazy" onerror="this.remove()">'
