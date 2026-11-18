@@ -2575,6 +2575,10 @@
 
 .raid-recap-drop.is-rare strong { color: #f5d0fe; }
 
+.raid-recap-drop.is-rare img {
+  filter: drop-shadow(0 0 2px #f5d0fe) drop-shadow(0 0 8px #d946ef);
+}
+
 .raid-recap-empty {
   padding: 8px;
   color: #a89880;
@@ -2740,6 +2744,10 @@
 
 .raid-card .roll-card.is-rare span { color: #f5d0fe; }
 
+.raid-card .roll-card.is-rare img {
+  filter: drop-shadow(0 0 2px #f5d0fe) drop-shadow(0 0 7px #d946ef);
+}
+
 .raid-card .roll-card.is-win {
   background: rgba(240, 216, 120, 0.14);
   border-radius: 8px;
@@ -2754,7 +2762,7 @@
 }
 
 .raid-card .roll-card.is-win.is-rare img {
-  filter: drop-shadow(0 0 8px #e879f9);
+  filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 12px #e879f9);
 }
 
 .raid-land {
@@ -2780,6 +2788,10 @@
 }
 
 .raid-prize.is-rare { border-color: #d946ef; box-shadow: 0 0 18px rgba(217, 70, 239, 0.28); }
+
+.raid-prize.is-rare img {
+  filter: drop-shadow(0 0 3px #f5d0fe) drop-shadow(0 0 14px #d946ef);
+}
 
 .raid-prize img {
   width: 64px;

@@ -1571,7 +1571,6 @@
     }).join('');
 
     const build = spoop.build === 'ranged' || spoop.build === 'magic' ? spoop.build : 'melee';
-    const buildLabel = build === 'ranged' ? 'ranged' : build === 'magic' ? 'magic' : 'melee';
     const buildTabs = ['ranged', 'melee', 'magic'].map((id) => {
       const label = id === 'ranged' ? 'Ranged' : id === 'magic' ? 'Magic' : 'Melee';
       const on = id === build;
@@ -1579,8 +1578,6 @@
     }).join('');
 
     root.innerHTML =
-      '<div class="build-tabs" role="tablist" aria-label="Combat style">' + buildTabs + '</div>' +
-      '<p class="build-note">Wearing the best ' + buildLabel + ' kit in the bank. A new drop only goes on if it is better for ' + buildLabel + '.</p>' +
       '<a href="/spoops.html" class="text-xs text-sky-400 hover:text-sky-300">All spoops</a>' +
       '<div class="mt-3 flex flex-wrap items-end gap-4">' +
         '<canvas id="spoop-hero" class="spoop-sprite" width="16" height="24"></canvas>' +
@@ -1628,6 +1625,7 @@
           '<div class="spoop-grid equip-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
+      spoopControlsHtml(spoop, build, buildTabs) +
       bossGrid(spoop) +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<h3 class="text-sm text-slate-300 mb-2">Crates</h3>' +
@@ -1653,6 +1651,9 @@
     drawSpoop(document.getElementById('spoop-hero'), spoop);
     root.querySelectorAll('[data-build]').forEach((btn) => {
       btn.addEventListener('click', () => chooseBuild(spoopKey(spoop), btn.getAttribute('data-build'), build));
+    });
+    root.querySelectorAll('[data-focus]').forEach((btn) => {
+      btn.addEventListener('click', () => chooseFocus(spoopKey(spoop), btn.getAttribute('data-focus'), spoop.focus || ''));
     });
     root.querySelectorAll('[data-crate]').forEach((btn) => {
       const crateId = btn.getAttribute('data-crate');
@@ -1813,8 +1814,61 @@
     window.addEventListener('resize', reposition);
   }
 
+  function spoopControlsHtml(spoop, build, buildTabs) {
+    const style = build === 'ranged' ? 'ranged' : build === 'magic' ? 'magic' : 'melee';
+    const styleName = style.charAt(0).toUpperCase() + style.slice(1);
+    const current = spoop.focus || '';
+    const focusSkill = (spoop.skills || []).find((skill) => skill.id === current);
+    const anyOn = !current;
+    const any = '<button type="button" class="focus-tab' + (anyOn ? ' is-on' : '') + '" data-focus="" role="tab" aria-selected="' + anyOn + '">Anything</button>';
+    const skills = (spoop.skills || []).map((skill) => {
+      const on = skill.id === current;
+      return '<button type="button" class="focus-tab' + (on ? ' is-on' : '') + '" data-focus="' + skill.id + '" role="tab" aria-selected="' + on + '">' +
+        '<img src="' + SKILL_ICON[skill.id] + '" alt="" width="16" height="16">' +
+        escapeHtml(skill.name) +
+      '</button>';
+    }).join('');
+    const trainNote = focusSkill
+      ? 'Picking a skill steers their random training. About 60% of wandering trains ' + escapeHtml(focusSkill.name) + '. The rest of the time they pick some other skill.'
+      : 'Picking a skill steers their random training. Anything is on, so wandering picks from whatever is around.';
+    return '<section class="spoop-controls mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+      '<h3>Spoop Controls</h3>' +
+      '<div class="control-row">' +
+        '<div class="control-block">' +
+          '<h4>Auto-equip</h4>' +
+          '<p class="control-note">Picking a style puts that armor on. ' + styleName + ' is on, so they wear the best ' + style + ' kit in the bank. A new drop only goes on if it is better ' + style + ' gear.</p>' +
+          '<div class="build-tabs" role="tablist" aria-label="Auto-equip armor">' + buildTabs + '</div>' +
+        '</div>' +
+        '<div class="control-block">' +
+          '<h4>Training</h4>' +
+          '<p class="control-note">' + trainNote + '</p>' +
+          '<div class="focus-tabs" role="tablist" aria-label="Training">' + any + skills + '</div>' +
+        '</div>' +
+      '</div>' +
+    '</section>';
+  }
+
   let selling = false;
   let settingBuild = false;
+  let settingFocus = false;
+
+  async function chooseFocus(name, skill, current) {
+    const next = skill || '';
+    if (settingFocus || next === (current || '')) return;
+    settingFocus = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'focus', name, skill: next || null }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      settingFocus = false;
+    }
+  }
 
   async function chooseBuild(name, style, current) {
     if (settingBuild || !style || style === current) return;
@@ -2075,7 +2129,8 @@
         const icon = item && item.osrsId
           ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="36" height="36">'
           : '';
-        return '<div class="roll-card" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
+        const quality = item && QUALITY_COLOR[item.quality] ? ' q-' + item.quality : '';
+        return '<div class="roll-card' + quality + '" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
       }).join('');
       overlay.innerHTML =
         '<div class="roll-modal" role="dialog" aria-modal="true" aria-label="' + escapeHtml(roll.crateName) + '">' +

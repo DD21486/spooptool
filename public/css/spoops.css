@@ -665,15 +665,42 @@ body[data-page="list"] #spoop-root {
   font-size: 13px;
 }
 
+.spoop-controls h3 {
+  margin: 0 0 14px;
+  color: #e2e8f0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.control-row {
+  display: grid;
+  gap: 18px;
+}
+
+.control-block h4 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.control-note {
+  margin: 4px 0 0;
+  max-width: 62ch;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .build-tabs {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  max-width: 420px;
+  margin-top: 10px;
 }
 
 .build-tab {
   flex: 1;
-  max-width: 180px;
   padding: 8px 12px;
   border-radius: 10px;
   border: 1px solid #334155;
@@ -701,8 +728,32 @@ body[data-page="list"] #spoop-root {
   background: #101828;
 }
 
-.build-note {
-  margin: 0 0 14px;
-  color: #8b97a8;
-  font-size: 12px;
+.focus-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.focus-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #cbd5e1;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.focus-tab img {
+  display: block;
+}
+
+.focus-tab.is-on {
+  border-color: #f0d878;
+  color: #fde68a;
+  background: #2a2112;
 }

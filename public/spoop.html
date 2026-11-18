@@ -242,9 +242,28 @@
       color: #e2e8f0;
       max-width: 96px;
     }
-    .roll-card.is-win img {
+    .roll-card.q-crude span { color: #9d9d9d; }
+    .roll-card.q-worn span { color: #ffffff; }
+    .roll-card.q-worn img { filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 3px #f4f4f4); }
+    .roll-card.q-standard span { color: #1eff00; }
+    .roll-card.q-standard img { filter: drop-shadow(0 0 1px #d8ffd4) drop-shadow(0 0 5px #3dff4a); }
+    .roll-card.q-fine span { color: #4aa3ff; }
+    .roll-card.q-fine img { filter: drop-shadow(0 0 1px #d6e8ff) drop-shadow(0 0 6px #4aa3ff); }
+    .roll-card.q-sharpened span { color: #c084fc; }
+    .roll-card.q-sharpened img { filter: drop-shadow(0 0 2px #f3e8ff) drop-shadow(0 0 7px #c084fc); }
+    .roll-card.q-tempered span { color: #ff8000; }
+    .roll-card.q-tempered img { filter: drop-shadow(0 0 2px #ffe7c2) drop-shadow(0 0 8px #ff8a1a); }
+    .roll-card.q-masterwork span { color: #e6cc80; }
+    .roll-card.q-masterwork img { filter: drop-shadow(0 0 2px #fff6c8) drop-shadow(0 0 9px #ffe38a); }
+    .roll-card.is-win:not([class*="q-"]) img {
       filter: drop-shadow(0 0 6px #f0d878);
     }
+    .roll-card.is-win.q-worn img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 8px #f4f4f4); }
+    .roll-card.is-win.q-standard img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 10px #3dff4a); }
+    .roll-card.is-win.q-fine img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 11px #4aa3ff); }
+    .roll-card.is-win.q-sharpened img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 12px #c084fc); }
+    .roll-card.is-win.q-tempered img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 13px #ff8a1a); }
+    .roll-card.is-win.q-masterwork img { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 14px #ffe38a); }
     .roll-result {
       margin-top: 0.75rem;
       color: #fde68a;
@@ -257,6 +276,6 @@
     <p id="spoop-clock" class="text-xs text-slate-500 mb-2"></p>
     <div id="spoop-root"></div>
   </div>
-  <script src="/js/spoop.js?v=build"></script>
+  <script src="/js/spoop.js?v=rarity"></script>
 </body>
 </html>

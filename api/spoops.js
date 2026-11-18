@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, applyWearRules, setCombatBuild, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, sellBankItem, applyWearRules, setCombatBuild, setTrainingFocus, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -144,6 +144,13 @@ async function handlePost(req) {
       return { status: 400, payload: { error: 'Pick melee, ranged, or magic' } };
     }
     setCombatBuild(spoop, style);
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    return { status: 200, payload: presentWorld(state, debug) };
+  }
+
+  if (action === 'focus') {
+    setTrainingFocus(spoop, body.skill);
     const saved = await save(state, state.clock);
     if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
     return { status: 200, payload: presentWorld(state, debug) };
