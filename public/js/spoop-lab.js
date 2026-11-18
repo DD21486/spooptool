@@ -42,9 +42,11 @@
     { id: 'slayer-helm', name: 'slayer helmet', tier: 'mithril', osrsId: 11864 },
     { id: 'initiate-sallet', name: 'initiate sallet', tier: 'mithril', osrsId: 5574 },
     { id: 'proselyte-sallet', name: 'proselyte sallet', tier: 'adamant', osrsId: 9672 },
+    { id: 'robin-hood', name: 'robin hood hat', tier: 'adamant', osrsId: 2581 },
     { id: 'berserker-helm', name: 'berserker helm', tier: 'rune', osrsId: 3751 },
     { id: 'warrior-helm', name: 'warrior helm', tier: 'rune', osrsId: 3753 },
     { id: 'archer-helm', name: 'archer helm', tier: 'rune', osrsId: 3749 },
+    { id: 'ranger-hat', name: 'ranger hat', tier: 'rune', osrsId: 10550 },
     { id: 'farseer-helm', name: 'farseer helm', tier: 'rune', osrsId: 3755 },
     { id: 'void-melee', name: 'void melee helm', tier: 'rune', osrsId: 11665 },
     { id: 'void-ranger', name: 'void ranger helm', tier: 'rune', osrsId: 11664 },
@@ -144,7 +146,7 @@
       gloves: { def: { stab: 1, slash: 1, crush: 1, magic: 2, range: 3 }, atk: { range: 1 } },
     },
   };
-  const HIDE_COLORS = { green: '#2f9a3a', blue: '#2d6fce', black: '#3c4148' };
+  const HIDE_COLORS = { green: '#2f9a3a', blue: '#2d6fce', black: '#3c4148', huey: '#1f8a78', crystal: '#5ec8d4', ranger: '#2f6a32' };
   const CLOTH_COLORS = {
     wizard: '#3a4e9a', zamorak: '#9a2424', saradomin: '#d8dce8', guthix: '#3d7a3a',
     xeric: '#6d8f4a', mystic: '#2c4f86', darkmystic: '#4a2a6a', infinity: '#d7c48a',
@@ -192,6 +194,15 @@
     { name: "black d'hide body", slot: 'body', tier: 'dragon', baseId: 'dhide-body', osrsId: 2503, hide: 'black' },
     { name: "black d'hide chaps", slot: 'legs', tier: 'dragon', baseId: 'dhide-chaps', osrsId: 2497, hide: 'black' },
     { name: "black d'hide vambraces", slot: 'gloves', tier: 'dragon', baseId: 'dhide-vambs', osrsId: 2491, hide: 'black' },
+    { name: "rangers' tunic", slot: 'body', tier: 'adamant', baseId: 'rangers-tunic', osrsId: 12596, hide: 'ranger' },
+    { name: "rangers' tights", slot: 'legs', tier: 'adamant', baseId: 'rangers-tights', osrsId: 23249, hide: 'ranger' },
+    { name: 'hueycoatl hide coif', slot: 'head', tier: 'dragon', baseId: 'huey-coif', osrsId: 30073, hide: 'huey' },
+    { name: 'hueycoatl hide body', slot: 'body', tier: 'dragon', baseId: 'huey-body', osrsId: 30076, hide: 'huey' },
+    { name: 'hueycoatl hide chaps', slot: 'legs', tier: 'dragon', baseId: 'huey-chaps', osrsId: 30079, hide: 'huey' },
+    { name: 'hueycoatl hide vambraces', slot: 'gloves', tier: 'dragon', baseId: 'huey-vambs', osrsId: 30082, hide: 'huey' },
+    { name: 'crystal helm', slot: 'head', tier: 'dragon', baseId: 'crystal-helm', osrsId: 23971, hide: 'crystal' },
+    { name: 'crystal body', slot: 'body', tier: 'dragon', baseId: 'crystal-body', osrsId: 23975, hide: 'crystal' },
+    { name: 'crystal legs', slot: 'legs', tier: 'dragon', baseId: 'crystal-legs', osrsId: 23979, hide: 'crystal' },
   ];
   const TIER_LEVEL = { bronze: 1, iron: 1, steel: 5, black: 10, mithril: 20, adamant: 30, rune: 40, dragon: 60, barrows: 70, raid: 75 };
   const SLOT_LABEL = {
@@ -260,6 +271,28 @@
         cloth: piece.cloth,
         shape: piece.shape,
         gearStyle: piece.gearStyle || null,
+      }));
+    });
+  });
+  const KIT = [
+    { name: 'book of balance', slot: 'shield', tier: 'mithril', baseId: 'book-balance', osrsId: 3844 },
+    { name: 'unholy book', slot: 'shield', tier: 'adamant', baseId: 'unholy-book', osrsId: 3842 },
+    { name: 'book of law', slot: 'shield', tier: 'rune', baseId: 'book-law', osrsId: 12610 },
+    { name: 'antler guard', slot: 'shield', tier: 'dragon', baseId: 'antler-guard', osrsId: 31081 },
+    { name: 'odium ward', slot: 'shield', tier: 'barrows', baseId: 'odium-ward', osrsId: 11926 },
+    { name: 'aquanite hopper', slot: 'shield', tier: 'barrows', baseId: 'aquanite-hopper', osrsId: 32879 },
+    { name: "ava's attractor", slot: 'cape', tier: 'mithril', baseId: 'avas-attractor', osrsId: 10498 },
+    { name: "ava's accumulator", slot: 'cape', tier: 'rune', baseId: 'avas-accumulator', osrsId: 10499 },
+    { name: 'shayzien boots (5)', slot: 'boots', tier: 'black', baseId: 'shayzien-boots', osrsId: 13378 },
+    { name: 'ranger boots', slot: 'boots', tier: 'dragon', baseId: 'ranger-boots', osrsId: 2577 },
+    { name: 'ranger gloves', slot: 'gloves', tier: 'barrows', baseId: 'ranger-gloves', osrsId: 19994 },
+  ];
+  KIT.forEach((piece) => {
+    QUALITIES.forEach((quality) => {
+      catalog.push(makeItem(piece.slot, piece.baseId, piece.name, null, piece.tier, quality, {
+        plainName: true,
+        osrsId: piece.osrsId,
+        gearStyle: 'ranged',
       }));
     });
   });

@@ -16,6 +16,35 @@
     green: '#2f9a3a',
     blue: '#2d6fce',
     black: '#3c4148',
+    huey: '#1f8a78',
+    crystal: '#5ec8d4',
+    ranger: '#2f6a32',
+  };
+
+  const CAPE_TINTS = {
+    'avas-attractor': '#6a8a48',
+    'avas-accumulator': '#3d8a3a',
+  };
+
+  const BOOT_TINTS = {
+    'ranger-boots': '#2f6a32',
+    'shayzien-boots': '#6e4030',
+  };
+
+  const GLOVE_TINTS = {
+    'ranger-gloves': '#2f6a32',
+  };
+
+  const BOOK_COLORS = {
+    'book-balance': ['#3d7a3a', '#d4e8a4', '#1e4020'],
+    'unholy-book': ['#8a2424', '#e07070', '#3a1010'],
+    'book-law': ['#f2f4f8', '#ffffff', '#3a4e9a'],
+  };
+
+  const SHIELD_TINTS = {
+    'antler-guard': '#8a6840',
+    'odium-ward': '#5a3a78',
+    'aquanite-hopper': '#3a6a9a',
   };
 
   const CLOTH_COLORS = {
@@ -154,7 +183,7 @@
     if (layer !== 'weapon') {
     const cape = eq.cape;
     const capeQ = cape ? (QUALITY_RANK[cape.quality] || 0) : -1;
-    const capeCol = cape ? shiftColor(TIER_COLORS[cape.tier] || '#3d5a8a', -58) : null;
+    const capeCol = cape ? shiftColor((CAPE_TINTS[cape.baseId] || TIER_COLORS[cape.tier] || '#3d5a8a'), -58) : null;
     const capeDk = capeCol ? shiftColor(capeCol, -22) : null;
     if (capeCol) {
       // Behind the body, and only down to the ankles. Boots stay on the ground.
@@ -232,17 +261,26 @@
         put(8, 3, '#f3e6ff');
       }
       paintFace();
-    } else if (helmKind === 'coif') {
+    } else if (helmKind === 'coif' || helmKind === 'huey-coif') {
+      const huey = helmKind === 'huey-coif';
+      const main = huey ? '#1f8a78' : '#6e4a2e';
+      const hi = huey ? '#4ec4ae' : '#8d6340';
+      const lo = huey ? '#0e4e44' : '#3e2918';
       paintFace();
-      fill(4, 1, 8, 2, '#6e4a2e');
-      fill(5, 1, 3, 1, '#8d6340');
-      fill(3, 3, 1, 7, '#6e4a2e');
-      fill(12, 3, 1, 7, '#6e4a2e');
-      fill(4, 3, 8, 1, '#3e2918');
-      put(4, 4, '#6e4a2e');
-      put(11, 4, '#6e4a2e');
-      put(4, 8, '#3e2918');
-      put(11, 8, '#3e2918');
+      fill(4, 1, 8, 2, main);
+      fill(5, 1, 3, 1, hi);
+      fill(3, 3, 1, 7, main);
+      fill(12, 3, 1, 7, main);
+      fill(4, 3, 8, 1, lo);
+      put(4, 4, main);
+      put(11, 4, main);
+      put(4, 8, lo);
+      put(11, 8, lo);
+    } else if (helmKind === 'crystal-helm') {
+      paintDome('#5ec8d4', '#f4ffff', '#1a6a78');
+      paintFace();
+      put(7, 2, '#f4ffff');
+      put(8, 3, '#9ee8f0');
     } else if (helmKind === 'spiny-helm') {
       paintDome(top, topHi, topLo);
       put(6, 0, topLo);
@@ -393,6 +431,21 @@
       put(7, 6, '#e0b84a');
       put(8, 6, '#e0b84a');
       fill(6, 8, 4, 1, '#e0b84a');
+    } else if (helmKind === 'robin-hood') {
+      paintFace();
+      fill(4, 1, 8, 2, '#2f6a32');
+      fill(3, 3, 10, 1, '#2f6a32');
+      fill(2, 4, 12, 1, '#1e4a22');
+      put(11, 1, '#c04545');
+      put(12, 0, '#c04545');
+      put(12, 2, '#e8d090');
+    } else if (helmKind === 'ranger-hat') {
+      paintFace();
+      fill(4, 2, 8, 2, '#4a6a78');
+      fill(3, 4, 10, 1, '#3a5560');
+      put(11, 1, '#f4f4f4');
+      put(12, 0, '#d0d8dc');
+      put(10, 2, '#f4f4f4');
     } else if (helmKind === 'torva-helm') {
       paintVisor('#2c2c2c', '#5a2020');
       put(5, 0, '#9a3030');
@@ -438,7 +491,7 @@
     }
     const gloves = eq.gloves;
     const gloveQ = gloves ? (QUALITY_RANK[gloves.quality] || 0) : -1;
-    const gloveHex = gloves ? (HIDE_COLORS[gloves.hide] || TIER_COLORS[gloves.tier] || '#8d5a34') : null;
+    const gloveHex = gloves ? (GLOVE_TINTS[gloves.baseId] || HIDE_COLORS[gloves.hide] || TIER_COLORS[gloves.tier] || '#8d5a34') : null;
     const hand = gloves
       ? shiftColor(gloveHex, gloveQ >= 3 ? 18 : -6)
       : skin;
@@ -539,7 +592,7 @@
 
     const boots = eq.boots;
     const bootQ = boots ? (QUALITY_RANK[boots.quality] || 0) : -1;
-    const bootCol = boots ? shiftColor(TIER_COLORS[boots.tier] || '#3d2914', bootQ >= 3 ? 10 : -16) : '#3a2618';
+    const bootCol = boots ? shiftColor(BOOT_TINTS[boots.baseId] || TIER_COLORS[boots.tier] || '#3d2914', bootQ >= 3 ? 10 : -16) : '#3a2618';
     fill(4, 18, 3, 2, bootCol);
     fill(9, 18, 3, 2, bootCol);
     if (bootQ >= 6) {
@@ -549,8 +602,15 @@
 
     const shield = eq.shield;
     if (shield) {
+      const book = BOOK_COLORS[shield.baseId];
       const sq = QUALITY_RANK[shield.quality] || 0;
-      const face = shiftColor(TIER_COLORS[shield.tier] || '#9aa3ad', sq >= 3 ? 14 : 0);
+      if (book) {
+        fill(11, 11, 4, 5, book[2]);
+        fill(11, 11, 4, 1, book[1]);
+        fill(12, 12, 2, 3, book[0]);
+        put(12, 13, book[1]);
+      } else {
+      const face = shiftColor(SHIELD_TINTS[shield.baseId] || TIER_COLORS[shield.tier] || '#9aa3ad', sq >= 3 ? 14 : 0);
       const hi = shiftColor(face, 48);
       const mid = shiftColor(face, -18);
       const rim = '#2c241c';
@@ -578,6 +638,7 @@
       if (sq >= 5) {
         put(x0 + 2, y0 + 1, '#e6c15a');
         put(x0 + 2, y0 + 5, '#e6c15a');
+      }
       }
     }
     }

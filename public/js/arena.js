@@ -793,7 +793,7 @@
   }
 
   function setHp(fighter, hp) {
-    const pct = fighter.maxHp ? hp / fighter.maxHp : 0;
+    const pct = fighter.maxHp ? Math.max(0, Math.min(1, hp / fighter.maxHp)) : 0;
     const view = actors.get(fighter.id);
     if (!view) return;
     view.hp = hp;
@@ -975,6 +975,20 @@
     });
   }
 
+  function poolMaxHp(fight, fighter) {
+    const listed = Math.max(1, Number(fighter.maxHp) || 1);
+    const hits = (fight && fight.hits) || [];
+    for (let i = 0; i < hits.length; i++) {
+      const hit = hits[i];
+      if (!hit || hit.to !== fighter.id) continue;
+      const dealt = !hit.miss && hit.amount > 0 ? hit.amount : 0;
+      const before = (Number(hit.hp) || 0) + dealt;
+      if (before >= listed * 0.75 && before <= listed * 1.25) return Math.max(1, Math.round(before));
+      return listed;
+    }
+    return listed;
+  }
+
   function mountActors(fight) {
     hideLoadout();
     actors.clear();
@@ -985,6 +999,7 @@
     const tracks = {};
     (fight.tracks || []).forEach((tr) => { tracks[tr.id] = tr.pts || []; });
     fight.fighters.forEach((f) => {
+      f.maxHp = poolMaxHp(fight, f);
       const el = document.createElement('div');
       const bossKind = f.monster && f.monster !== 'dragon' ? ' is-' + String(f.monster).replace(/[^a-z0-9-]/g, '') : '';
       el.className = 'actor' + (f.monster ? ' is-boss' : '') + (f.minion ? ' is-minion' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '');
