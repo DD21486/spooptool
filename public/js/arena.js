@@ -2323,8 +2323,14 @@
     if (lobby) pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-enraged');
   }
 
-  // Fair line from combat and gear. A duel is a logistic on that strength.
+  // Strength is average gear, plus 1.5 for each combat level after 1.
+  // A duel is a logistic on that gap. One metal tier of gear is 10 points, and
+  // a bout's form swing (10–20% hot or cold) plus the 18–85% hit cap is about
+  // that big, so a tier is 61/39 rather than a lock. The old scale of 16 made
+  // a close field's bracket price half the night past +20000.
   // The bracket is the same shuffle the night uses, then the final is best of 3.
+  const ODDS_SCALE = 50;
+
   function oddsStrength(row) {
     return Number(row.gear) + Math.max(0, Number(row.combat) - 1) * 1.5;
   }
@@ -2337,7 +2343,7 @@
   }
 
   function oddsBeat(a, b) {
-    return 1 / (1 + Math.pow(10, (b - a) / 16));
+    return 1 / (1 + Math.pow(10, (b - a) / ODDS_SCALE));
   }
 
   function oddsSeries(p, bestOf) {
@@ -2394,7 +2400,7 @@
     const score = new Map(field.map((row) => [row.name, oddsStrength(row)]));
     let probs;
     if (board.kind === 'ffa') {
-      const weights = field.map((row) => Math.exp(oddsStrength(row) / 12));
+      const weights = field.map((row) => Math.pow(10, oddsStrength(row) / ODDS_SCALE));
       const sum = weights.reduce((total, weight) => total + weight, 0) || 1;
       probs = new Map(field.map((row, i) => [row.name, weights[i] / sum]));
     } else if (board.kind === 'raid') {
