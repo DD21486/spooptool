@@ -757,3 +757,27 @@ body[data-page="list"] #spoop-root {
   color: #fde68a;
   background: #2a2112;
 }
+
+.sell-tabs {
+  display: flex;
+  gap: 8px;
+  max-width: 220px;
+  margin-top: 10px;
+}
+
+.sell-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #cbd5e1;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.sell-tab.is-on {
+  border-color: #f0d878;
+  color: #fde68a;
+  background: #2a2112;
+}

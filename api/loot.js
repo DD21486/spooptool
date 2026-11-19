@@ -292,6 +292,12 @@ module.exports = async function handler(req, res) {
           return res.status(200).json({ url });
         }
         if (req.query.leaderboard === '1' || req.query.leaderboard === 'true') {
+          if (req.query.bundle === '1' || req.query.bundle === 'true') {
+            const { loadLootBoards } = require('../lib/home-stats');
+            const boards = await loadLootBoards(sql);
+            res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
+            return res.status(200).json({ boards });
+          }
           const hoursParam = req.query.hours != null ? parseInt(req.query.hours, 10) : null;
           const todayParam = req.query.today === '1' || req.query.today === 'true';
           const weekParam = req.query.week === '1' || req.query.week === 'true';

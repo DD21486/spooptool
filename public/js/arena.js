@@ -2262,8 +2262,46 @@
     tickCountdown();
   }
 
-  function playReplay() {
+  function replayMissing(row) {
+    if (!row || !row.hasReplay) return false;
+    if (row.raid) return false;
+    if (row.bout) return false;
+    if (row.tournament && Array.isArray(row.tournament.matches) && row.tournament.matches.length) return false;
+    return true;
+  }
+
+  function fightStub(row) {
+    if (!row) return null;
+    if (row.bout) return row.bout;
+    if (row.boutDuration) return { duration: row.boutDuration };
+    return { duration: 0 };
+  }
+
+  async function hydrateReplay(data, force) {
+    const last = data.last;
+    const lastPk = data.lastPk;
+    const showMs = last && last.tournament ? last.tournament.showMs : (last && last.showMs) || 0;
+    const pkSoon = !!(lastPk && liveFor(Date.parse(lastPk.at), fightStub(lastPk), PK_SPEED, 0));
+    const nightSoon = !!(last && liveFor(Date.parse(last.at), fightStub(last), ARENA_SPEED, showMs));
+    const needLast = last && replayMissing(last) && (force || nightSoon);
+    const needPk = lastPk && replayMissing(lastPk) && (force || pkSoon);
+    if (!needLast && !needPk) return data;
+    const res = await fetch('/api/arena?replay=1');
+    const full = await res.json().catch(() => ({}));
+    if (!res.ok) return data;
+    if (needLast && full.last) data.last = full.last;
+    if (needPk && full.lastPk) data.lastPk = full.lastPk;
+    return data;
+  }
+
+  async function playReplay() {
     if (!replayLast || playing || introducing) return;
+    if (replayMissing(replayLast)) {
+      const data = { last: replayLast, lastPk: null };
+      await hydrateReplay(data, true);
+      replayLast = data.last || replayLast;
+    }
+    if (replayMissing(replayLast)) return;
     hideRecap();
     if (waitEl) waitEl.hidden = true;
     if (replayBtn) replayBtn.hidden = true;
@@ -2290,7 +2328,7 @@
   function syncReplay() {
     if (!replayBtn) return;
     const pkWaiting = !!(pkAtMs && worldMs() < pkAtMs);
-    const replayable = replayLast && (replayLast.bout || replayLast.tournament);
+    const replayable = replayLast && (replayLast.bout || replayLast.tournament || replayLast.raid || replayLast.hasReplay);
     replayBtn.hidden = !replayable || playing || introducing || pkWaiting;
   }
 
@@ -3417,6 +3455,7 @@
       nextDetail = data.nextDetail || '';
       oddsBoard = data.odds || null;
       oddsTrail = Array.isArray(data.oddsTrail) ? data.oddsTrail : [];
+      await hydrateReplay(data, false);
       pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
       pkA = data.pk ? data.pk.a || '' : '';
       pkB = data.pk ? data.pk.b || '' : '';
@@ -3429,7 +3468,7 @@
         : null;
       paintPot(upcomingPot);
       const lastPk = data.lastPk;
-      replayLast = last && (last.bout || last.tournament) ? last : null;
+      replayLast = last && (last.bout || last.tournament || last.raid || last.hasReplay) ? last : null;
       const waiting = !!(pkAtMs && worldMs() < pkAtMs);
       const pkLive = !!(lastPk && lastPk.bout && !waiting && holdPk !== lastPk.at && seenPk() !== lastPk.at && liveFor(Date.parse(lastPk.at), lastPk.bout, PK_SPEED));
       const showMs = last && last.tournament ? last.tournament.showMs : (last && last.showMs) || 0;
@@ -3534,10 +3573,19 @@
     if (action.getAttribute('data-recap') === 'close') leaveRecap();
   });
 
+  function nextPollMs() {
+    const now = worldMs();
+    const targets = [nextAtMs, pkAtMs].filter((t) => t > 0);
+    for (let i = 0; i < targets.length; i++) {
+      if (Math.abs(targets[i] - now) < 3 * 60 * 1000) return 15000;
+    }
+    return 120000;
+  }
+
   window.setInterval(tickCountdown, 250);
   window.setInterval(() => {
     if (playing || fetchingNight || introducing) return;
-    if (Date.now() - lastFetchAt < 30000) return;
+    if (Date.now() - lastFetchAt < nextPollMs()) return;
     loadNight();
   }, 5000);
   loadNight();

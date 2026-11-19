@@ -1775,6 +1775,13 @@
     root.querySelectorAll('[data-focus]').forEach((btn) => {
       btn.addEventListener('click', () => chooseFocus(spoopKey(spoop), btn.getAttribute('data-focus'), spoop.focus || ''));
     });
+    root.querySelectorAll('[data-autosell]').forEach((btn) => {
+      btn.addEventListener('click', () => chooseAutoSell(
+        spoopKey(spoop),
+        btn.getAttribute('data-autosell') === '1',
+        spoop.autoSell !== false
+      ));
+    });
     root.querySelectorAll('[data-crate]').forEach((btn) => {
       const crateId = btn.getAttribute('data-crate');
       btn.addEventListener('click', () => buyCrate(spoopKey(spoop), crateId, spoop.gold));
@@ -1951,6 +1958,13 @@
     const trainNote = focusSkill
       ? 'Picking a skill steers their random training. About 60% of wandering trains ' + escapeHtml(focusSkill.name) + '. The rest of the time they pick some other skill.'
       : 'Picking a skill steers their random training. Anything is on, so wandering picks from whatever is around.';
+    const sellOn = spoop.autoSell !== false;
+    const sellNote = sellOn
+      ? 'On, spare gear that is no better than what they wear goes to the Grand Exchange. Uniques stay, and so does the best upgrade in each slot. Click a bank item if you want to sell one yourself.'
+      : 'Off, they keep spare gear in the bank. A full bank still clears the cheapest leftovers. Click a bank item if you want to sell one yourself.';
+    const sellTabs =
+      '<button type="button" class="sell-tab' + (sellOn ? ' is-on' : '') + '" data-autosell="1" role="tab" aria-selected="' + sellOn + '">On</button>' +
+      '<button type="button" class="sell-tab' + (sellOn ? '' : ' is-on') + '" data-autosell="0" role="tab" aria-selected="' + !sellOn + '">Off</button>';
     return '<section class="spoop-controls mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
       '<h3>Spoop Controls</h3>' +
       '<div class="control-row">' +
@@ -1964,6 +1978,11 @@
           '<p class="control-note">' + trainNote + '</p>' +
           '<div class="focus-tabs" role="tablist" aria-label="Training">' + any + skills + '</div>' +
         '</div>' +
+        '<div class="control-block">' +
+          '<h4>Auto-sell</h4>' +
+          '<p class="control-note">' + sellNote + '</p>' +
+          '<div class="sell-tabs" role="tablist" aria-label="Auto-sell spare gear">' + sellTabs + '</div>' +
+        '</div>' +
       '</div>' +
     '</section>';
   }
@@ -1971,6 +1990,24 @@
   let selling = false;
   let settingBuild = false;
   let settingFocus = false;
+  let settingSell = false;
+
+  async function chooseAutoSell(name, on, current) {
+    if (settingSell || on === current) return;
+    settingSell = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'autosell', name, on }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      settingSell = false;
+    }
+  }
 
   async function chooseFocus(name, skill, current) {
     const next = skill || '';

@@ -379,7 +379,7 @@
     const rows = displayList.map(username => {
       const d = deltaSource[username];
       const delta = isDelta && d
-        ? (d.skillDeltas && skillKey in d.skillDeltas ? d.skillDeltas[skillKey] : d.xpDelta)
+        ? (skillKey === 'overall' ? (d.xpDelta || 0) : ((d.skillDeltas && d.skillDeltas[skillKey]) || 0))
         : 0;
       return {
         username,
@@ -1034,79 +1034,36 @@
     rightTbody.innerHTML = '';
     if (lootTbody) lootTbody.innerHTML = '';
     try {
-      const [dataRes, deltasRes, deltasTodayRes, deltasWeekRes, deltasMonthRes, deltasLastWeekRes, lootTotalRes, loot24Res, lootTodayRes, lootWeekRes, lootMonthRes, lootLastWeekRes] = await Promise.all([
+      const [dataRes, deltasRes, lootRes] = await Promise.all([
         fetch(API + '/characters-with-snapshots'),
-        fetch(API + '/characters-deltas?hours=24'),
-        fetch(API + '/characters-deltas?today=1'),
-        fetch(API + '/characters-deltas?week=1'),
-        fetch(API + '/characters-deltas?month=1'),
-        fetch(API + '/characters-deltas?lastWeek=1'),
-        fetch(API + '/loot?leaderboard=1'),
-        fetch(API + '/loot?leaderboard=1&hours=24'),
-        fetch(API + '/loot?leaderboard=1&today=1'),
-        fetch(API + '/loot?leaderboard=1&week=1'),
-        fetch(API + '/loot?leaderboard=1&month=1'),
-        fetch(API + '/loot?leaderboard=1&lastWeek=1'),
+        fetch(API + '/characters-deltas?bundle=1'),
+        fetch(API + '/loot?leaderboard=1&bundle=1'),
       ]);
       if (!dataRes.ok) throw new Error('Failed to load data');
       const data = await dataRes.json();
       const deltasData = await deltasRes.json().catch(() => ({}));
-      const deltasTodayData = await deltasTodayRes.json().catch(() => ({}));
-      const deltasWeekData = await deltasWeekRes.json().catch(() => ({}));
-      const deltasMonthData = await deltasMonthRes.json().catch(() => ({}));
-      const deltasLastWeekData = await deltasLastWeekRes.json().catch(() => ({}));
-      last24hDeltas = {};
-      (deltasData.deltas || []).forEach((d) => {
-        last24hDeltas[d.username] = {
-          xpDelta: d.xpDelta,
-          bossKcDelta: d.bossKcDelta,
-          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
-          skillDeltas: d.skillDeltas || {},
-          bossDeltas: d.bossDeltas || {},
-        };
-      });
-      todayDeltas = {};
-      (deltasTodayData.deltas || []).forEach((d) => {
-        todayDeltas[d.username] = {
-          xpDelta: d.xpDelta,
-          bossKcDelta: d.bossKcDelta,
-          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
-          skillDeltas: d.skillDeltas || {},
-          bossDeltas: d.bossDeltas || {},
-        };
-      });
-      weekDeltas = {};
-      (deltasWeekData.deltas || []).forEach((d) => {
-        weekDeltas[d.username] = {
-          xpDelta: d.xpDelta,
-          bossKcDelta: d.bossKcDelta,
-          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
-          skillDeltas: d.skillDeltas || {},
-          bossDeltas: d.bossDeltas || {},
-        };
-      });
-      monthDeltas = {};
-      (deltasMonthData.deltas || []).forEach((d) => {
-        monthDeltas[d.username] = {
-          xpDelta: d.xpDelta,
-          bossKcDelta: d.bossKcDelta,
-          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
-          skillDeltas: d.skillDeltas || {},
-          bossDeltas: d.bossDeltas || {},
-        };
-      });
-      lastWeekDeltas = {};
-      (deltasLastWeekData.deltas || []).forEach((d) => {
-        lastWeekDeltas[d.username] = {
-          xpDelta: d.xpDelta,
-          bossKcDelta: d.bossKcDelta,
-          bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
-          skillDeltas: d.skillDeltas || {},
-          bossDeltas: d.bossDeltas || {},
-        };
-      });
-      const lootLastWeekData = await lootLastWeekRes.json().catch(() => ({}));
-      lastWeekLootLeaderboard = Array.isArray(lootLastWeekData.players) ? lootLastWeekData.players : [];
+      const periods = deltasData.periods || {};
+      function takeDeltas(list) {
+        const out = {};
+        (list || []).forEach((d) => {
+          out[d.username] = {
+            xpDelta: d.xpDelta,
+            bossKcDelta: d.bossKcDelta,
+            bossScoreDelta: d.bossScoreDelta != null ? d.bossScoreDelta : (d.bossKcDelta || 0),
+            skillDeltas: d.skillDeltas || {},
+            bossDeltas: d.bossDeltas || {},
+          };
+        });
+        return out;
+      }
+      last24hDeltas = takeDeltas(periods.hours24);
+      todayDeltas = takeDeltas(periods.today);
+      weekDeltas = takeDeltas(periods.week);
+      monthDeltas = takeDeltas(periods.month);
+      lastWeekDeltas = takeDeltas(periods.lastWeek);
+      const lootData = await lootRes.json().catch(() => ({}));
+      const boards = lootData.boards || {};
+      lastWeekLootLeaderboard = Array.isArray(boards.lastWeek) ? boards.lastWeek : [];
       const list = data.characters || [];
       characterList = list.map(c => (typeof c === 'string' ? c : c.username));
       playerData = {};
@@ -1120,16 +1077,11 @@
         if (lootLoading) lootLoading.textContent = 'No characters.';
         return;
       }
-      const lootTotalData = await lootTotalRes.json().catch(() => ({}));
-      const loot24Data = await loot24Res.json().catch(() => ({}));
-      const lootTodayData = await lootTodayRes.json().catch(() => ({}));
-      const lootWeekData = await lootWeekRes.json().catch(() => ({}));
-      const lootMonthData = await lootMonthRes.json().catch(() => ({}));
-      lootLeaderboardTotal = Array.isArray(lootTotalData.players) ? lootTotalData.players : [];
-      lootLeaderboard24 = Array.isArray(loot24Data.players) ? loot24Data.players : [];
-      lootLeaderboardToday = Array.isArray(lootTodayData.players) ? lootTodayData.players : [];
-      lootLeaderboardWeek = Array.isArray(lootWeekData.players) ? lootWeekData.players : [];
-      lootLeaderboardMonth = Array.isArray(lootMonthData.players) ? lootMonthData.players : [];
+      lootLeaderboardTotal = Array.isArray(boards.total) ? boards.total : [];
+      lootLeaderboard24 = Array.isArray(boards.hours24) ? boards.hours24 : [];
+      lootLeaderboardToday = Array.isArray(boards.today) ? boards.today : [];
+      lootLeaderboardWeek = Array.isArray(boards.week) ? boards.week : [];
+      lootLeaderboardMonth = Array.isArray(boards.month) ? boards.month : [];
       populateFilterSkill();
       populateFilterBoss();
       renderLeft();

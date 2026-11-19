@@ -648,7 +648,7 @@
   });
 
   if (new URLSearchParams(location.search).has('live')) {
-    fetch('/api/arena')
+    fetch('/api/arena?replay=1')
       .then((res) => res.json())
       .then((data) => {
         const raid = data.last && data.last.raid;

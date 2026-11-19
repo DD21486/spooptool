@@ -6,7 +6,7 @@
  */
 
 const { neon } = require('@neondatabase/serverless');
-const { computeBossScore } = require('../lib/spoopscore');
+const { loadWeeklySeries } = require('../lib/home-stats');
 
 const GE_PRICES_BASE = 'https://prices.runescape.wiki/api/v1/osrs';
 const GE_USER_AGENT = 'SpoopTool GE Tracker - https://github.com/spooptool';
@@ -182,112 +182,10 @@ async function handleGeProxy(req, res, sql) {
   }
 }
 
-function xpFromData(data) {
-  if (!data || !data.skills || !data.skills.overall) return 0;
-  const x = data.skills.overall.xp;
-  return x != null ? Number(x) : 0;
-}
-
-function totalBossKcFromData(data) {
-  if (!data || !data.bosses) return 0;
-  let sum = 0;
-  for (const b of Object.values(data.bosses)) {
-    if (b && typeof b.count === 'number') sum += b.count;
-  }
-  return sum;
-}
-
-const WEEKLY_WINNERS_WEEKS = 52;
-
 async function handleWeeklyWinners(sql, res) {
-  const weeksParam = WEEKLY_WINNERS_WEEKS;
-  const daysBack = weeksParam * 7;
-  const chars = await sql`SELECT id, username FROM characters ORDER BY id ASC`;
-  const idToUsername = {};
-  chars.forEach((c) => { idToUsername[c.id] = c.username; });
-
-  const snapshotRows = await sql`
-    SELECT character_id, at, data
-    FROM character_snapshots
-    WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - make_interval(days => ${daysBack})
-      AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
-    ORDER BY at ASC
-  `;
-  const lootRows = await sql`
-    SELECT LOWER(TRIM(username)) AS key_username, MAX(TRIM(username)) AS username, at, total_value_gp
-    FROM loot_drops
-    WHERE at >= (date_trunc('week', NOW() + interval '1 day') - interval '1 day') - make_interval(days => ${daysBack})
-      AND at < (date_trunc('week', NOW() + interval '1 day') - interval '1 day')
-  `;
-
-  const weekEndRow = await sql`SELECT (date_trunc('week', NOW() + interval '1 day') - interval '1 day') AS week_end`;
-  const weekEnd = weekEndRow.length && weekEndRow[0].week_end ? new Date(weekEndRow[0].week_end) : new Date();
-  const msPerWeek = 7 * 24 * 60 * 60 * 1000;
-  const xpWinners = [];
-  const bossWinners = [];
-  const lootWinners = [];
-
-  for (let i = 0; i < weeksParam; i++) {
-    const windowStart = new Date(weekEnd.getTime() - (i + 1) * msPerWeek);
-    const windowEnd = new Date(weekEnd.getTime() - i * msPerWeek);
-
-    const snapInWindow = (snapshotRows || []).filter((r) => {
-      const t = new Date(r.at).getTime();
-      return t >= windowStart.getTime() && t < windowEnd.getTime();
-    });
-    const firstByChar = {};
-    const lastByChar = {};
-    for (const r of snapInWindow) {
-      const cid = r.character_id;
-      if (!firstByChar[cid]) firstByChar[cid] = r;
-      lastByChar[cid] = r;
-    }
-    const deltas = chars.map((c) => {
-      const first = firstByChar[c.id];
-      const last = lastByChar[c.id];
-      if (!first || !last) return { username: c.username, xpDelta: 0, bossKcDelta: 0, bossScoreDelta: 0 };
-      const firstData = first.data || {};
-      const lastData = last.data || {};
-      const firstBossScore = computeBossScore(firstData.bosses || {});
-      const lastBossScore = computeBossScore(lastData.bosses || {});
-      const bossScoreDelta = Math.max(0, lastBossScore - firstBossScore);
-      return {
-        username: c.username,
-        xpDelta: Math.max(0, xpFromData(lastData) - xpFromData(firstData)),
-        bossKcDelta: Math.max(0, totalBossKcFromData(lastData) - totalBossKcFromData(firstData)),
-        bossScoreDelta,
-      };
-    });
-    const xpWinner = deltas.filter((d) => d.xpDelta > 0).sort((a, b) => b.xpDelta - a.xpDelta)[0];
-    const bossWinner = deltas.filter((d) => d.bossScoreDelta > 0).sort((a, b) => b.bossScoreDelta - a.bossScoreDelta)[0];
-    xpWinners.push(xpWinner ? xpWinner.username : null);
-    bossWinners.push(bossWinner ? bossWinner.username : null);
-
-    const lootInWindow = (lootRows || []).filter((r) => {
-      const t = new Date(r.at).getTime();
-      return t >= windowStart.getTime() && t < windowEnd.getTime();
-    });
-    const lootByUser = {};
-    for (const r of lootInWindow) {
-      const u = (r.key_username || r.username || '').trim();
-      if (!u) continue;
-      if (!lootByUser[u]) lootByUser[u] = { username: (r.username || u).trim(), total: 0 };
-      lootByUser[u].total += Number(r.total_value_gp) || 0;
-    }
-    const lootSorted = Object.values(lootByUser).filter((o) => o.total > 0).sort((a, b) => b.total - a.total);
-    lootWinners.push(lootSorted[0] ? lootSorted[0].username : null);
-  }
-
-  const firstNonNull = (arr) => (arr && Array.isArray(arr) ? arr.find((x) => x != null && String(x).trim() !== '') : null) ?? null;
+  const series = await loadWeeklySeries(sql);
   res.setHeader('Cache-Control', 'public, s-maxage=90, stale-while-revalidate=120');
-  return res.status(200).json({
-    xp: xpWinners,
-    boss: bossWinners,
-    loot: lootWinners,
-    xpLatest: firstNonNull(xpWinners),
-    bossLatest: firstNonNull(bossWinners),
-    lootLatest: firstNonNull(lootWinners),
-  });
+  return res.status(200).json(series);
 }
 
 module.exports = async function handler(req, res) {

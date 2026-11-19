@@ -1,5 +1,5 @@
-const { load, save, keepReminderMarks } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, applyWearRules, setCombatBuild, setTrainingFocus, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
+const { advance, openCrate, sellBankItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -74,6 +74,7 @@ async function syncWorld(debug) {
   const changedGear = events.length > 0;
   if (!state.useSim) {
     events = events.concat(advance(state, new Date()));
+    noteOddsHour(state, new Date(state.clock));
     const claimed = takeDiscordQueue(state, events);
     const saved = await save(state, expected);
     if (!saved) return presentWorld(await load(), debug, []);
@@ -156,6 +157,13 @@ async function handlePost(req) {
     return { status: 200, payload: presentWorld(state, debug) };
   }
 
+  if (action === 'autosell') {
+    setAutoSell(spoop, body.on === true || body.on === 'true' || body.on === 1 || body.on === '1');
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    return { status: 200, payload: presentWorld(state, debug) };
+  }
+
   if (action === 'sell') {
     const now = new Date(state.clock);
     const result = sellBankItem(spoop, body.item, now);
@@ -228,20 +236,44 @@ async function proxySprite(req, res) {
   return res.status(404).end();
 }
 
-async function worldNow() {
-  await syncWorld(false);
-  const state = await load();
-  if (!state.useSim && noteOddsHour(state, new Date(state.clock))) {
-    await save(state, state.clock);
+const ARENA_SYNC_MS = 10 * 60 * 1000;
+
+function cardNeedsSync(card) {
+  if (!card || !card.now) return true;
+  if (card.useSim) return false;
+  const clock = Date.parse(card.now);
+  if (!Number.isFinite(clock) || Date.now() - clock > ARENA_SYNC_MS) return true;
+  const nextAt = Date.parse(card.nextAt || '');
+  if (Number.isFinite(nextAt) && nextAt <= Date.now() + 20000) {
+    const lastAt = card.last && Date.parse(card.last.at);
+    if (!(Number.isFinite(lastAt) && Math.abs(lastAt - nextAt) < 120000)) return true;
   }
+  const pkAt = card.pk && Date.parse(card.pk.fightAt || '');
+  if (Number.isFinite(pkAt) && pkAt <= Date.now() + 20000) return true;
+  return false;
+}
+
+async function replaySnapshot() {
+  const state = await load();
+  attachReplays(state, await loadReplays());
   return arenaSnapshot(state);
 }
 
-/** GET /api/arena (rewrite → ?path=arena). Same function as /api/spoops. */
+/** GET /api/arena (rewrite → ?path=arena). Countdown reads a small card.
+ *  The full fight replay is loaded only for ?replay=1. */
 async function handleArena(req, res) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    return res.status(200).json(await worldNow());
+    res.setHeader('Cache-Control', 'private, no-store');
+    const replay = req.query.replay === '1' || req.query.replay === 'true';
+    if (replay) return res.status(200).json(await replaySnapshot());
+    let card = await peekArenaCard();
+    if (cardNeedsSync(card)) {
+      await locked(() => syncWorld(false));
+      card = await peekArenaCard();
+    }
+    if (!card) return res.status(200).json(await replaySnapshot());
+    return res.status(200).json(card);
   } catch (err) {
     console.error('arena', err);
     return res.status(500).json({ error: 'Could not load the Spoopfight', detail: err.message || String(err) });
