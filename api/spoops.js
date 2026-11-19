@@ -173,6 +173,7 @@ async function handlePost(req) {
       discord: result.discord,
       kind: 'lamp',
       icon: result.icon,
+      stats: result.stats,
     }], state)) {
       await save(state, state.clock);
     }
