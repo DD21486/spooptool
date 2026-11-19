@@ -1356,6 +1356,15 @@
     pet: '<svg viewBox="0 0 24 24"><circle cx="7" cy="8" r="2.1" fill="currentColor"/><circle cx="12" cy="6.2" r="2.1" fill="currentColor"/><circle cx="17" cy="8" r="2.1" fill="currentColor"/><ellipse cx="12" cy="15.2" rx="5.2" ry="4" fill="currentColor"/></svg>',
   };
 
+  function crateIcon(tint) {
+    return '<svg class="crate-icon" viewBox="0 0 24 24" aria-hidden="true">' +
+      '<path fill="#8a5a2b" stroke="#2a180a" stroke-width="1" d="M3.5 6.5h17v14h-17z"/>' +
+      '<path fill="none" stroke="#5a3616" stroke-width="1" d="M3.5 11.2h17M3.5 15.8h17"/>' +
+      '<path fill="none" stroke="#5a3616" stroke-width="1.4" d="M4.5 7.5l15 12"/>' +
+      '<path fill="' + tint + '" stroke="#1a120c" stroke-width="0.6" d="M3 5h18v2.8H3zM3 19.2h18V22H3zM3 5h2.4v17H3zM18.6 5H21v17h-2.6z"/>' +
+    '</svg>';
+  }
+
   function feedKind(body, xp) {
     const text = body || '';
     if (/^found /i.test(text) || /rare drop/i.test(text)) return { kind: 'loot', label: 'Found gear' };
@@ -1588,7 +1597,7 @@
     }).join('');
   }
 
-  function itemTip(item, spoop) {
+  function itemTip(item, spoop, label) {
     const bonuses = item.bonuses || { attack: {}, defence: {}, other: {} };
     const attack = bonusRows(bonuses.attack || {});
     const defence = bonusRows(bonuses.defence || {});
@@ -1609,7 +1618,9 @@
     const value = item.value != null
       ? '<p class="text-amber-200 tabular-nums">' + Number(item.value).toLocaleString() + ' gold</p>'
       : '';
+    const kicker = label ? '<p class="spoop-tip-kicker">' + escapeHtml(label) + '</p>' : '';
     return '<div class="spoop-tip" role="tooltip">' +
+      kicker +
       '<p class="text-xs" style="color:' + (QUALITY_COLOR[item.quality] || '#fde68a') + '">' + escapeHtml(item.name) + '</p>' +
       value +
       rating +
@@ -1620,25 +1631,26 @@
     '</div>';
   }
 
+  function slotTips(item, spoop, gear) {
+    if (!item) return '';
+    const worn = gear === 'bank' && spoop && spoop.equipped && item.slot ? spoop.equipped[item.slot] : null;
+    if (worn && String(worn.id) !== String(item.id)) {
+      return '<div class="spoop-tips">' + itemTip(worn, spoop, 'Wearing') + itemTip(item, spoop, 'In bank') + '</div>';
+    }
+    return '<div class="spoop-tips">' + itemTip(item, spoop) + '</div>';
+  }
+
   function slotFrame(item, inner, spoop, sellOrOpts) {
-    const opts = sellOrOpts && typeof sellOrOpts === 'object' ? sellOrOpts : { sell: !!sellOrOpts };
-    const manual = spoop && spoop.autoEquip === false;
-    const gear = manual && item && opts.gear ? opts.gear : '';
-    const sell = !gear && opts.sell && item;
+    const opts = sellOrOpts && typeof sellOrOpts === 'object' ? sellOrOpts : {};
+    const gear = item && (opts.gear === 'worn' || opts.gear === 'bank') ? opts.gear : '';
     const color = item && QUALITY_COLOR[item.quality];
     const style = color ? ' style="border-color:' + color + '"' : '';
-    let tip = item ? itemTip(item, spoop) : '';
-    if (sell) {
-      tip = tip.replace(/<\/div>$/, '<p class="mt-1.5 text-slate-400">Click to sell</p></div>');
-    }
+    const tip = slotTips(item, spoop, gear);
     const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
-    const sellAttr = sell
-      ? ' data-sell="' + item.id + '" data-name="' + escapeHtml(item.name) + '" data-value="' + Number(item.value || 0) + '" role="button" aria-label="Sell ' + escapeHtml(item.name) + ' for ' + Number(item.value || 0).toLocaleString() + ' gold"'
-      : '';
     const gearAttr = gear
       ? ' data-gear="' + gear + '" data-item="' + item.id + '" role="button" aria-haspopup="menu" aria-label="' + escapeHtml(item.name) + '"'
       : '';
-    return '<div class="spoop-slot"' + sellAttr + gearAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
+    return '<div class="spoop-slot"' + gearAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
 
   function gearCell(slot, item, spoop) {
@@ -1706,7 +1718,7 @@
     for (let i = 0; i < bankSlots; i++) {
       const item = spoop.bank[i];
       bankCells.push(item
-        ? slotFrame(item, itemIcon(item), spoop, { sell: true, gear: 'bank' })
+        ? slotFrame(item, itemIcon(item), spoop, { gear: 'bank' })
         : '<div class="spoop-slot"></div>');
     }
     const bank = '<div class="flex flex-wrap gap-1">' + bankCells.join('') + '</div>';
@@ -1716,14 +1728,23 @@
       ? '<p class="text-sm ' + (fight.won ? 'text-emerald-300' : 'text-rose-300') + '">' + escapeHtml(fight.summary) + '</p>' +
         '<ol class="mt-2 text-xs text-slate-400 space-y-0.5">' + fight.lines.map((line) => '<li>' + escapeHtml(line) + '</li>').join('') + '</ol>'
       : '<p class="text-slate-600 text-sm">No arena fight yet. Fights resolve at 9:00pm ET.</p>';
-    const crates = (state.crates || []).map((crate) => {
+    const crateButton = (crate) => {
       const afford = spoop.gold >= crate.cost;
-      const tint = TIER_COLORS[crate.tier] || '#94a3b8';
-      return '<button type="button" data-crate="' + escapeHtml(crate.id) + '" class="crate-btn text-left rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2' + (afford ? '' : ' opacity-45') + '" style="border-left:3px solid ' + tint + '">' +
-        '<span class="block text-sm text-slate-100">' + escapeHtml(crate.name) + '</span>' +
-        '<span class="block text-xs text-amber-200/90">' + priceLabel(crate.cost) + ' gold</span>' +
+      const tint = crate.tint || TIER_COLORS[crate.tier] || '#94a3b8';
+      return '<button type="button" data-crate="' + escapeHtml(crate.id) + '" class="crate-btn flex items-center gap-2 text-left rounded-lg border border-slate-700 bg-slate-900/80 px-3 py-2' + (afford ? '' : ' opacity-45') + '" style="border-left:3px solid ' + tint + '">' +
+        crateIcon(tint) +
+        '<span class="min-w-0">' +
+          '<span class="block text-sm text-slate-100">' + escapeHtml(crate.name) + '</span>' +
+          '<span class="block text-xs text-amber-200/90">' + priceLabel(crate.cost) + ' gold</span>' +
+        '</span>' +
       '</button>';
-    }).join('');
+    };
+    const metalCrates = (state.crates || []).filter((crate) => !crate.style).map(crateButton).join('');
+    const styleCrates = (state.crates || []).filter((crate) => crate.style).map(crateButton).join('');
+    const crates = metalCrates +
+      (styleCrates
+        ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">Ranging and mage</h3>' + styleCrates
+        : '');
 
     const build = spoop.build === 'ranged' || spoop.build === 'magic' ? spoop.build : 'melee';
     const buildTabs = ['ranged', 'melee', 'magic'].map((id) => {
@@ -1817,8 +1838,7 @@
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<div class="flex items-baseline justify-between gap-3 mb-2">' +
           '<h3 class="text-sm text-slate-300">Bank</h3>' +
-          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots +
-            (spoop.autoEquip === false ? ' · hover or click an item' : ' · click an item to sell it') + '</p>' +
+          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots + ' · click an item</p>' +
         '</div>' +
         bank +
       '</section>' +
@@ -1858,38 +1878,45 @@
         if (crate) openCrateMenu(ev, crate);
       });
     });
-    root.querySelectorAll('[data-sell]').forEach((slot) => {
-      const sell = () => sellBankPiece(
-        spoopKey(spoop),
-        slot.getAttribute('data-sell'),
-        slot.getAttribute('data-name'),
-        slot.getAttribute('data-value')
-      );
-      slot.addEventListener('click', sell);
-      slot.addEventListener('keydown', (ev) => {
-        if (ev.key !== 'Enter' && ev.key !== ' ') return;
-        ev.preventDefault();
-        sell();
-      });
-    });
     root.querySelectorAll('[data-gear]').forEach((slot) => {
-      slot.addEventListener('pointerenter', () => openGearMenu(slot, false));
-      slot.addEventListener('pointerleave', scheduleCloseGearMenu);
-      slot.addEventListener('click', (ev) => {
-        if (ev.target.closest('.gear-menu')) return;
-        openGearMenu(slot, true);
-      });
+      slot.addEventListener('click', () => openGearMenu(slot));
       slot.addEventListener('contextmenu', (ev) => {
         ev.preventDefault();
-        openGearMenu(slot, true);
+        openGearMenu(slot);
       });
       slot.addEventListener('keydown', (ev) => {
         if (ev.key !== 'Enter' && ev.key !== ' ') return;
         ev.preventDefault();
-        openGearMenu(slot, true);
+        openGearMenu(slot);
       });
     });
     bindEquipTips(root);
+    bindBankTips(root);
+  }
+
+  function placeBankTips(slot) {
+    const tips = slot.querySelector('.spoop-tips');
+    if (!tips) return;
+    tips.classList.remove('is-right');
+    tips.style.marginTop = '';
+    let rect = tips.getBoundingClientRect();
+    if (!rect.width) return;
+    if (rect.left < 8) tips.classList.add('is-right');
+    rect = tips.getBoundingClientRect();
+    const overflowBottom = rect.bottom - (window.innerHeight - 8);
+    const overflowTop = 8 - rect.top;
+    if (overflowBottom > 0) tips.style.marginTop = Math.round(-overflowBottom) + 'px';
+    else if (overflowTop > 0) tips.style.marginTop = Math.round(overflowTop) + 'px';
+  }
+
+  function bindBankTips(root) {
+    root.querySelectorAll('[data-gear="bank"]').forEach((slot) => {
+      slot.addEventListener('pointerover', (ev) => {
+        if (ev.relatedTarget && slot.contains(ev.relatedTarget)) return;
+        placeBankTips(slot);
+      });
+      slot.addEventListener('focusin', () => placeBankTips(slot));
+    });
   }
 
   let equipTipSlot = null;
@@ -2099,7 +2126,7 @@
   function equipModeNote(auto) {
     return auto
       ? 'Auto wears the best kit for a combat style. Manual leaves every piece where you put it.'
-      : 'Manual leaves every piece where you put it. Hover a bank item, or click it, to equip, compare, or sell. Worn gear comes off the same way.';
+      : 'Manual leaves every piece where you put it. Click a bank item or worn gear to equip, unequip, or sell.';
   }
 
   function equipStyleNote(style) {
@@ -2117,8 +2144,8 @@
 
   function sellOnText(on) {
     return on
-      ? 'On, spare gear that is no better than what they wear goes to the Grand Exchange. Uniques stay, and so does the best upgrade in each slot. Click a bank item if you want to sell one yourself.'
-      : 'Off, they keep spare gear in the bank. A full bank still clears the cheapest leftovers. Click a bank item if you want to sell one yourself.';
+      ? 'On, spare gear that is no better than what they wear goes to the Grand Exchange. Uniques stay, and so does the best upgrade in each slot. Click a bank item or worn gear to sell it, or to equip and unequip.'
+      : 'Off, they keep spare gear in the bank. A full bank still clears the cheapest leftovers. Click a bank item or worn gear to sell it, or to equip and unequip.';
   }
 
   function restoreControls() {
@@ -2364,25 +2391,20 @@
 
   let gearMenu = null;
   let gearMenuSlot = null;
-  let gearMenuPinned = false;
-  let gearHoverTimer = null;
 
   function closeGearMenu() {
-    if (gearHoverTimer) {
-      clearTimeout(gearHoverTimer);
-      gearHoverTimer = null;
+    if (gearMenuSlot) {
+      const tip = gearMenuSlot.querySelector('.spoop-tips');
+      if (tip) tip.style.display = '';
     }
-    if (gearMenuSlot) gearMenuSlot.style.zIndex = '';
     if (gearMenu) gearMenu.remove();
     gearMenu = null;
     gearMenuSlot = null;
-    gearMenuPinned = false;
     document.removeEventListener('mousedown', onGearMenuAway, true);
     document.removeEventListener('keydown', onGearMenuKey);
   }
 
   function onGearMenuAway(ev) {
-    if (!gearMenuPinned) return;
     if (gearMenu && gearMenu.contains(ev.target)) return;
     if (gearMenuSlot && gearMenuSlot.contains(ev.target)) return;
     closeGearMenu();
@@ -2390,16 +2412,6 @@
 
   function onGearMenuKey(ev) {
     if (ev.key === 'Escape') closeGearMenu();
-  }
-
-  function scheduleCloseGearMenu(ev) {
-    if (gearMenuPinned) return;
-    const next = ev.relatedTarget;
-    if (next && gearMenuSlot && gearMenuSlot.contains(next)) return;
-    if (gearHoverTimer) clearTimeout(gearHoverTimer);
-    gearHoverTimer = setTimeout(() => {
-      if (!gearMenuPinned) closeGearMenu();
-    }, 180);
   }
 
   function wearBlocked(spoop, item) {
@@ -2417,7 +2429,7 @@
 
   function gearContext(slot) {
     const spoop = detailSpoop();
-    if (!spoop || spoop.autoEquip !== false) return null;
+    if (!spoop) return null;
     const where = slot.getAttribute('data-gear');
     const id = String(slot.getAttribute('data-item'));
     let item = null;
@@ -2427,66 +2439,40 @@
       item = (spoop.bank || []).find((row) => String(row.id) === id) || null;
     }
     if (!item) return null;
-    const worn = where === 'bank' && spoop.equipped ? spoop.equipped[item.slot] : null;
-    return { spoop, where, item, worn };
+    return { spoop, where, item };
   }
 
-  function pinGearMenu() {
-    if (gearMenuPinned) return;
-    gearMenuPinned = true;
-    document.addEventListener('mousedown', onGearMenuAway, true);
-    document.addEventListener('keydown', onGearMenuKey);
-  }
-
-  function openGearMenu(slot, pin) {
+  function openGearMenu(slot) {
     if (!slot || !slot.isConnected) return;
-    const ctx = gearContext(slot);
-    if (!ctx) return;
-    if (gearHoverTimer) {
-      clearTimeout(gearHoverTimer);
-      gearHoverTimer = null;
-    }
     if (gearMenu && gearMenuSlot === slot) {
-      if (pin) pinGearMenu();
+      closeGearMenu();
       return;
     }
+    const ctx = gearContext(slot);
+    if (!ctx) return;
     closeGearMenu();
-    const fresh = gearContext(slot);
-    if (!fresh) return;
-    const { spoop, where, item, worn } = fresh;
+    const { spoop, where, item } = ctx;
     const blocked = where === 'bank' ? wearBlocked(spoop, item) : '';
-    const buttons = [];
-    if (where === 'worn') {
-      buttons.push('<button type="button" role="menuitem" data-act="unequip">Unequip</button>');
-    } else {
-      buttons.push(blocked
+    const wear = where === 'worn'
+      ? '<button type="button" role="menuitem" data-act="unequip">Unequip</button>'
+      : (blocked
         ? '<button type="button" role="menuitem" data-act="equip" disabled>' + escapeHtml(blocked) + '</button>'
         : '<button type="button" role="menuitem" data-act="equip">Equip</button>');
-      if (worn) buttons.push('<button type="button" role="menuitem" data-act="compare">Compare</button>');
-      buttons.push('<button type="button" role="menuitem" data-act="sell">Sell</button>');
-    }
     const menu = document.createElement('div');
     menu.className = 'spoop-menu gear-menu';
     menu.setAttribute('role', 'menu');
-    menu.innerHTML = buttons.join('');
-    slot.style.zIndex = '40';
-    slot.appendChild(menu);
-    const rect = menu.getBoundingClientRect();
-    if (rect.bottom > window.innerHeight - 8) {
-      menu.style.top = 'auto';
-      menu.style.bottom = 'calc(100% + 4px)';
-    }
-    if (rect.right > window.innerWidth - 8) {
-      menu.style.left = 'auto';
-      menu.style.right = '0';
-    }
-    menu.addEventListener('pointerenter', () => {
-      if (gearHoverTimer) {
-        clearTimeout(gearHoverTimer);
-        gearHoverTimer = null;
-      }
-    });
-    menu.addEventListener('pointerleave', scheduleCloseGearMenu);
+    menu.innerHTML = wear + '<button type="button" role="menuitem" data-act="sell">Sell</button>';
+    document.body.appendChild(menu);
+    const slotRect = slot.getBoundingClientRect();
+    const menuRect = menu.getBoundingClientRect();
+    let left = slotRect.left;
+    let top = slotRect.bottom + 4;
+    if (left + menuRect.width > window.innerWidth - 8) left = window.innerWidth - menuRect.width - 8;
+    if (top + menuRect.height > window.innerHeight - 8) top = Math.max(8, slotRect.top - menuRect.height - 4);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = top + 'px';
+    const tip = slot.querySelector('.spoop-tips');
+    if (tip) tip.style.display = 'none';
     menu.addEventListener('contextmenu', (ev) => ev.preventDefault());
     menu.addEventListener('click', (ev) => {
       const btn = ev.target.closest('[data-act]');
@@ -2498,89 +2484,11 @@
       if (act === 'equip') wearPiece(name, 'equip', item.id);
       else if (act === 'unequip') wearPiece(name, 'unequip', item.id);
       else if (act === 'sell') sellBankPiece(name, item.id, item.name, item.value);
-      else if (act === 'compare' && worn) showCompare(item, worn);
     });
     gearMenu = menu;
     gearMenuSlot = slot;
-    if (pin) {
-      pinGearMenu();
-      const first = menu.querySelector('button:not(:disabled)') || menu.querySelector('button');
-      if (first) first.focus();
-    }
-  }
-
-  function compareValue(item, group, key) {
-    const bonuses = item && item.bonuses;
-    const bag = bonuses && bonuses[group];
-    return Number(bag && bag[key]) || 0;
-  }
-
-  function compareTone(mine, other) {
-    if (mine === other) return 'text-slate-300';
-    return mine > other ? 'text-emerald-400' : 'text-rose-400';
-  }
-
-  function compareAmount(n, suffix) {
-    return (n > 0 ? '+' : '') + n + (suffix || '');
-  }
-
-  function showCompare(item, worn) {
-    const groups = [
-      ['Attack', 'attack', [['stab', 'Stab'], ['slash', 'Slash'], ['crush', 'Crush'], ['magic', 'Magic'], ['range', 'Range']]],
-      ['Defence', 'defence', [['stab', 'Stab'], ['slash', 'Slash'], ['crush', 'Crush'], ['magic', 'Magic'], ['range', 'Range']]],
-      ['Other', 'other', [['melee', 'Melee str'], ['ranged', 'Ranged str'], ['magic', 'Magic dmg', '%'], ['prayer', 'Prayer']]],
-    ];
-    const card = (piece, label) => {
-      const color = QUALITY_COLOR[piece.quality] || '#fde68a';
-      return '<div class="compare-card">' +
-        '<p class="compare-kicker">' + label + '</p>' +
-        itemIcon(piece) +
-        '<p class="compare-name" style="color:' + color + '">' + escapeHtml(piece.name) + '</p>' +
-        '<p class="compare-meta">Rating ' + (piece.rating != null ? piece.rating : 0) + '</p>' +
-        '<p class="compare-gold">' + Number(piece.value || 0).toLocaleString() + ' gold</p>' +
-      '</div>';
-    };
-    const rows = groups.map((group) => {
-      const lines = group[2].filter((row) => compareValue(item, group[1], row[0]) || compareValue(worn, group[1], row[0]));
-      if (!lines.length) return '';
-      const body = lines.map((row) => {
-        const mine = compareValue(item, group[1], row[0]);
-        const theirs = compareValue(worn, group[1], row[0]);
-        const suffix = row[2] || '';
-        return '<div class="compare-row"><span>' + row[1] + '</span>' +
-          '<span class="tabular-nums ' + compareTone(mine, theirs) + '">' + compareAmount(mine, suffix) + '</span>' +
-          '<span class="tabular-nums ' + compareTone(theirs, mine) + '">' + compareAmount(theirs, suffix) + '</span></div>';
-      }).join('');
-      return '<h3>' + group[0] + '</h3>' + body;
-    }).join('');
-    const overlay = document.createElement('div');
-    overlay.className = 'roll-overlay';
-    overlay.innerHTML =
-      '<div class="roll-modal compare-sheet" role="dialog" aria-modal="true" aria-labelledby="compare-title">' +
-        '<div class="flex items-start justify-between gap-3">' +
-          '<h2 id="compare-title" class="text-lg text-slate-100">Compare</h2>' +
-          '<button type="button" data-cancel class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>' +
-        '</div>' +
-        '<div class="compare-pair">' + card(item, 'In bank') + card(worn, 'Wearing') + '</div>' +
-        '<div class="compare-stats">' +
-          '<div class="compare-row compare-head"><span></span><span>In bank</span><span>Wearing</span></div>' +
-          (rows || '<p class="compare-empty">Neither piece has a bonus.</p>') +
-        '</div>' +
-      '</div>';
-    const finish = () => {
-      document.removeEventListener('keydown', onKey);
-      overlay.remove();
-    };
-    const onKey = (ev) => {
-      if (ev.key === 'Escape') finish();
-    };
-    overlay.addEventListener('click', (ev) => {
-      if (ev.target === overlay || ev.target.closest('[data-cancel]')) finish();
-    });
-    document.addEventListener('keydown', onKey);
-    document.body.appendChild(overlay);
-    const close = overlay.querySelector('[data-cancel]');
-    if (close) close.focus();
+    document.addEventListener('mousedown', onGearMenuAway, true);
+    document.addEventListener('keydown', onGearMenuKey);
   }
 
   async function sellBankPiece(name, itemId, itemName, price) {

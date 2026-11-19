@@ -1320,6 +1320,13 @@ body[data-page="detail"] .spoop-log-list li {
   border-top-color: #3a2c1c;
 }
 
+.crate-icon {
+  flex: none;
+  width: 26px;
+  height: 26px;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.5));
+}
+
 body[data-page="detail"] .crate-btn {
   border-radius: 2px;
   border-color: #5c4630;

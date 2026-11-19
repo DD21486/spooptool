@@ -36,13 +36,30 @@
       outline: none;
       box-shadow: 0 0 0 1px #f0d878;
     }
-    .spoop-tip {
+    .spoop-tips {
       display: none;
       position: absolute;
       right: calc(100% + 8px);
       top: 50%;
       transform: translateY(-50%);
+      gap: 8px;
+      align-items: flex-start;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .spoop-slot:hover .spoop-tips,
+    .spoop-slot:focus-visible .spoop-tips {
+      display: flex;
+    }
+    .spoop-tips.is-right {
+      right: auto;
+      left: calc(100% + 8px);
+      flex-direction: row-reverse;
+    }
+    .spoop-tip {
+      display: block;
       width: 168px;
+      flex: 0 0 168px;
       padding: 8px 10px;
       background: #0f172a;
       border: 1px solid #334155;
@@ -54,9 +71,12 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
       pointer-events: none;
     }
-    .spoop-slot:hover .spoop-tip,
-    .spoop-slot:focus-visible .spoop-tip {
-      display: block;
+    .spoop-tip-kicker {
+      margin-bottom: 2px;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      color: #94a3b8;
     }
     @media (max-width: 720px) {
       .equip-grid .spoop-slot:has(.spoop-tip):hover,
@@ -64,9 +84,9 @@
         z-index: 80;
         outline: none;
       }
-      .equip-grid .spoop-slot:hover .spoop-tip,
-      .equip-grid .spoop-slot:focus .spoop-tip {
-        display: block;
+      .spoop-slot:hover .spoop-tips,
+      .spoop-slot:focus .spoop-tips,
+      .spoop-slot:focus-visible .spoop-tips {
         position: fixed;
         left: 8px;
         right: 8px;
@@ -76,7 +96,11 @@
         max-height: min(50vh, 320px);
         transform: none;
         overflow: auto;
-        z-index: 2;
+        z-index: 80;
+      }
+      .spoop-tip {
+        width: auto;
+        flex: 1 1 140px;
       }
     }
     .spoop-slot img {
@@ -163,11 +187,9 @@
       background: transparent;
     }
     .spoop-menu.gear-menu {
-      position: absolute;
-      left: 0;
-      top: calc(100% + 4px);
-      z-index: 5;
-      min-width: 148px;
+      position: fixed;
+      z-index: 80;
+      min-width: 132px;
     }
     .spoop-slot[data-gear] { cursor: pointer; }
     .roll-modal.compare-sheet {
@@ -368,6 +390,6 @@
   <div class="spoop-page spoop-detail">
     <div id="spoop-root"></div>
   </div>
-  <script src="/js/spoop.js?v=back"></script>
+  <script src="/js/spoop.js?v=tips"></script>
 </body>
 </html>
