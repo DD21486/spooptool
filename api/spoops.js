@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, sellBankItem, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -162,6 +162,31 @@ async function handlePost(req) {
     const saved = await save(state, state.clock);
     if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
     return { status: 200, payload: presentWorld(state, debug) };
+  }
+
+  if (action === 'equipmode') {
+    const mode = String(body.mode || '').toLowerCase();
+    if (mode !== 'auto' && mode !== 'manual') {
+      return { status: 400, payload: { error: 'Pick auto or manual' } };
+    }
+    setEquipMode(spoop, mode);
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    return { status: 200, payload: presentWorld(state, debug) };
+  }
+
+  if (action === 'wear') {
+    const now = new Date(state.clock);
+    const op = String(body.op || '');
+    const result = op === 'unequip'
+      ? unequipItem(spoop, body.item, now)
+      : op === 'equip'
+        ? equipBankItem(spoop, body.item, now)
+        : { ok: false, error: 'Unknown wear action' };
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    return { status: 200, payload: presentWorld(state, debug, [result.text]) };
   }
 
   if (action === 'sell') {

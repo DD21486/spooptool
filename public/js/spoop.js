@@ -110,10 +110,6 @@
       .replace(/"/g, '&quot;');
   }
 
-  function gold(n) {
-    return Number(n || 0).toLocaleString() + ' gold';
-  }
-
   function shiftColor(hex, amt) {
     const n = parseInt(String(hex).replace('#', ''), 16);
     const ch = (v) => Math.max(0, Math.min(255, v));
@@ -1261,7 +1257,7 @@
   function nextActionHtml(spoop, state, detail) {
     const next = spoop && spoop.nextAction;
     if (!next || !next.at) return '';
-    const cls = detail ? 'spoop-next mt-3 text-sm text-slate-300' : 'spoop-next';
+    const cls = 'spoop-next';
     return '<p class="' + cls + '" data-next-at="' + escapeHtml(next.at) + '" data-next-kind="' + escapeHtml(next.kind || 'tick') + '" data-next-time="' + escapeHtml(next.time || '') + '" data-next-line="' + escapeHtml(next.line || '') + '"' +
       (detail ? ' data-next-detail="1"' : '') +
       (state && state.useSim ? ' data-sim="1" data-sim-clock="' + escapeHtml(state.clock || '') + '"' : '') +
@@ -1406,8 +1402,9 @@
         });
       });
     });
-    rows.sort((a, b) => b.at - a.at);
-    const items = rows.slice(0, 80).map((row) => {
+    const picked = feedSort === 'recent' ? rows : rows.filter((row) => row.name === feedSort);
+    picked.sort((a, b) => b.at - a.at);
+    const items = picked.slice(0, 80).map((row) => {
       const xp = row.xp.length ? '<p class="spoop-feed-xp">' + row.xp.map(escapeHtml).join(' · ') + '</p>' : '';
       const body = row.body ? '<p class="spoop-feed-do">' + escapeHtml(row.body) + '</p>' : '';
       const find = row.kind.kind === 'loot' ? ' is-find' : '';
@@ -1419,10 +1416,40 @@
         '</span>' +
       '</a></li>';
     }).join('');
+    const seen = {};
+    const choices = spoops.filter((spoop) => {
+      if (!spoop.name || seen[spoop.name]) return false;
+      seen[spoop.name] = true;
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name));
+    const options = '<option value="recent"' + (feedSort === 'recent' ? ' selected' : '') + '>Recent</option>' +
+      choices.map((spoop) => '<option value="' + escapeHtml(spoop.name) + '"' + (feedSort === spoop.name ? ' selected' : '') + '>' + escapeHtml(spoop.name) + '</option>').join('');
     return '<aside class="spoop-feed" aria-label="Activity">' +
-      '<h2>Activity</h2>' +
+      '<div class="spoop-feed-head">' +
+        '<h2>Activity</h2>' +
+        '<label class="spoop-feed-sort">Sort ' +
+          '<select aria-label="Sort activity">' + options + '</select>' +
+        '</label>' +
+      '</div>' +
       (items ? '<ol class="spoop-feed-list">' + items + '</ol>' : '<p class="spoop-log-empty">Nothing recorded yet.</p>') +
     '</aside>';
+  }
+
+  let feedSort = 'recent';
+
+  function bindFeedSort(root, spoops) {
+    const select = root.querySelector('.spoop-feed-sort select');
+    if (!select) return;
+    select.addEventListener('change', () => {
+      feedSort = select.value || 'recent';
+      const head = select.closest('.spoop-feed-head');
+      if (!head) return;
+      const fresh = document.createElement('div');
+      fresh.innerHTML = renderFeed(spoops);
+      const list = fresh.querySelector('.spoop-feed-list, .spoop-log-empty');
+      while (head.nextSibling) head.nextSibling.remove();
+      if (list) head.after(list);
+    });
   }
 
   function renderList(state) {
@@ -1462,6 +1489,7 @@
     root.innerHTML = '<div class="spoop-main">' + pkBanner + renderMap(spoops) + board + '</div>' + renderFeed(spoops);
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
+    bindFeedSort(root, spoops);
     paint(state);
   }
 
@@ -1592,18 +1620,25 @@
     '</div>';
   }
 
-  function slotFrame(item, inner, spoop, sell) {
+  function slotFrame(item, inner, spoop, sellOrOpts) {
+    const opts = sellOrOpts && typeof sellOrOpts === 'object' ? sellOrOpts : { sell: !!sellOrOpts };
+    const manual = spoop && spoop.autoEquip === false;
+    const gear = manual && item && opts.gear ? opts.gear : '';
+    const sell = !gear && opts.sell && item;
     const color = item && QUALITY_COLOR[item.quality];
     const style = color ? ' style="border-color:' + color + '"' : '';
     let tip = item ? itemTip(item, spoop) : '';
-    if (sell && item) {
+    if (sell) {
       tip = tip.replace(/<\/div>$/, '<p class="mt-1.5 text-slate-400">Click to sell</p></div>');
     }
     const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
-    const sellAttr = sell && item
+    const sellAttr = sell
       ? ' data-sell="' + item.id + '" data-name="' + escapeHtml(item.name) + '" data-value="' + Number(item.value || 0) + '" role="button" aria-label="Sell ' + escapeHtml(item.name) + ' for ' + Number(item.value || 0).toLocaleString() + ' gold"'
       : '';
-    return '<div class="spoop-slot"' + sellAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
+    const gearAttr = gear
+      ? ' data-gear="' + gear + '" data-item="' + item.id + '" role="button" aria-haspopup="menu" aria-label="' + escapeHtml(item.name) + '"'
+      : '';
+    return '<div class="spoop-slot"' + sellAttr + gearAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
 
   function gearCell(slot, item, spoop) {
@@ -1612,7 +1647,7 @@
     const inner = item && item.osrsId
       ? itemIcon(item)
       : '<span class="text-[9px] uppercase tracking-wide text-slate-600 text-center leading-tight px-1">' + escapeHtml(label) + '</span>';
-    return slotFrame(item, inner, spoop);
+    return slotFrame(item, inner, spoop, { gear: item ? 'worn' : '' });
   }
 
   function bossGrid(spoop) {
@@ -1671,7 +1706,7 @@
     for (let i = 0; i < bankSlots; i++) {
       const item = spoop.bank[i];
       bankCells.push(item
-        ? slotFrame(item, itemIcon(item), spoop, true)
+        ? slotFrame(item, itemIcon(item), spoop, { sell: true, gear: 'bank' })
         : '<div class="spoop-slot"></div>');
     }
     const bank = '<div class="flex flex-wrap gap-1">' + bankCells.join('') + '</div>';
@@ -1697,35 +1732,58 @@
       return '<button type="button" class="build-tab is-' + id + (on ? ' is-on' : '') + '" data-build="' + id + '" role="tab" aria-selected="' + on + '">' + label + '</button>';
     }).join('');
 
+    const activity = spoop.activity || {};
+    const training = activity.skill && !activity.quest && !activity.clue && !activity.boss && !activity.errand;
+    const skillIcon = training && SKILL_ICON[activity.skill]
+      ? '<img src="' + SKILL_ICON[activity.skill] + '" alt="" width="16" height="16">'
+      : '';
+    const owner = spoop.owner && spoop.owner !== spoop.name
+      ? '<p class="spoop-hero-owner">' + escapeHtml(spoop.owner) + '</p>'
+      : '';
+    const follower = spoop.follower
+      ? '<p class="spoop-follower">' +
+          (spoop.follower.osrsId
+            ? '<img src="/api/spoops?icon=1&id=' + Number(spoop.follower.osrsId) + '" alt="" width="22" height="22">'
+            : '') +
+          '<span>Followed by ' + escapeHtml(spoop.follower.name) +
+          (spoop.follower.owned > 1 ? ' · ' + spoop.follower.owned + ' pets' : '') + '</span></p>'
+      : '';
+    const pk = state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
+      ? '<p class="spoop-hero-pk"><a href="/arena.html">PK vs ' + escapeHtml(state.pk.a === spoop.name ? state.pk.b : state.pk.a) + '</a></p>'
+      : '';
+
     root.innerHTML =
-      '<a href="/spoops.html" class="text-xs text-sky-400 hover:text-sky-300">All spoops</a>' +
-      '<div class="mt-3 flex flex-wrap items-end gap-4">' +
-        '<canvas id="spoop-hero" class="spoop-sprite" width="16" height="24"></canvas>' +
-        '<div>' +
-          '<h1 class="text-2xl text-slate-100">' + escapeHtml(spoop.name) + '</h1>' +
-          (spoop.owner && spoop.owner !== spoop.name ? '<p class="text-xs text-slate-500">' + escapeHtml(spoop.owner) + '</p>' : '') +
-          '<p class="text-slate-400 text-sm">' + gold(spoop.gold) + ' · Arena ' + spoop.arenaWins + 'W ' + spoop.arenaLosses + 'L</p>' +
-          (spoop.follower
-            ? '<p class="text-sm text-amber-200 mt-1 flex items-center gap-2">' +
-              (spoop.follower.osrsId
-                ? '<img src="/api/spoops?icon=1&id=' + Number(spoop.follower.osrsId) + '" alt="" width="24" height="24">'
-                : '') +
-              '<span>Followed by ' + escapeHtml(spoop.follower.name) +
-              (spoop.follower.owned > 1 ? ' · ' + spoop.follower.owned + ' pets' : '') + '</span></p>'
-            : '') +
-          (state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
-            ? '<p class="text-sm mt-1"><a class="text-rose-300 hover:text-rose-200" href="/arena.html">PK vs ' + escapeHtml(state.pk.a === spoop.name ? state.pk.b : state.pk.a) + '</a></p>'
-            : '') +
+      '<header class="spoop-hero">' +
+        '<div class="spoop-hero-bar">' +
+          '<a class="spoop-back" href="/spoops.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7.2 2.4 1.6 8l5.6 5.6 1.1-1.1L4.6 8.8H14.4V7.2H4.6l3.7-3.7z"/></svg>Back To Spoops</a>' +
+          '<p id="spoop-clock" class="spoop-hero-clock"></p>' +
         '</div>' +
-        '<section class="ml-auto max-w-md text-right">' +
-          '<p class="text-xs uppercase tracking-wide text-slate-500">Right now</p>' +
-          '<h2 class="text-xl text-amber-200 mt-1">' + escapeHtml(spoop.activity.name) + '</h2>' +
-          '<p class="text-slate-300 mt-1">' + escapeHtml(spoop.activity.detail) + '</p>' +
-          '<p class="text-xs text-slate-500 mt-2">' + escapeHtml(questStatus(spoop.activity)) + '</p>' +
-          (spoop.activity.money ? '<p class="text-xs text-amber-200/80 mt-1">Slow training. The gold is the point.</p>' : '') +
-          nextActionHtml(spoop, state, true) +
-        '</section>' +
-      '</div>' +
+        '<div class="spoop-hero-main">' +
+          '<div class="spoop-portrait">' +
+            '<canvas id="spoop-hero" class="spoop-sprite" width="16" height="24"></canvas>' +
+          '</div>' +
+          '<div class="spoop-identity">' +
+            '<h1>' + escapeHtml(spoop.name) + '</h1>' +
+            owner +
+            '<ul class="spoop-pills">' +
+              '<li class="spoop-pill is-gold"><span>Gold</span><strong>' + Number(spoop.gold || 0).toLocaleString() + '</strong></li>' +
+              '<li class="spoop-pill"><span>Arena</span><strong class="win">' + spoop.arenaWins + 'W</strong><strong class="loss">' + spoop.arenaLosses + 'L</strong></li>' +
+            '</ul>' +
+            follower +
+            pk +
+          '</div>' +
+          '<section class="spoop-now">' +
+            '<p class="spoop-now-kicker"><i class="spoop-live" aria-hidden="true"></i>Right now</p>' +
+            '<h2>' + escapeHtml(activity.name || '') + '</h2>' +
+            '<p class="spoop-now-detail">' + escapeHtml(activity.detail || '') + '</p>' +
+            (activity.money ? '<p class="spoop-now-note">Slow training. The gold is the point.</p>' : '') +
+            '<div class="spoop-now-foot">' +
+              '<p class="spoop-now-skill">' + skillIcon + '<span>' + escapeHtml(questStatus(activity)) + '</span></p>' +
+              nextActionHtml(spoop, state, true) +
+            '</div>' +
+          '</section>' +
+        '</div>' +
+      '</header>' +
       '<div class="mt-6 grid gap-4 md:grid-cols-2">' +
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-2">' +
@@ -1735,7 +1793,6 @@
           '<div class="flex items-center gap-2 mb-3">' + bar(gate.progress) + '</div>' +
           '<p class="text-[11px] text-slate-500 mb-2">' + escapeHtml(gateLabel) + ' · ' + quests.done + '/' + quests.total + ' quests</p>' +
           skills +
-          statsHtml +
         '</section>' +
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-3">' +
@@ -1745,6 +1802,7 @@
           '<div class="spoop-grid equip-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
+      statsHtml +
       spoopControlsHtml(spoop, build, buildTabs) +
       bossGrid(spoop) +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
@@ -1759,7 +1817,8 @@
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<div class="flex items-baseline justify-between gap-3 mb-2">' +
           '<h3 class="text-sm text-slate-300">Bank</h3>' +
-          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots + ' · click an item to sell it</p>' +
+          '<p class="text-xs text-slate-500 tabular-nums">' + Math.min(spoop.bank.length, bankSlots) + '/' + bankSlots +
+            (spoop.autoEquip === false ? ' · hover or click an item' : ' · click an item to sell it') + '</p>' +
         '</div>' +
         bank +
       '</section>' +
@@ -1768,7 +1827,15 @@
         log +
       '</section>';
 
-    drawSpoop(document.getElementById('spoop-hero'), spoop);
+    drawSpoop(document.getElementById('spoop-hero'), spoop, { clear: true });
+    closeGearMenu();
+    root.querySelectorAll('[data-equipmode]').forEach((btn) => {
+      btn.addEventListener('click', () => chooseEquipMode(
+        spoopKey(spoop),
+        btn.getAttribute('data-equipmode'),
+        spoop.autoEquip === false ? 'manual' : 'auto'
+      ));
+    });
     root.querySelectorAll('[data-build]').forEach((btn) => {
       btn.addEventListener('click', () => chooseBuild(spoopKey(spoop), btn.getAttribute('data-build'), build));
     });
@@ -1803,6 +1870,23 @@
         if (ev.key !== 'Enter' && ev.key !== ' ') return;
         ev.preventDefault();
         sell();
+      });
+    });
+    root.querySelectorAll('[data-gear]').forEach((slot) => {
+      slot.addEventListener('pointerenter', () => openGearMenu(slot, false));
+      slot.addEventListener('pointerleave', scheduleCloseGearMenu);
+      slot.addEventListener('click', (ev) => {
+        if (ev.target.closest('.gear-menu')) return;
+        openGearMenu(slot, true);
+      });
+      slot.addEventListener('contextmenu', (ev) => {
+        ev.preventDefault();
+        openGearMenu(slot, true);
+      });
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        openGearMenu(slot, true);
       });
     });
     bindEquipTips(root);
@@ -1943,7 +2027,6 @@
 
   function spoopControlsHtml(spoop, build, buildTabs) {
     const style = build === 'ranged' ? 'ranged' : build === 'magic' ? 'magic' : 'melee';
-    const styleName = style.charAt(0).toUpperCase() + style.slice(1);
     const current = spoop.focus || '';
     const focusSkill = (spoop.skills || []).find((skill) => skill.id === current);
     const anyOn = !current;
@@ -1958,10 +2041,15 @@
     const trainNote = focusSkill
       ? 'Picking a skill steers their random training. About 60% of wandering trains ' + escapeHtml(focusSkill.name) + '. The rest of the time they pick some other skill.'
       : 'Picking a skill steers their random training. Anything is on, so wandering picks from whatever is around.';
+    const autoEquip = spoop.autoEquip !== false;
+    const equipNote = equipModeNote(autoEquip);
+    const modeTabs =
+      '<button type="button" class="sell-tab' + (autoEquip ? ' is-on' : '') + '" data-equipmode="auto" role="tab" aria-selected="' + autoEquip + '">Auto</button>' +
+      '<button type="button" class="sell-tab' + (autoEquip ? '' : ' is-on') + '" data-equipmode="manual" role="tab" aria-selected="' + !autoEquip + '">Manual</button>';
+    const styleBlock = '<div class="equip-style' + (autoEquip ? '' : ' is-hidden') + '"><p class="control-note" data-control="style">' + equipStyleNote(style) + '</p>' +
+      '<div class="build-tabs" role="tablist" aria-label="Auto-equip armor">' + buildTabs + '</div></div>';
     const sellOn = spoop.autoSell !== false;
-    const sellNote = sellOn
-      ? 'On, spare gear that is no better than what they wear goes to the Grand Exchange. Uniques stay, and so does the best upgrade in each slot. Click a bank item if you want to sell one yourself.'
-      : 'Off, they keep spare gear in the bank. A full bank still clears the cheapest leftovers. Click a bank item if you want to sell one yourself.';
+    const sellNote = sellOnText(sellOn);
     const sellTabs =
       '<button type="button" class="sell-tab' + (sellOn ? ' is-on' : '') + '" data-autosell="1" role="tab" aria-selected="' + sellOn + '">On</button>' +
       '<button type="button" class="sell-tab' + (sellOn ? '' : ' is-on') + '" data-autosell="0" role="tab" aria-selected="' + !sellOn + '">Off</button>';
@@ -1969,18 +2057,19 @@
       '<h3>Spoop Controls</h3>' +
       '<div class="control-row">' +
         '<div class="control-block">' +
-          '<h4>Auto-equip</h4>' +
-          '<p class="control-note">Picking a style puts that armor on. ' + styleName + ' is on, so they wear the best ' + style + ' kit in the bank. A new drop only goes on if it is better ' + style + ' gear.</p>' +
-          '<div class="build-tabs" role="tablist" aria-label="Auto-equip armor">' + buildTabs + '</div>' +
+          '<h4>Equip</h4>' +
+          '<p class="control-note" data-control="equip">' + equipNote + '</p>' +
+          '<div class="sell-tabs" role="tablist" aria-label="Equip mode">' + modeTabs + '</div>' +
+          styleBlock +
         '</div>' +
         '<div class="control-block">' +
           '<h4>Training</h4>' +
-          '<p class="control-note">' + trainNote + '</p>' +
+          '<p class="control-note" data-control="train">' + trainNote + '</p>' +
           '<div class="focus-tabs" role="tablist" aria-label="Training">' + any + skills + '</div>' +
         '</div>' +
         '<div class="control-block">' +
           '<h4>Auto-sell</h4>' +
-          '<p class="control-note">' + sellNote + '</p>' +
+          '<p class="control-note" data-control="sell">' + sellNote + '</p>' +
           '<div class="sell-tabs" role="tablist" aria-label="Auto-sell spare gear">' + sellTabs + '</div>' +
         '</div>' +
       '</div>' +
@@ -1991,10 +2080,95 @@
   let settingBuild = false;
   let settingFocus = false;
   let settingSell = false;
+  let settingEquip = false;
+  let wearing = false;
+
+  function markTabs(selector, attr, value) {
+    document.querySelectorAll(selector).forEach((btn) => {
+      const on = btn.getAttribute(attr) === value;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+  }
+
+  function setControlNote(which, text) {
+    const note = document.querySelector('[data-control="' + which + '"]');
+    if (note) note.textContent = text;
+  }
+
+  function equipModeNote(auto) {
+    return auto
+      ? 'Auto wears the best kit for a combat style. Manual leaves every piece where you put it.'
+      : 'Manual leaves every piece where you put it. Hover a bank item, or click it, to equip, compare, or sell. Worn gear comes off the same way.';
+  }
+
+  function equipStyleNote(style) {
+    const name = style === 'ranged' ? 'Ranged' : style === 'magic' ? 'Magic' : 'Melee';
+    const lower = name.toLowerCase();
+    return 'Picking a style puts that armor on. ' + name + ' is on, so they wear the best ' + lower + ' kit in the bank. A new drop only goes on if it is better ' + lower + ' gear.';
+  }
+
+  function trainingNote(skillId) {
+    if (!skillId) return 'Picking a skill steers their random training. Anything is on, so wandering picks from whatever is around.';
+    const btn = document.querySelector('.focus-tabs [data-focus="' + skillId + '"]');
+    const name = btn ? btn.textContent.replace(/\s+/g, ' ').trim() : 'that skill';
+    return 'Picking a skill steers their random training. About 60% of wandering trains ' + name + '. The rest of the time they pick some other skill.';
+  }
+
+  function sellOnText(on) {
+    return on
+      ? 'On, spare gear that is no better than what they wear goes to the Grand Exchange. Uniques stay, and so does the best upgrade in each slot. Click a bank item if you want to sell one yourself.'
+      : 'Off, they keep spare gear in the bank. A full bank still clears the cheapest leftovers. Click a bank item if you want to sell one yourself.';
+  }
+
+  function restoreControls() {
+    if (lastState) render(lastState);
+  }
+
+  async function chooseEquipMode(name, mode, current) {
+    if (settingEquip || !mode || mode === current) return;
+    settingEquip = true;
+    markTabs('[data-equipmode]', 'data-equipmode', mode);
+    setControlNote('equip', equipModeNote(mode === 'auto'));
+    const styles = document.querySelector('.equip-style');
+    if (styles) styles.classList.toggle('is-hidden', mode !== 'auto');
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'equipmode', name, mode }),
+      });
+      render(data);
+    } catch (err) {
+      restoreControls();
+      window.alert(err.message);
+    } finally {
+      settingEquip = false;
+    }
+  }
+
+  async function wearPiece(name, op, itemId) {
+    if (wearing || itemId == null) return;
+    wearing = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'wear', name, op, item: itemId }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      wearing = false;
+    }
+  }
 
   async function chooseAutoSell(name, on, current) {
     if (settingSell || on === current) return;
     settingSell = true;
+    markTabs('[data-autosell]', 'data-autosell', on ? '1' : '0');
+    setControlNote('sell', sellOnText(on));
     try {
       const data = await api('/api/spoops', {
         method: 'POST',
@@ -2003,6 +2177,7 @@
       });
       render(data);
     } catch (err) {
+      restoreControls();
       window.alert(err.message);
     } finally {
       settingSell = false;
@@ -2013,6 +2188,8 @@
     const next = skill || '';
     if (settingFocus || next === (current || '')) return;
     settingFocus = true;
+    markTabs('[data-focus]', 'data-focus', next);
+    setControlNote('train', trainingNote(next));
     try {
       const data = await api('/api/spoops', {
         method: 'POST',
@@ -2021,6 +2198,7 @@
       });
       render(data);
     } catch (err) {
+      restoreControls();
       window.alert(err.message);
     } finally {
       settingFocus = false;
@@ -2030,6 +2208,8 @@
   async function chooseBuild(name, style, current) {
     if (settingBuild || !style || style === current) return;
     settingBuild = true;
+    markTabs('[data-build]', 'data-build', style);
+    setControlNote('style', equipStyleNote(style));
     try {
       const data = await api('/api/spoops', {
         method: 'POST',
@@ -2038,6 +2218,7 @@
       });
       render(data);
     } catch (err) {
+      restoreControls();
       window.alert(err.message);
     } finally {
       settingBuild = false;
@@ -2181,6 +2362,227 @@
     if (close) close.focus();
   }
 
+  let gearMenu = null;
+  let gearMenuSlot = null;
+  let gearMenuPinned = false;
+  let gearHoverTimer = null;
+
+  function closeGearMenu() {
+    if (gearHoverTimer) {
+      clearTimeout(gearHoverTimer);
+      gearHoverTimer = null;
+    }
+    if (gearMenuSlot) gearMenuSlot.style.zIndex = '';
+    if (gearMenu) gearMenu.remove();
+    gearMenu = null;
+    gearMenuSlot = null;
+    gearMenuPinned = false;
+    document.removeEventListener('mousedown', onGearMenuAway, true);
+    document.removeEventListener('keydown', onGearMenuKey);
+  }
+
+  function onGearMenuAway(ev) {
+    if (!gearMenuPinned) return;
+    if (gearMenu && gearMenu.contains(ev.target)) return;
+    if (gearMenuSlot && gearMenuSlot.contains(ev.target)) return;
+    closeGearMenu();
+  }
+
+  function onGearMenuKey(ev) {
+    if (ev.key === 'Escape') closeGearMenu();
+  }
+
+  function scheduleCloseGearMenu(ev) {
+    if (gearMenuPinned) return;
+    const next = ev.relatedTarget;
+    if (next && gearMenuSlot && gearMenuSlot.contains(next)) return;
+    if (gearHoverTimer) clearTimeout(gearHoverTimer);
+    gearHoverTimer = setTimeout(() => {
+      if (!gearMenuPinned) closeGearMenu();
+    }, 180);
+  }
+
+  function wearBlocked(spoop, item) {
+    const req = item && item.requirement;
+    if (!req) return '';
+    const skill = (spoop.skills || []).find((row) => row.id === req.skill);
+    if (skill && skill.level >= req.level) return '';
+    return 'Needs ' + req.level + ' ' + (req.skillName || req.skill);
+  }
+
+  function detailSpoop() {
+    const params = new URLSearchParams(window.location.search);
+    return findSpoop(lastState && lastState.spoops, params.get('name') || 'SpoopSpooply');
+  }
+
+  function gearContext(slot) {
+    const spoop = detailSpoop();
+    if (!spoop || spoop.autoEquip !== false) return null;
+    const where = slot.getAttribute('data-gear');
+    const id = String(slot.getAttribute('data-item'));
+    let item = null;
+    if (where === 'worn') {
+      item = Object.keys(spoop.equipped || {}).map((key) => spoop.equipped[key]).find((row) => row && String(row.id) === id) || null;
+    } else {
+      item = (spoop.bank || []).find((row) => String(row.id) === id) || null;
+    }
+    if (!item) return null;
+    const worn = where === 'bank' && spoop.equipped ? spoop.equipped[item.slot] : null;
+    return { spoop, where, item, worn };
+  }
+
+  function pinGearMenu() {
+    if (gearMenuPinned) return;
+    gearMenuPinned = true;
+    document.addEventListener('mousedown', onGearMenuAway, true);
+    document.addEventListener('keydown', onGearMenuKey);
+  }
+
+  function openGearMenu(slot, pin) {
+    if (!slot || !slot.isConnected) return;
+    const ctx = gearContext(slot);
+    if (!ctx) return;
+    if (gearHoverTimer) {
+      clearTimeout(gearHoverTimer);
+      gearHoverTimer = null;
+    }
+    if (gearMenu && gearMenuSlot === slot) {
+      if (pin) pinGearMenu();
+      return;
+    }
+    closeGearMenu();
+    const fresh = gearContext(slot);
+    if (!fresh) return;
+    const { spoop, where, item, worn } = fresh;
+    const blocked = where === 'bank' ? wearBlocked(spoop, item) : '';
+    const buttons = [];
+    if (where === 'worn') {
+      buttons.push('<button type="button" role="menuitem" data-act="unequip">Unequip</button>');
+    } else {
+      buttons.push(blocked
+        ? '<button type="button" role="menuitem" data-act="equip" disabled>' + escapeHtml(blocked) + '</button>'
+        : '<button type="button" role="menuitem" data-act="equip">Equip</button>');
+      if (worn) buttons.push('<button type="button" role="menuitem" data-act="compare">Compare</button>');
+      buttons.push('<button type="button" role="menuitem" data-act="sell">Sell</button>');
+    }
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu gear-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = buttons.join('');
+    slot.style.zIndex = '40';
+    slot.appendChild(menu);
+    const rect = menu.getBoundingClientRect();
+    if (rect.bottom > window.innerHeight - 8) {
+      menu.style.top = 'auto';
+      menu.style.bottom = 'calc(100% + 4px)';
+    }
+    if (rect.right > window.innerWidth - 8) {
+      menu.style.left = 'auto';
+      menu.style.right = '0';
+    }
+    menu.addEventListener('pointerenter', () => {
+      if (gearHoverTimer) {
+        clearTimeout(gearHoverTimer);
+        gearHoverTimer = null;
+      }
+    });
+    menu.addEventListener('pointerleave', scheduleCloseGearMenu);
+    menu.addEventListener('contextmenu', (ev) => ev.preventDefault());
+    menu.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-act]');
+      if (!btn || btn.disabled) return;
+      ev.stopPropagation();
+      const act = btn.getAttribute('data-act');
+      const name = spoopKey(spoop);
+      closeGearMenu();
+      if (act === 'equip') wearPiece(name, 'equip', item.id);
+      else if (act === 'unequip') wearPiece(name, 'unequip', item.id);
+      else if (act === 'sell') sellBankPiece(name, item.id, item.name, item.value);
+      else if (act === 'compare' && worn) showCompare(item, worn);
+    });
+    gearMenu = menu;
+    gearMenuSlot = slot;
+    if (pin) {
+      pinGearMenu();
+      const first = menu.querySelector('button:not(:disabled)') || menu.querySelector('button');
+      if (first) first.focus();
+    }
+  }
+
+  function compareValue(item, group, key) {
+    const bonuses = item && item.bonuses;
+    const bag = bonuses && bonuses[group];
+    return Number(bag && bag[key]) || 0;
+  }
+
+  function compareTone(mine, other) {
+    if (mine === other) return 'text-slate-300';
+    return mine > other ? 'text-emerald-400' : 'text-rose-400';
+  }
+
+  function compareAmount(n, suffix) {
+    return (n > 0 ? '+' : '') + n + (suffix || '');
+  }
+
+  function showCompare(item, worn) {
+    const groups = [
+      ['Attack', 'attack', [['stab', 'Stab'], ['slash', 'Slash'], ['crush', 'Crush'], ['magic', 'Magic'], ['range', 'Range']]],
+      ['Defence', 'defence', [['stab', 'Stab'], ['slash', 'Slash'], ['crush', 'Crush'], ['magic', 'Magic'], ['range', 'Range']]],
+      ['Other', 'other', [['melee', 'Melee str'], ['ranged', 'Ranged str'], ['magic', 'Magic dmg', '%'], ['prayer', 'Prayer']]],
+    ];
+    const card = (piece, label) => {
+      const color = QUALITY_COLOR[piece.quality] || '#fde68a';
+      return '<div class="compare-card">' +
+        '<p class="compare-kicker">' + label + '</p>' +
+        itemIcon(piece) +
+        '<p class="compare-name" style="color:' + color + '">' + escapeHtml(piece.name) + '</p>' +
+        '<p class="compare-meta">Rating ' + (piece.rating != null ? piece.rating : 0) + '</p>' +
+        '<p class="compare-gold">' + Number(piece.value || 0).toLocaleString() + ' gold</p>' +
+      '</div>';
+    };
+    const rows = groups.map((group) => {
+      const lines = group[2].filter((row) => compareValue(item, group[1], row[0]) || compareValue(worn, group[1], row[0]));
+      if (!lines.length) return '';
+      const body = lines.map((row) => {
+        const mine = compareValue(item, group[1], row[0]);
+        const theirs = compareValue(worn, group[1], row[0]);
+        const suffix = row[2] || '';
+        return '<div class="compare-row"><span>' + row[1] + '</span>' +
+          '<span class="tabular-nums ' + compareTone(mine, theirs) + '">' + compareAmount(mine, suffix) + '</span>' +
+          '<span class="tabular-nums ' + compareTone(theirs, mine) + '">' + compareAmount(theirs, suffix) + '</span></div>';
+      }).join('');
+      return '<h3>' + group[0] + '</h3>' + body;
+    }).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'roll-overlay';
+    overlay.innerHTML =
+      '<div class="roll-modal compare-sheet" role="dialog" aria-modal="true" aria-labelledby="compare-title">' +
+        '<div class="flex items-start justify-between gap-3">' +
+          '<h2 id="compare-title" class="text-lg text-slate-100">Compare</h2>' +
+          '<button type="button" data-cancel class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>' +
+        '</div>' +
+        '<div class="compare-pair">' + card(item, 'In bank') + card(worn, 'Wearing') + '</div>' +
+        '<div class="compare-stats">' +
+          '<div class="compare-row compare-head"><span></span><span>In bank</span><span>Wearing</span></div>' +
+          (rows || '<p class="compare-empty">Neither piece has a bonus.</p>') +
+        '</div>' +
+      '</div>';
+    const finish = () => {
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') finish();
+    };
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay || ev.target.closest('[data-cancel]')) finish();
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const close = overlay.querySelector('[data-cancel]');
+    if (close) close.focus();
+  }
+
   async function sellBankPiece(name, itemId, itemName, price) {
     if (selling || itemId == null) return;
     const yes = await confirmSale(itemName, price);
@@ -2247,24 +2649,26 @@
         statLine('magic', 'Magic', values.magic) +
         statLine('range', 'Range', values.range) +
       '</div>';
-    return '<div class="mt-4 pt-3 border-t border-slate-700/80">' +
-      '<h3 class="text-sm text-slate-300 mb-2">Stats</h3>' +
-      '<div class="grid grid-cols-2 gap-x-4">' +
+    return '<section class="spoop-sheet-card mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+      '<h3 class="text-sm text-slate-300 mb-3">Stats</h3>' +
+      '<div class="spoop-sheet">' +
         column('Attack bonus', attack) +
         column('Defence bonus', defence) +
-      '</div>' +
-      '<p class="text-[11px] uppercase tracking-wide text-slate-500 mt-3 mb-1">Other bonuses</p>' +
-      '<div class="grid grid-cols-2 gap-x-4">' +
-        '<div>' +
-          statLine('strength', 'Melee strength', other.melee) +
-          statLine('range', 'Ranged strength', other.ranged) +
+        '<div class="spoop-sheet-other">' +
+          '<p class="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Other bonuses</p>' +
+          '<div class="spoop-sheet-pair">' +
+            '<div>' +
+              statLine('strength', 'Melee strength', other.melee) +
+              statLine('range', 'Ranged strength', other.ranged) +
+            '</div>' +
+            '<div>' +
+              statLine('magic', 'Magic damage', other.magic, '%') +
+              statLine('prayer', 'Prayer', other.prayer) +
+            '</div>' +
+          '</div>' +
         '</div>' +
-        '<div>' +
-          statLine('magic', 'Magic damage', other.magic, '%') +
-          statLine('prayer', 'Prayer', other.prayer) +
-        '</div>' +
       '</div>' +
-    '</div>';
+    '</section>';
   }
 
   function priceLabel(n) {
