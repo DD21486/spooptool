@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, sellBankItem, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, openMegaChest, sellBankItem, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -129,6 +129,28 @@ async function handlePost(req) {
       text: result.text,
       discord: result.discord,
       kind: 'crate',
+      icon: result.icon,
+      stats: result.stats,
+    }], state)) {
+      await save(state, state.clock);
+    }
+    const payload = presentWorld(state, debug, [result.text]);
+    payload.roll = result.roll;
+    return { status: 200, payload };
+  }
+
+  if (action === 'open-mega') {
+    const now = new Date(state.clock);
+    const rng = mulberry32(hashString(`${spoop.name}|mega|${now.toISOString()}|${spoop.megaChests}|${Math.random()}`));
+    const result = openMegaChest(spoop, now, rng);
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    if (await publishEvents([{
+      name: spoop.name,
+      text: result.text,
+      discord: result.discord,
+      kind: 'mega',
       icon: result.icon,
       stats: result.stats,
     }], state)) {

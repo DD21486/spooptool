@@ -80,6 +80,9 @@
     enchanted: '#2a3a6a',
     elderchaos: '#3a3a3e',
     dagonhai: '#3a2a4a',
+    thirdage: '#e8e6dc',
+    thirdrange: '#3e7a4a',
+    thirdmage: '#2e4a9a',
   };
 
   const POINTY_HATS = {
@@ -1657,8 +1660,12 @@
       ? '<p class="text-amber-200 tabular-nums">' + Number(item.value).toLocaleString() + ' gold</p>'
       : '';
     const kicker = label ? '<p class="spoop-tip-kicker">' + escapeHtml(label) + '</p>' : '';
+    const mega = item.mega
+      ? '<p class="spoop-tip-mega">Megarare' + (item.job ? ' · ' + escapeHtml(item.job) : '') + '</p>'
+      : '';
     return '<div class="spoop-tip" role="tooltip">' +
       kicker +
+      mega +
       '<p class="text-xs" style="color:' + (QUALITY_COLOR[item.quality] || '#fde68a') + '">' + escapeHtml(item.name) + '</p>' +
       value +
       rating +
@@ -1688,7 +1695,7 @@
     const gearAttr = gear
       ? ' data-gear="' + gear + '" data-item="' + item.id + '" role="button" aria-haspopup="menu" aria-label="' + escapeHtml(item.name) + '"'
       : '';
-    return '<div class="spoop-slot"' + gearAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
+    return '<div class="spoop-slot' + (item && item.mega ? ' is-mega' : '') + '"' + gearAttr + style + ' tabindex="0">' + inner + rate + tip + '</div>';
   }
 
   function gearCell(slot, item, spoop) {
@@ -1759,7 +1766,19 @@
         ? slotFrame(item, itemIcon(item), spoop, { gear: 'bank' })
         : '<div class="spoop-slot"></div>');
     }
-    const bank = '<div class="flex flex-wrap gap-1">' + bankCells.join('') + '</div>';
+    const chests = Number(spoop.megaChests) || 0;
+    const chestTable = state.megaTable || {};
+    const chestCell = chests
+      ? '<div class="spoop-slot is-mega-chest" data-mega-chest role="button" tabindex="0" aria-haspopup="menu" aria-label="' + escapeHtml((chestTable.name || 'Megarare chest') + ', ' + chests) + '">' +
+          (chestTable.osrsId ? itemIcon(chestTable) : '') +
+          (chests > 1 ? '<span class="mega-count">' + chests + '</span>' : '') +
+          '<div class="spoop-tips"><div class="spoop-tip" role="tooltip">' +
+            '<p class="spoop-tip-mega">' + escapeHtml(chestTable.name || 'Megarare chest') + (chests > 1 ? ' × ' + chests : '') + '</p>' +
+            '<p class="text-slate-300 mt-1">Click to open. It rolls one piece off the megarare table.</p>' +
+          '</div></div>' +
+        '</div>'
+      : '';
+    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + bankCells.join('') + '</div>';
     const log = activityLog(spoop);
     const fight = spoop.fights[0];
     const fightHtml = fight
@@ -1913,7 +1932,18 @@
       btn.addEventListener('contextmenu', (ev) => {
         ev.preventDefault();
         const crate = (state.crates || []).find((row) => row.id === crateId);
-        if (crate) openCrateMenu(ev, crate);
+        if (crate) openCrateMenu(ev, crate, build);
+      });
+    });
+    root.querySelectorAll('[data-mega-chest]').forEach((slot) => {
+      const open = (ev) => {
+        ev.preventDefault();
+        openChestMenu(slot, spoopKey(spoop), state.megaTable);
+      };
+      slot.addEventListener('click', open);
+      slot.addEventListener('contextmenu', open);
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') open(ev);
       });
     });
     root.querySelectorAll('[data-gear]').forEach((slot) => {
@@ -2361,7 +2391,7 @@
     if (ev.key === 'Escape') closeCrateMenu();
   }
 
-  function openCrateMenu(ev, crate) {
+  function openCrateMenu(ev, crate, build) {
     closeCrateMenu();
     const menu = document.createElement('div');
     menu.className = 'spoop-menu';
@@ -2375,7 +2405,7 @@
     if (rect.bottom > window.innerHeight - 8) menu.style.top = Math.max(8, window.innerHeight - rect.height - 8) + 'px';
     menu.querySelector('[data-view]').addEventListener('click', () => {
       closeCrateMenu();
-      showCrateLoot(crate);
+      showCrateLoot(crate, build);
     });
     crateMenu = menu;
     document.addEventListener('mousedown', onCrateMenuAway, true);
@@ -2383,18 +2413,112 @@
     menu.querySelector('[data-view]').focus();
   }
 
-  function showCrateLoot(crate) {
+  function openChestMenu(slot, name, table) {
+    closeCrateMenu();
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML =
+      '<button type="button" role="menuitem" data-open>Open</button>' +
+      '<button type="button" role="menuitem" data-view>View contents</button>';
+    document.body.appendChild(menu);
+    const slotRect = slot.getBoundingClientRect();
+    const rect = menu.getBoundingClientRect();
+    let left = slotRect.left;
+    let top = slotRect.bottom + 4;
+    if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+    if (top + rect.height > window.innerHeight - 8) top = Math.max(8, slotRect.top - rect.height - 4);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = top + 'px';
+    menu.querySelector('[data-open]').addEventListener('click', () => {
+      closeCrateMenu();
+      openMegaChest(name, table);
+    });
+    menu.querySelector('[data-view]').addEventListener('click', () => {
+      closeCrateMenu();
+      if (table) showCrateLoot({ name: table.name, loot: table });
+    });
+    crateMenu = menu;
+    document.addEventListener('mousedown', onCrateMenuAway, true);
+    document.addEventListener('keydown', onCrateMenuKey);
+    menu.querySelector('[data-open]').focus();
+  }
+
+  let openingChest = false;
+
+  async function openMegaChest(name, table) {
+    if (openingChest || buyingCrate || askingCrate) return;
+    const label = (table && table.name) || 'Megarare chest';
+    openingChest = true;
+    try {
+      const yes = await askConfirm({
+        title: 'Open ' + label.toLowerCase() + '?',
+        detail: 'It rolls one piece off the megarare table. This uses up the chest.',
+        yes: 'Open',
+      });
+      if (!yes) return;
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'open-mega', name }),
+      });
+      if (data.roll) await playRoll(data.roll);
+      const fresh = await api('/api/spoops');
+      render(fresh);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      openingChest = false;
+    }
+  }
+
+  function chanceLabel(chance) {
+    const pct = (Number(chance) || 0) * 100;
+    if (pct <= 0) return '0%';
+    if (pct >= 1) return (pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)) + '%';
+    return Number(pct.toPrecision(2)) + '%';
+  }
+
+  // Metal crates send odds per build. Style crates and the megarare table send one number.
+  function itemChance(item, build) {
+    if (item.chance == null) return null;
+    if (typeof item.chance === 'number') return item.chance;
+    return item.chance[build || 'melee'];
+  }
+
+  function showCrateLoot(crate, build) {
     const loot = crate.loot || { groups: [], quality: '' };
+    let perBuild = false;
     const groups = (loot.groups || []).map((group) => {
       const cards = (group.items || []).map((item) => {
         const icon = item.osrsId
           ? '<img src="/api/spoops?icon=1&id=' + Number(item.osrsId) + '" alt="" width="32" height="32">'
           : '';
         const rare = item.rare ? '<span class="rare">Rare</span>' : '';
-        return '<div class="loot-card">' + icon + '<span>' + escapeHtml(item.name) + '</span>' + rare + '</div>';
+        const job = item.job ? '<span class="job">' + escapeHtml(item.job) + '</span>' : '';
+        const chance = itemChance(item, build);
+        if (item.chance && typeof item.chance === 'object') perBuild = true;
+        const odds = chance != null ? '<span class="odds">' + escapeHtml(chanceLabel(chance)) + '</span>' : '';
+        return '<div class="loot-card' + (item.mega ? ' is-mega' : '') + '">' + icon + '<span>' + escapeHtml(item.name) + '</span>' + odds + rare + job + '</div>';
       }).join('');
       return '<h3 class="text-sm text-slate-300 mt-4 mb-2">' + escapeHtml(group.label) + '</h3><div class="loot-grid">' + cards + '</div>';
     }).join('');
+    const oddsNote = perBuild
+      ? '<p class="mt-1 text-xs text-slate-500">Odds per open for a ' + escapeHtml(build || 'melee') + ' spoop.</p>'
+      : '';
+    const mega = loot.mega;
+    const megaBox = mega
+      ? '<div class="mega-box">' +
+          (mega.osrsId ? '<img src="/api/spoops?icon=1&id=' + Number(mega.osrsId) + '" alt="">' : '') +
+          '<div class="min-w-0 flex-1">' +
+            '<p class="text-sm text-amber-200">Megarare roll · ' + escapeHtml(chanceLabel(mega.chance)) + '</p>' +
+            '<p class="text-xs text-slate-400">Each open can pay ' + escapeHtml((mega.name || 'a megarare chest').toLowerCase()) + ' instead of a piece. It goes to the bank, and you open it there.</p>' +
+          '</div>' +
+          (lastState && lastState.megaTable
+            ? '<button type="button" data-mega-table class="shrink-0 rounded-lg border border-amber-700/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/30">View table</button>'
+            : '') +
+        '</div>'
+      : '';
     const overlay = document.createElement('div');
     overlay.className = 'roll-overlay';
     overlay.innerHTML =
@@ -2403,10 +2527,12 @@
           '<div>' +
             '<h2 id="loot-title" class="text-lg text-slate-100">' + escapeHtml(crate.name) + '</h2>' +
             '<p class="mt-1 text-xs text-slate-400">' + escapeHtml(loot.quality || 'One piece from this list.') + '</p>' +
+            oddsNote +
           '</div>' +
           '<button type="button" data-cancel class="rounded-lg px-2 py-1 text-slate-400 hover:bg-slate-700 hover:text-slate-200" aria-label="Close">✕</button>' +
         '</div>' +
         (groups || '<p class="mt-3 text-sm text-slate-400">Contents are unavailable.</p>') +
+        megaBox +
       '</div>';
     let done = false;
     const finish = () => {
@@ -2420,6 +2546,10 @@
     };
     overlay.addEventListener('click', (ev) => {
       if (ev.target === overlay || ev.target.closest('[data-cancel]')) finish();
+      else if (ev.target.closest('[data-mega-table]') && lastState && lastState.megaTable) {
+        finish();
+        showCrateLoot({ name: lastState.megaTable.name, loot: lastState.megaTable });
+      }
     });
     document.addEventListener('keydown', onKey);
     document.body.appendChild(overlay);
@@ -2637,7 +2767,8 @@
           ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="36" height="36">'
           : '';
         const quality = item && QUALITY_COLOR[item.quality] ? ' q-' + item.quality : '';
-        return '<div class="roll-card' + quality + '" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
+        const mega = item && item.mega ? ' is-mega' : '';
+        return '<div class="roll-card' + quality + mega + '" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
       }).join('');
       overlay.innerHTML =
         '<div class="roll-modal" role="dialog" aria-modal="true" aria-label="' + escapeHtml(roll.crateName) + '">' +

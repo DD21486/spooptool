@@ -303,6 +303,60 @@
       letter-spacing: 0.04em;
       text-transform: uppercase;
     }
+    .loot-card .odds {
+      color: #fcd34d;
+      font-size: 10px;
+      font-variant-numeric: tabular-nums;
+    }
+    .loot-card .job {
+      color: #94a3b8;
+      font-size: 9px;
+    }
+    .loot-card.is-mega {
+      border-color: #b8892c;
+      background: linear-gradient(180deg, #2a1d08, #1c140c);
+    }
+    .mega-box {
+      margin-top: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 12px;
+      border: 1px solid #b8892c;
+      border-radius: 8px;
+      background: linear-gradient(90deg, #2a1d08, #16110c);
+      box-shadow: 0 0 12px rgba(240, 200, 90, 0.12);
+    }
+    .mega-box img {
+      width: 40px;
+      height: 40px;
+      object-fit: contain;
+      image-rendering: pixelated;
+      filter: drop-shadow(0 0 6px #ffe38a);
+    }
+    body[data-page="detail"] .spoop-slot.is-mega-chest {
+      border-color: #e6c15a;
+      box-shadow: 0 0 8px rgba(240, 200, 90, 0.45);
+      cursor: pointer;
+    }
+    body[data-page="detail"] .spoop-slot.is-mega {
+      box-shadow: 0 0 7px rgba(240, 200, 90, 0.4), inset 0 0 0 1px #0c0906;
+    }
+    .spoop-slot.is-mega-chest img { filter: drop-shadow(0 0 4px #ffe38a); }
+    .spoop-slot .mega-count {
+      position: absolute;
+      left: 3px;
+      top: 1px;
+      font-size: 10px;
+      color: #fde047;
+      text-shadow: 1px 1px 0 #000;
+    }
+    .spoop-tip-mega {
+      color: #fde047;
+      font-size: 10px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
     .roll-modal {
       width: min(640px, 100%);
       background: #0f172a;
@@ -379,6 +433,11 @@
     .roll-card.is-win.q-sharpened img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 12px #c084fc); }
     .roll-card.is-win.q-tempered img { filter: drop-shadow(0 0 2px #fff) drop-shadow(0 0 13px #ff8a1a); }
     .roll-card.is-win.q-masterwork img { filter: drop-shadow(0 0 3px #fff) drop-shadow(0 0 14px #ffe38a); }
+    .roll-card.is-mega {
+      background: linear-gradient(180deg, #3a2808, #1c140c);
+      box-shadow: inset 0 0 0 1px #e6c15a;
+    }
+    .roll-card.is-mega span { color: #fde047; }
     .roll-result {
       margin-top: 0.75rem;
       color: #fde68a;
@@ -390,6 +449,6 @@
   <div class="spoop-page spoop-detail">
     <div id="spoop-root"></div>
   </div>
-  <script src="/js/spoop.js?v=rangemage"></script>
+  <script src="/js/spoop.js?v=megarare"></script>
 </body>
 </html>
