@@ -19,6 +19,14 @@
     huey: '#1f8a78',
     crystal: '#5ec8d4',
     ranger: '#2f6a32',
+    leather: '#8a5a32',
+    hardleather: '#6e4428',
+    studded: '#7a6248',
+    frog: '#5a6e3a',
+    snakeskin: '#7a8a4a',
+    guthix: '#3d7a3a',
+    saradomin: '#3a57b5',
+    zamorak: '#9a2424',
   };
 
   const CAPE_TINTS = {
@@ -39,9 +47,12 @@
     'book-balance': ['#3d7a3a', '#d4e8a4', '#1e4020'],
     'unholy-book': ['#8a2424', '#e07070', '#3a1010'],
     'book-law': ['#f2f4f8', '#ffffff', '#3a4e9a'],
+    'mages-book': ['#5a3a8a', '#c9a0e8', '#2a1840'],
   };
 
   const SHIELD_TINTS = {
+    'green-dhide-shield': '#2f9a3a',
+    'blue-dhide-shield': '#2d6fce',
     'antler-guard': '#8a6840',
     'odium-ward': '#5a3a78',
     'aquanite-hopper': '#3a6a9a',
@@ -61,16 +72,37 @@
     proselyte: '#f2efe6',
     obsidian: '#2a2a2e',
     torso: '#8d3030',
+    darkwizard: '#2e2e36',
+    wizardtrim: '#34489a',
+    blackwizard: '#26262e',
+    lightmystic: '#d8d4c8',
+    splitbark: '#6e5a3a',
+    enchanted: '#2a3a6a',
+    elderchaos: '#3a3a3e',
+    dagonhai: '#3a2a4a',
   };
 
   const POINTY_HATS = {
     'wizard-hat': ['#3a4e9a', '#7a92e0', '#243268'],
+    'blue-wizard-hat-t': ['#34489a', '#e0c060', '#243268'],
+    'black-wizard-hat-g': ['#26262e', '#e0c060', '#141418'],
+    'light-mystic-hat': ['#d8d4c8', '#ffffff', '#8a8678'],
+    'enchanted-hat': ['#2a3a6a', '#e0c060', '#18223e'],
     'ancestral-hat': ['#6a3aa0', '#c89ae8', '#3a1860'],
     'xeric-hat': ['#6d8f4a', '#d4e8a4', '#3a5228'],
     'mystic-hat': ['#2c4f86', '#8eb4e8', '#1a3058'],
     'dark-mystic-hat': ['#4a2a6a', '#c9a0e8', '#2a1840'],
     'infinity-hat': ['#d7c48a', '#fff6c8', '#8a7040'],
     'bloodbark-helm': ['#6a1c28', '#e07080', '#3a1018'],
+  };
+
+  const COIFS = {
+    coif: ['#6e4a2e', '#8d6340', '#3e2918'],
+    'huey-coif': ['#1f8a78', '#4ec4ae', '#0e4e44'],
+    'leather-cowl': ['#8a5a32', '#b07a48', '#4e3018'],
+    'guthix-coif': ['#3d7a3a', '#e8e0c0', '#1e4020'],
+    'saradomin-coif': ['#3a57b5', '#f0e8c8', '#1e2e6a'],
+    'zamorak-coif': ['#9a2424', '#e8d090', '#4a1010'],
   };
 
   const HELM_TINTS = {
@@ -257,11 +289,10 @@
         put(8, 3, '#f3e6ff');
       }
       paintFace();
-    } else if (helmKind === 'coif' || helmKind === 'huey-coif') {
-      const huey = helmKind === 'huey-coif';
-      const main = huey ? '#1f8a78' : '#6e4a2e';
-      const hi = huey ? '#4ec4ae' : '#8d6340';
-      const lo = huey ? '#0e4e44' : '#3e2918';
+    } else if (COIFS[helmKind]) {
+      const main = COIFS[helmKind][0];
+      const hi = COIFS[helmKind][1];
+      const lo = COIFS[helmKind][2];
       paintFace();
       fill(4, 1, 8, 2, main);
       fill(5, 1, 3, 1, hi);
@@ -272,6 +303,13 @@
       put(11, 4, main);
       put(4, 8, lo);
       put(11, 8, lo);
+    } else if (helmKind === 'snakeskin-bandana') {
+      paintDome(hair, hairHi, hairLo);
+      paintFace();
+      fill(3, 3, 10, 2, '#7a8a4a');
+      fill(4, 3, 3, 1, '#a4b46a');
+      put(13, 4, '#4e5a2e');
+      put(13, 5, '#4e5a2e');
     } else if (helmKind === 'crystal-helm') {
       paintDome('#5ec8d4', '#f4ffff', '#1a6a78');
       paintFace();
@@ -487,7 +525,7 @@
     }
     const gloves = eq.gloves;
     const gloveQ = gloves ? (QUALITY_RANK[gloves.quality] || 0) : -1;
-    const gloveHex = gloves ? (GLOVE_TINTS[gloves.baseId] || HIDE_COLORS[gloves.hide] || TIER_COLORS[gloves.tier] || '#8d5a34') : null;
+    const gloveHex = gloves ? (GLOVE_TINTS[gloves.baseId] || HIDE_COLORS[gloves.hide] || CLOTH_COLORS[gloves.cloth] || TIER_COLORS[gloves.tier] || '#8d5a34') : null;
     const hand = gloves
       ? shiftColor(gloveHex, gloveQ >= 3 ? 18 : -6)
       : skin;
@@ -588,7 +626,7 @@
 
     const boots = eq.boots;
     const bootQ = boots ? (QUALITY_RANK[boots.quality] || 0) : -1;
-    const bootCol = boots ? shiftColor(BOOT_TINTS[boots.baseId] || TIER_COLORS[boots.tier] || '#3d2914', bootQ >= 3 ? 10 : -16) : '#3a2618';
+    const bootCol = boots ? shiftColor(BOOT_TINTS[boots.baseId] || HIDE_COLORS[boots.hide] || CLOTH_COLORS[boots.cloth] || TIER_COLORS[boots.tier] || '#3d2914', bootQ >= 3 ? 10 : -16) : '#3a2618';
     fill(4, 18, 3, 2, bootCol);
     fill(9, 18, 3, 2, bootCol);
     if (bootQ >= 6) {
