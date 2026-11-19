@@ -1778,7 +1778,17 @@
           '</div></div>' +
         '</div>'
       : '';
-    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + bankCells.join('') + '</div>';
+    const lampCells = (spoop.lamps || []).map((lamp) =>
+      '<div class="spoop-slot is-lamp" data-lamp="' + escapeHtml(lamp.id) + '" role="button" tabindex="0" aria-haspopup="menu" aria-label="' + escapeHtml(lamp.name + ', ' + lamp.count) + '">' +
+        (lamp.osrsId ? itemIcon(lamp) : '') +
+        (lamp.count > 1 ? '<span class="mega-count">' + lamp.count + '</span>' : '') +
+        '<div class="spoop-tips"><div class="spoop-tip" role="tooltip">' +
+          '<p class="spoop-tip-mega">' + escapeHtml(lamp.name) + (lamp.count > 1 ? ' × ' + lamp.count : '') + '</p>' +
+          '<p class="text-slate-300 mt-1">' + Number(lamp.xp).toLocaleString() + ' XP in one skill. Click to open.</p>' +
+        '</div></div>' +
+      '</div>'
+    ).join('');
+    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + lampCells + bankCells.join('') + '</div>';
     const log = activityLog(spoop);
     const fight = spoop.fights[0];
     const fightHtml = fight
@@ -1796,11 +1806,15 @@
         '</span>' +
       '</button>';
     };
-    const metalCrates = (state.crates || []).filter((crate) => !crate.style).map(crateButton).join('');
+    const metalCrates = (state.crates || []).filter((crate) => !crate.style && !crate.lamps).map(crateButton).join('');
     const styleCrates = (state.crates || []).filter((crate) => crate.style).map(crateButton).join('');
+    const lampCrates = (state.crates || []).filter((crate) => crate.lamps).map(crateButton).join('');
     const crates = metalCrates +
       (styleCrates
         ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">Ranging and mage</h3>' + styleCrates
+        : '') +
+      (lampCrates
+        ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">XP lamps</h3>' + lampCrates
         : '');
 
     const build = spoop.build === 'ranged' || spoop.build === 'magic' ? spoop.build : 'melee';
@@ -1933,6 +1947,18 @@
         ev.preventDefault();
         const crate = (state.crates || []).find((row) => row.id === crateId);
         if (crate) openCrateMenu(ev, crate, build);
+      });
+    });
+    root.querySelectorAll('[data-lamp]').forEach((slot) => {
+      const lamp = (spoop.lamps || []).find((row) => row.id === slot.getAttribute('data-lamp'));
+      const open = (ev) => {
+        ev.preventDefault();
+        if (lamp) openLampMenu(slot, spoopKey(spoop), lamp, spoop);
+      };
+      slot.addEventListener('click', open);
+      slot.addEventListener('contextmenu', open);
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') open(ev);
       });
     });
     root.querySelectorAll('[data-mega-chest]').forEach((slot) => {
@@ -2444,6 +2470,103 @@
     menu.querySelector('[data-open]').focus();
   }
 
+  function openLampMenu(slot, name, lamp, spoop) {
+    closeCrateMenu();
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = '<button type="button" role="menuitem" data-open>Open lamp</button>';
+    document.body.appendChild(menu);
+    const slotRect = slot.getBoundingClientRect();
+    const rect = menu.getBoundingClientRect();
+    let left = slotRect.left;
+    let top = slotRect.bottom + 4;
+    if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+    if (top + rect.height > window.innerHeight - 8) top = Math.max(8, slotRect.top - rect.height - 4);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = top + 'px';
+    menu.querySelector('[data-open]').addEventListener('click', () => {
+      closeCrateMenu();
+      pickLampSkill(name, lamp, spoop);
+    });
+    crateMenu = menu;
+    document.addEventListener('mousedown', onCrateMenuAway, true);
+    document.addEventListener('keydown', onCrateMenuKey);
+    menu.querySelector('[data-open]').focus();
+  }
+
+  let usingLamp = false;
+
+  function pickLampSkill(name, lamp, spoop) {
+    if (usingLamp) return;
+    const xp = Number(lamp.xp).toLocaleString();
+    const skills = (spoop.skills || []).map((s) => {
+      const maxed = s.toNext === 0;
+      return '<button type="button" class="lamp-skill" data-skill="' + escapeHtml(s.id) + '"' + (maxed ? ' disabled' : '') + '>' +
+        '<img src="' + SKILL_ICON[s.id] + '" alt="" width="18" height="18">' +
+        '<span class="flex-1 text-left">' + escapeHtml(s.name) + '</span>' +
+        '<span class="tabular-nums text-slate-400">' + (maxed ? 'Maxed' : 'Lvl ' + s.level) + '</span>' +
+      '</button>';
+    }).join('');
+    const overlay = document.createElement('div');
+    overlay.className = 'roll-overlay';
+    overlay.innerHTML =
+      '<div class="roll-modal lamp-modal" role="dialog" aria-modal="true" aria-labelledby="lamp-title">' +
+        '<h2 id="lamp-title" class="text-lg text-slate-100">' + escapeHtml(lamp.name) + '</h2>' +
+        '<p class="mt-1 text-sm text-slate-300">Pick a skill for <span class="text-amber-200 tabular-nums">' + xp + ' XP</span>. The lamp is used up.</p>' +
+        '<div class="lamp-skills mt-3" role="radiogroup">' + skills + '</div>' +
+        '<div class="mt-4 flex justify-end gap-2">' +
+          '<button type="button" data-cancel class="px-3 py-1.5 rounded-lg bg-slate-600 hover:bg-slate-500 text-sm">Cancel</button>' +
+          '<button type="button" data-use disabled class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-900 font-semibold text-sm disabled:opacity-40">Use lamp</button>' +
+        '</div>' +
+      '</div>';
+    let chosen = null;
+    let done = false;
+    const useBtn = overlay.querySelector('[data-use]');
+    const finish = () => {
+      if (done) return;
+      done = true;
+      document.removeEventListener('keydown', onKey);
+      overlay.remove();
+    };
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') finish();
+    };
+    overlay.addEventListener('click', async (ev) => {
+      if (ev.target === overlay || ev.target.closest('[data-cancel]')) return finish();
+      const pick = ev.target.closest('[data-skill]');
+      if (pick && !pick.disabled) {
+        chosen = pick.getAttribute('data-skill');
+        overlay.querySelectorAll('[data-skill]').forEach((btn) => btn.classList.toggle('is-on', btn === pick));
+        useBtn.disabled = false;
+        return;
+      }
+      if (!ev.target.closest('[data-use]') || !chosen || usingLamp) return;
+      usingLamp = true;
+      useBtn.disabled = true;
+      try {
+        const data = await api('/api/spoops', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'use-lamp', name, lamp: lamp.id, skill: chosen }),
+        });
+        finish();
+        render(data);
+        const line = String((data.happened || [])[0] || '').replace(/^.+?\s—\s/, '');
+        askConfirm({ title: lamp.name + ' used', detail: escapeHtml(line) });
+      } catch (err) {
+        useBtn.disabled = false;
+        window.alert(err.message);
+      } finally {
+        usingLamp = false;
+      }
+    });
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const first = overlay.querySelector('[data-skill]:not([disabled])');
+    if (first) first.focus();
+  }
+
   let openingChest = false;
 
   async function openMegaChest(name, table) {
@@ -2475,7 +2598,7 @@
   function chanceLabel(chance) {
     const pct = (Number(chance) || 0) * 100;
     if (pct <= 0) return '0%';
-    if (pct >= 1) return (pct % 1 === 0 ? pct.toFixed(0) : pct.toFixed(1)) + '%';
+    if (pct >= 1) return Math.round(pct * 10) / 10 + '%';
     return Number(pct.toPrecision(2)) + '%';
   }
 
@@ -2519,6 +2642,19 @@
             : '') +
         '</div>'
       : '';
+    const lamp = loot.lamp;
+    const lampBox = lamp
+      ? '<div class="mega-box lamp-box">' +
+          (lamp.osrsId ? '<img src="/api/spoops?icon=1&id=' + Number(lamp.osrsId) + '" alt="">' : '') +
+          '<div class="min-w-0 flex-1">' +
+            '<p class="text-sm text-amber-200">XP lamp · ' + escapeHtml(chanceLabel(lamp.chance)) + '</p>' +
+            '<p class="text-xs text-slate-400">Each open can pay an XP lamp instead of a piece. It goes to the inventory, and you pick the skill there.</p>' +
+          '</div>' +
+          (lastState && lastState.lampTable
+            ? '<button type="button" data-lamp-table class="shrink-0 rounded-lg border border-amber-700/70 px-2 py-1 text-xs text-amber-200 hover:bg-amber-900/30">View table</button>'
+            : '') +
+        '</div>'
+      : '';
     const overlay = document.createElement('div');
     overlay.className = 'roll-overlay';
     overlay.innerHTML =
@@ -2533,6 +2669,7 @@
         '</div>' +
         (groups || '<p class="mt-3 text-sm text-slate-400">Contents are unavailable.</p>') +
         megaBox +
+        lampBox +
       '</div>';
     let done = false;
     const finish = () => {
@@ -2549,6 +2686,9 @@
       else if (ev.target.closest('[data-mega-table]') && lastState && lastState.megaTable) {
         finish();
         showCrateLoot({ name: lastState.megaTable.name, loot: lastState.megaTable });
+      } else if (ev.target.closest('[data-lamp-table]') && lastState && lastState.lampTable) {
+        finish();
+        showCrateLoot({ name: lastState.lampTable.name, loot: lastState.lampTable });
       }
     });
     document.addEventListener('keydown', onKey);
@@ -2768,7 +2908,8 @@
           : '';
         const quality = item && QUALITY_COLOR[item.quality] ? ' q-' + item.quality : '';
         const mega = item && item.mega ? ' is-mega' : '';
-        return '<div class="roll-card' + quality + mega + '" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
+        const lamp = item && item.lamp ? ' is-lamp' : '';
+        return '<div class="roll-card' + quality + mega + lamp + '" data-i="' + i + '">' + icon + '<span>' + escapeHtml(item ? item.name : '') + '</span></div>';
       }).join('');
       overlay.innerHTML =
         '<div class="roll-modal" role="dialog" aria-modal="true" aria-label="' + escapeHtml(roll.crateName) + '">' +

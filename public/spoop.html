@@ -438,6 +438,50 @@
       box-shadow: inset 0 0 0 1px #e6c15a;
     }
     .roll-card.is-mega span { color: #fde047; }
+    .roll-card.is-lamp {
+      background: linear-gradient(180deg, #2b2410, #1c140c);
+      box-shadow: inset 0 0 0 1px #c9a24a;
+    }
+    .roll-card.is-lamp span { color: #fcd34d; }
+    body[data-page="detail"] .spoop-slot.is-lamp {
+      border-color: #c9a24a;
+      box-shadow: 0 0 6px rgba(240, 200, 90, 0.3);
+      cursor: pointer;
+    }
+    .roll-modal.lamp-modal {
+      width: min(380px, 100%);
+    }
+    .lamp-skills {
+      display: grid;
+      gap: 4px;
+    }
+    .lamp-skill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 10px;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      background: #111827;
+      color: #e2e8f0;
+      font-size: 13px;
+    }
+    .lamp-skill:hover:not(:disabled),
+    .lamp-skill:focus-visible {
+      border-color: #64748b;
+      outline: none;
+    }
+    .lamp-skill.is-on {
+      border-color: #e6c15a;
+      background: #2a1d08;
+    }
+    .lamp-skill:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
+    .lamp-box {
+      margin-top: 0.75rem;
+    }
     .roll-result {
       margin-top: 0.75rem;
       color: #fde68a;

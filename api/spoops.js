@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, openMegaChest, sellBankItem, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, openMegaChest, useLamp, sellBankItem, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -159,6 +159,24 @@ async function handlePost(req) {
     const payload = presentWorld(state, debug, [result.text]);
     payload.roll = result.roll;
     return { status: 200, payload };
+  }
+
+  if (action === 'use-lamp') {
+    const now = new Date(state.clock);
+    const result = useLamp(spoop, String(body.lamp || ''), String(body.skill || ''), now);
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    if (await publishEvents([{
+      name: spoop.name,
+      text: result.text,
+      discord: result.discord,
+      kind: 'lamp',
+      icon: result.icon,
+    }], state)) {
+      await save(state, state.clock);
+    }
+    return { status: 200, payload: presentWorld(state, debug, [result.text]) };
   }
 
   if (action === 'build') {

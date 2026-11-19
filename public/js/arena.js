@@ -1239,6 +1239,37 @@
     window.setTimeout(() => el.remove(), 320);
   }
 
+  function burst(x, y, color, kind) {
+    if (!fxEl || !bout) return;
+    const el = document.createElement('div');
+    el.className = 'chaos-burst' + (kind ? ' is-' + kind : '');
+    el.style.setProperty('--burst', color);
+    el.style.left = (x / bout.width * 100) + '%';
+    el.style.top = ((y - 3.4) / bout.height * 100) + '%';
+    fxEl.appendChild(el);
+    window.setTimeout(() => el.remove(), 720);
+  }
+
+  function chaosFx(from, to, hit) {
+    const tint = { magic: '#c084fc', ranged: '#4ade80', melee: '#f87171' }[hit.style] || '#c084fc';
+    burst(from.x, from.y - 2, hit.attack === 'discord' ? tint : '#e9d5ff', 'swell');
+    if (hit.attack === 'confusion') {
+      burst(to.x, to.y, '#a5f3fc', 'swirl');
+      window.setTimeout(() => {
+        if (to.el && to.el.isConnected) burst(to.x, to.y, '#a5f3fc', 'swirl');
+      }, 200);
+      return;
+    }
+    const color = hit.attack === 'madness' ? '#a855f7' : tint;
+    window.setTimeout(() => {
+      if (!from.el.isConnected || !bout) return;
+      shot(from, to, 'magic', color, true);
+    }, 60);
+    window.setTimeout(() => {
+      if (to.el && to.el.isConnected) burst(to.x, to.y, color, hit.attack === 'madness' ? 'swirl' : '');
+    }, 480);
+  }
+
   function shot(from, to, style, color, bright) {
     if (!fxEl || !bout || !from || !to) return;
     const el = document.createElement('div');
@@ -1288,12 +1319,14 @@
       const poses = {
         charge: 'is-charge', toss: 'is-toss', claw: 'is-claw', dirt: 'is-dirt', burrow: 'is-burrow',
         bite: 'is-bite', rocks: 'is-rocks', barrage: 'is-barrage',
+        discord: 'is-discord', confusion: 'is-confusion', madness: 'is-madness',
       };
       const cls = poses[style] || 'is-stomp';
       view.el.classList.remove(
         'is-stomp', 'is-charge', 'is-toss', 'is-claw', 'is-dirt', 'is-burrow', 'is-bite', 'is-rocks', 'is-barrage',
+        'is-discord', 'is-confusion', 'is-madness',
         'is-wind-stomp', 'is-wind-charge', 'is-wind-toss', 'is-wind-claw', 'is-wind-dirt', 'is-wind-burrow',
-        'is-wind-bite', 'is-wind-rocks', 'is-wind-barrage'
+        'is-wind-bite', 'is-wind-rocks', 'is-wind-barrage', 'is-wind-discord', 'is-wind-confusion', 'is-wind-madness'
       );
       void view.el.offsetWidth;
       view.el.classList.add(cls);
@@ -1375,19 +1408,25 @@
     if (!attacker || !victim || !to) return;
     setHp(victim, hit.hp);
     const bias = victim.monster ? splatBias(hit.from) : null;
-    const miss = (hit.miss || !(hit.amount > 0)) && hit.effect !== 'disarm';
-    if (hit.effect !== 'disarm' && miss) {
+    const miss = (hit.miss || !(hit.amount > 0)) && hit.effect !== 'madness';
+    if (hit.effect === 'madness') to.madUntil = Number(hit.until) || Number(hit.t) + 5;
+    if (hit.effect !== 'madness' && miss) {
       floater(to.x, to.y, 0, true, bias);
       playMissSound();
-    } else if (hit.effect !== 'disarm') {
+    } else if (hit.effect !== 'madness' || hit.amount > 0) {
       floater(to.x, to.y, hit.amount, false, bias);
       playHitSound(hit.hp <= 0 && !victim.monster);
       if (!victim.monster) flashHurt(to);
     }
     if (hit.style === 'ranged') playBowSound();
     if (!attacker.monster && hit.style === 'magic') playMagicSound();
-    if (hit.effect === 'disarm') {
-      pushFeed(escapeHtml(attacker.name) + ' pulls the weapon off ' + escapeHtml(victim.name), 'hit');
+    if (hit.effect === 'madness') {
+      pushFeed(escapeHtml(attacker.name) + ' drives ' + escapeHtml(victim.name) + ' mad', 'hit');
+    } else if (hit.attack === 'mad') {
+      pushFeed(
+        escapeHtml(attacker.name) + (miss ? ' swings madly at ' : ' turns on ') + escapeHtml(victim.name) + (miss ? '' : ' ' + hit.amount),
+        miss ? 'miss' : 'hit'
+      );
     } else if (hit.effect === 'wash') {
       pushFeed(escapeHtml(attacker.name) + ' roars and washes ' + escapeHtml(victim.name) + ' to the edge', 'hit');
     } else if (hit.attack === 'smoke' && miss) {
@@ -1418,8 +1457,9 @@
     faceView(from, to);
     const swing = hit.verb ? hit.attack : hit.attack === 'fire' ? 'fire' : hit.attack === 'claw' ? 'melee' : hit.style;
     playAttack(from, swing, to);
+    if (from.monster === 'chaos') chaosFx(from, to, hit);
     if (from.monster || swing === 'melee' || hit.verb) return;
-    const color = swing === 'fire' ? '#fb923c' : from.glow && from.glow.color;
+    const color = hit.attack === 'mad' ? '#c084fc' : swing === 'fire' ? '#fb923c' : from.glow && from.glow.color;
     const bright = swing === 'fire' || !!(from.weapon && (from.weapon.quality === 'tempered' || from.weapon.quality === 'masterwork'));
     const wait = swing === 'fire' ? 80 : hit.style === 'magic' ? 120 : 140;
     window.setTimeout(() => {
@@ -1435,7 +1475,8 @@
       view.attackGen = (view.attackGen || 0) + 1;
       if (view.attackRaf) cancelAnimationFrame(view.attackRaf);
       view.el.classList.add('is-dead');
-      view.el.classList.remove('is-lunge', 'is-draw', 'is-cast');
+      view.el.classList.remove('is-lunge', 'is-draw', 'is-cast', 'is-mad');
+      if (view.card) view.card.classList.remove('is-mad');
       if (view.weaponGlow) view.weaponGlow.classList.remove('is-hot');
       paintLayers(view, 'idle');
       if (view.pray) view.pray.hidden = true;
@@ -1568,6 +1609,31 @@
     });
   }
 
+  function coneEase(hz, t) {
+    const span = Math.max(0.1, Number(hz.lockAt) - Number(hz.t0));
+    const u = Math.max(0, Math.min(1, (t - hz.t0) / span));
+    return 1 - Math.pow(1 - u, 3);
+  }
+
+  function coneHeading(hz, t) {
+    if (t >= hz.lockAt) return Number(hz.a);
+    return Number(hz.from) + Number(hz.sweep) * coneEase(hz, t);
+  }
+
+  function conePath(hz, heading) {
+    const x = Number(hz.x);
+    const y = Number(hz.y);
+    const r = Number(hz.r);
+    const arc = Number(hz.arc);
+    const ax = x + Math.cos(heading - arc) * r;
+    const ay = y + Math.sin(heading - arc) * r;
+    const bx = x + Math.cos(heading + arc) * r;
+    const by = y + Math.sin(heading + arc) * r;
+    const big = arc * 2 > Math.PI ? 1 : 0;
+    return 'M' + x.toFixed(2) + ' ' + y.toFixed(2) + ' L' + ax.toFixed(2) + ' ' + ay.toFixed(2) +
+      ' A' + r + ' ' + r + ' 0 ' + big + ' 1 ' + bx.toFixed(2) + ' ' + by.toFixed(2) + ' Z';
+  }
+
   function drawHazards(t) {
     const svg = document.getElementById('arena-hazards');
     if (!svg || !bout || bout.formation !== 'raid') return;
@@ -1576,7 +1642,12 @@
     for (const hz of list) {
       if (t < hz.t0 || t > hz.t1 + 0.45) continue;
       const cls = t >= hz.t1 ? 'is-hit' : t >= hz.t1 - 0.16 ? 'is-hot' : 'is-warn';
-      if (hz.kind === 'lane') {
+      if (hz.kind === 'cone') {
+        const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
+        const spinning = t < hz.lockAt;
+        markup += '<path class="' + (spinning ? 'is-spin' : cls) + tone + '" d="' + conePath(hz, coneHeading(hz, t)) + '"></path>';
+        if (spinning) continue;
+      } else if (hz.kind === 'lane') {
         const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
         markup += '<line class="' + cls + tone + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
       } else if (hz.attack === 'rocks') {
@@ -1586,8 +1657,12 @@
         markup += '<circle class="' + cls + tone + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
       }
       if (hz.attack !== 'rocks') {
-        const lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
-        const ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
+        let lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
+        let ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
+        if (hz.kind === 'cone') {
+          lx = Number(hz.x) + Math.cos(hz.a) * hz.r * 0.62;
+          ly = Number(hz.y) + Math.sin(hz.a) * hz.r * 0.62;
+        }
         markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
       }
     }
@@ -1598,6 +1673,16 @@
     const view = fighter ? actors.get(fighter.id) : null;
     if (!view || !view.el) return;
     const active = list.find((hz) => t >= hz.t0 && t < hz.t1);
+    const turning = active && active.kind === 'cone' ? active : null;
+    view.el.classList.toggle('is-turning', !!turning);
+    if (turning) {
+      // The wrap faces right, and the sprite's width is the cosine of the heading, like a turntable.
+      const c = Math.cos(coneHeading(turning, t));
+      const settle = coneEase(turning, t);
+      const size = Math.abs(c) + (1 - Math.abs(c)) * settle;
+      view.wrap.classList.remove('is-left');
+      view.el.style.setProperty('--turn', ((c < 0 ? -1 : 1) * Math.max(0.1, size)).toFixed(3));
+    }
     ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage', 'slash', 'fire', 'discord', 'confusion', 'madness', 'orb', 'roar', 'smoke'].forEach((id) => {
       const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
       view.el.classList.toggle('is-wind-' + id, winding);
@@ -1717,6 +1802,9 @@
       view.wrap.classList.toggle('is-left', facingLeft(view, pos, prevX));
       view.wrap.classList.toggle('is-walk', !!pos.moving && !pos.buried);
       view.el.classList.toggle('is-burrowed', !!pos.buried);
+      const mad = !!view.madUntil && t < view.madUntil;
+      view.el.classList.toggle('is-mad', mad);
+      if (view.card) view.card.classList.toggle('is-mad', mad);
       setPrayer(view, t);
       setSpeed(view, t);
     }
