@@ -601,7 +601,7 @@
       statusEl.textContent = 'Pick at least one spoop.';
       return;
     }
-    if (!seedEl.value.trim()) seedEl.value = String(Date.now());
+    if (!seedEl.value.trim() || (bossEl && bossEl.value === 'raid')) seedEl.value = String(Date.now());
     busy = true;
     fightBtn.disabled = true;
     statusEl.textContent = 'Walking in…';
