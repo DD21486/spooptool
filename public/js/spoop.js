@@ -1878,7 +1878,17 @@
         '</div></div>' +
       '</div>'
     ).join('');
-    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + lampCells + bankCells.join('') + '</div>';
+    const jackpotCells = (spoop.jackpots || []).map((prize) =>
+      '<div class="spoop-slot is-jackpot" data-jackpot="' + escapeHtml(prize.id) + '" role="button" tabindex="0" aria-haspopup="menu" aria-label="' + escapeHtml(prize.name + ', ' + prize.count) + '">' +
+        (prize.osrsId ? itemIcon(prize) : '') +
+        (prize.count > 1 ? '<span class="mega-count">' + prize.count + '</span>' : '') +
+        '<div class="spoop-tips"><div class="spoop-tip" role="tooltip">' +
+          '<p class="spoop-tip-mega">' + escapeHtml(prize.name) + (prize.count > 1 ? ' × ' + prize.count : '') + '</p>' +
+          '<p class="text-slate-300 mt-1">A raid jackpot. Sells for ' + Number(prize.gold).toLocaleString() + ' gold. Click to sell.</p>' +
+        '</div></div>' +
+      '</div>'
+    ).join('');
+    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + jackpotCells + lampCells + bankCells.join('') + '</div>';
     const log = activityLog(spoop);
     const fight = spoop.fights[0];
     const fightHtml = fight
@@ -2046,6 +2056,18 @@
       const open = (ev) => {
         ev.preventDefault();
         if (lamp) openLampMenu(slot, spoopKey(spoop), lamp, spoop);
+      };
+      slot.addEventListener('click', open);
+      slot.addEventListener('contextmenu', open);
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') open(ev);
+      });
+    });
+    root.querySelectorAll('[data-jackpot]').forEach((slot) => {
+      const prize = (spoop.jackpots || []).find((row) => row.id === slot.getAttribute('data-jackpot'));
+      const open = (ev) => {
+        ev.preventDefault();
+        if (prize) openJackpotMenu(slot, spoopKey(spoop), prize);
       };
       slot.addEventListener('click', open);
       slot.addEventListener('contextmenu', open);
@@ -2586,6 +2608,50 @@
     document.addEventListener('mousedown', onCrateMenuAway, true);
     document.addEventListener('keydown', onCrateMenuKey);
     menu.querySelector('[data-open]').focus();
+  }
+
+  function openJackpotMenu(slot, name, prize) {
+    closeCrateMenu();
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML = '<button type="button" role="menuitem" data-sell>Sell for ' + Number(prize.gold).toLocaleString() + '</button>';
+    document.body.appendChild(menu);
+    const slotRect = slot.getBoundingClientRect();
+    const rect = menu.getBoundingClientRect();
+    let left = slotRect.left;
+    let top = slotRect.bottom + 4;
+    if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+    if (top + rect.height > window.innerHeight - 8) top = Math.max(8, slotRect.top - rect.height - 4);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = top + 'px';
+    menu.querySelector('[data-sell]').addEventListener('click', () => {
+      closeCrateMenu();
+      sellJackpot(name, prize);
+    });
+    crateMenu = menu;
+    document.addEventListener('mousedown', onCrateMenuAway, true);
+    document.addEventListener('keydown', onCrateMenuKey);
+    menu.querySelector('[data-sell]').focus();
+  }
+
+  async function sellJackpot(name, prize) {
+    if (selling) return;
+    const yes = await confirmSale(prize.name, prize.gold);
+    if (!yes) return;
+    selling = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'sell-jackpot', name, jackpot: prize.id }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      selling = false;
+    }
   }
 
   let usingLamp = false;

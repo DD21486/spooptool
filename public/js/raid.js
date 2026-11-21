@@ -175,7 +175,9 @@
       const rare = drop.rare ? ' is-rare' : '';
       prize = '<div class="raid-prize' + rare + '">' +
         iconHtml(drop.osrsId, 64) +
-        (drop.rare ? '<p class="raid-rare-tag">Rare</p>' : '') +
+        (drop.jackpot
+          ? '<p class="raid-rare-tag">Jackpot · 500,000 gp</p>'
+          : drop.rare ? '<p class="raid-rare-tag">Rare</p>' : '') +
         '<p class="raid-take">' + escapeHtml(who) + ' takes the ' + escapeHtml(drop.name) + '.</p>' +
       '</div>';
     }
