@@ -142,7 +142,7 @@ async function handlePost(req) {
   if (action === 'open-mega') {
     const now = new Date(state.clock);
     const rng = mulberry32(hashString(`${spoop.name}|mega|${now.toISOString()}|${spoop.megaChests}|${Math.random()}`));
-    const result = openMegaChest(spoop, now, rng);
+    const result = openMegaChest(spoop, now, rng, state);
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
     if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };

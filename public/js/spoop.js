@@ -1514,6 +1514,9 @@
           '<canvas class="spoop-sprite" width="16" height="24" data-spoop="' + escapeHtml(spoopKey(spoop)) + '"></canvas>' +
           '<h2>' + escapeHtml(spoop.name) + '</h2>' +
           owner +
+          (spoop.social && spoop.social.title
+            ? '<p class="spoop-card-title" title="' + escapeHtml(spoop.social.title.detail) + '">' + escapeHtml(spoop.social.title.name) + '</p>'
+            : '') +
           '<dl class="spoop-stats">' +
             '<div><dt>Combat</dt><dd>' + spoop.combat + '</dd></div>' +
             '<div><dt title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1.">Gear</dt><dd>' + (spoop.gearRating || 0) + '</dd></div>' +
@@ -1536,7 +1539,7 @@
       ? '<a class="spoop-pk" href="/arena.html">PK · ' + escapeHtml(pk.a) + ' vs ' + escapeHtml(pk.b) + ' · ' + escapeHtml(pk.reason) + '</a>'
       : '';
     const board = cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>';
-    root.innerHTML = '<div class="spoop-main">' + pkBanner + renderMap(spoops) + board + '</div>' + renderFeed(spoops);
+    root.innerHTML = '<div class="spoop-main">' + pkBanner + renderMap(spoops) + feudsStrip(state) + board + '</div>' + renderFeed(spoops);
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
     bindFeedSort(root, spoops);
@@ -1729,6 +1732,93 @@
     '</section>';
   }
 
+  function spoopLink(key, name) {
+    return '<a href="/spoop.html?name=' + encodeURIComponent(key) + '">' + escapeHtml(name) + '</a>';
+  }
+
+  function traitBadges(social) {
+    const traits = (social && social.traits) || [];
+    if (!traits.length) return '';
+    return '<ul class="spoop-traits">' + traits.map((trait) =>
+      '<li class="spoop-trait is-' + escapeHtml(trait.kind) + '" title="' + escapeHtml(trait.detail) + '">' + escapeHtml(trait.name) + '</li>'
+    ).join('') + '</ul>';
+  }
+
+  function relationRow(row) {
+    const label = row.label
+      ? '<span class="spoop-rel-label is-' + escapeHtml(row.label) + '">' + escapeHtml(row.labelName) + '</span>'
+      : '<span class="spoop-rel-label">' + (row.affinity < 0 ? 'Cool on' : 'Warm to') + '</span>';
+    const numbers = 'Likes ' + row.affinity + ' · Respects ' + row.respect;
+    const spot = Math.max(0, Math.min(100, (Number(row.affinity) + 100) / 2));
+    return '<li class="spoop-rel" title="' + escapeHtml(numbers) + '">' +
+      '<p class="spoop-rel-head">' + label + spoopLink(row.key, row.name) + '</p>' +
+      '<div class="spoop-rel-meter" aria-label="' + escapeHtml(numbers) + '">' +
+        '<i style="left:' + spot.toFixed(1) + '%"></i>' +
+      '</div>' +
+      (row.reason ? '<p class="spoop-rel-why">' + escapeHtml(row.reason) + '</p>' : '') +
+    '</li>';
+  }
+
+  const RELATIONS_OPEN_KEY = 'spoop-relations-open';
+
+  function relationsOpen() {
+    try {
+      return window.localStorage.getItem(RELATIONS_OPEN_KEY) !== '0';
+    } catch (err) {
+      return true;
+    }
+  }
+
+  function bindRelationsToggle(root) {
+    const panel = root.querySelector('[data-relations]');
+    if (!panel) return;
+    panel.addEventListener('toggle', () => {
+      try {
+        window.localStorage.setItem(RELATIONS_OPEN_KEY, panel.open ? '1' : '0');
+      } catch (err) {}
+    });
+  }
+
+  function relationsSection(spoop) {
+    const social = spoop.social || { sees: [], seenBy: [] };
+    const column = (title, rows, empty) =>
+      '<div>' +
+        '<h4 class="spoop-rel-title">' + escapeHtml(title) + '</h4>' +
+        (rows.length
+          ? '<ul class="spoop-rel-list">' + rows.map(relationRow).join('') + '</ul>'
+          : '<p class="text-slate-600 text-sm">' + escapeHtml(empty) + '</p>') +
+      '</div>';
+    return '<details class="spoop-relations mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4" data-relations' + (relationsOpen() ? ' open' : '') + '>' +
+      '<summary><h3 class="text-sm text-slate-300">Relationships</h3></summary>' +
+      '<div class="grid gap-4 md:grid-cols-2 mt-3">' +
+        column('How ' + spoop.name + ' sees others', social.sees || [], 'No strong feelings about anyone yet.') +
+        column('How others see ' + spoop.name, social.seenBy || [], 'Nobody has made up their mind yet.') +
+      '</div>' +
+    '</details>';
+  }
+
+  const FEUD_VERBS = {
+    nemesis: 'wants revenge on',
+    rival: 'has it out for',
+    contempt: 'can’t stand',
+  };
+
+  function feudsStrip(state) {
+    const feuds = state.feuds || [];
+    if (!feuds.length) return '';
+    const rows = feuds.map((row) =>
+      '<li>' +
+        '<p>' + spoopLink(row.holderKey, row.holder) +
+          ' <span class="spoop-feud-vs">' + escapeHtml(row.mutual ? 'and' : (FEUD_VERBS[row.label] || 'has a problem with')) + '</span> ' +
+          spoopLink(row.targetKey, row.target) +
+          (row.mutual ? ' <span class="spoop-feud-tag">Feud</span>' : '') +
+        '</p>' +
+        (row.reason ? '<p class="spoop-feud-why">' + escapeHtml(row.reason) + '</p>' : '') +
+      '</li>'
+    ).join('');
+    return '<section class="spoop-feuds"><h3>Bad blood</h3><ul>' + rows + '</ul></section>';
+  }
+
   function renderDetail(state) {
     const root = document.getElementById('spoop-root');
     const params = new URLSearchParams(window.location.search);
@@ -1857,6 +1947,7 @@
           '<div class="spoop-identity">' +
             '<h1>' + escapeHtml(spoop.name) + '</h1>' +
             owner +
+            traitBadges(spoop.social) +
             '<ul class="spoop-pills">' +
               '<li class="spoop-pill is-gold"><span>Gold</span><strong>' + Number(spoop.gold || 0).toLocaleString() + '</strong></li>' +
               '<li class="spoop-pill"><span>Arena</span><strong class="win">' + spoop.arenaWins + 'W</strong><strong class="loss">' + spoop.arenaLosses + 'L</strong></li>' +
@@ -1894,6 +1985,7 @@
           '<div class="spoop-grid equip-grid">' + grid + '</div>' +
         '</section>' +
       '</div>' +
+      relationsSection(spoop) +
       statsHtml +
       spoopControlsHtml(spoop, build, buildTabs) +
       bossGrid(spoop) +
@@ -1986,6 +2078,7 @@
     });
     bindEquipTips(root);
     bindBankTips(root);
+    bindRelationsToggle(root);
   }
 
   function placeBankTips(slot) {
