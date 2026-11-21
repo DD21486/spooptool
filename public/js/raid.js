@@ -555,8 +555,11 @@
   function paintScene(boss) {
     const pit = document.getElementById('arena-pit');
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel');
     const known = {
+      obor: 'is-hillcave',
+      vorkath: 'is-ungael',
+      cerberus: 'is-kennel',
       mole: 'is-lair',
       brutus: 'is-pasture',
       scurrius: 'is-sewer',
@@ -636,7 +639,7 @@
     const tonight = bossEl.value === 'raid';
     tierEl.disabled = tonight;
     tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
-    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master' }[bossEl.value];
+    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough' }[bossEl.value];
     if (!tonight && home && bossEl.dataset.home !== bossEl.value) tierEl.value = home;
     bossEl.dataset.home = bossEl.value;
   }

@@ -1320,19 +1320,17 @@
         charge: 'is-charge', toss: 'is-toss', claw: 'is-claw', dirt: 'is-dirt', burrow: 'is-burrow',
         bite: 'is-bite', rocks: 'is-rocks', barrage: 'is-barrage',
         discord: 'is-discord', confusion: 'is-confusion', madness: 'is-madness',
+        club: 'is-club', maul: 'is-maul', heads: 'is-heads', lava: 'is-lava',
+        bolt: 'is-bolt', breath: 'is-breath', bomb: 'is-bomb', spit: 'is-spit', pool: 'is-spit',
       };
       const cls = poses[style] || 'is-stomp';
-      view.el.classList.remove(
-        'is-stomp', 'is-charge', 'is-toss', 'is-claw', 'is-dirt', 'is-burrow', 'is-bite', 'is-rocks', 'is-barrage',
-        'is-discord', 'is-confusion', 'is-madness',
-        'is-wind-stomp', 'is-wind-charge', 'is-wind-toss', 'is-wind-claw', 'is-wind-dirt', 'is-wind-burrow',
-        'is-wind-bite', 'is-wind-rocks', 'is-wind-barrage', 'is-wind-discord', 'is-wind-confusion', 'is-wind-madness'
-      );
+      const posed = ['is-stomp'].concat(Object.values(poses));
+      view.el.classList.remove.apply(view.el.classList, posed.concat(posed.map((c) => c.replace('is-', 'is-wind-'))));
       void view.el.offsetWidth;
       view.el.classList.add(cls);
       const hold = style === 'charge' ? 620 : style === 'barrage' || style === 'rocks' ? 640 : style === 'toss' || style === 'dirt' ? 520 : style === 'claw' || style === 'bite' ? 500 : 680;
-      if ((style === 'toss' || style === 'dirt' || style === 'barrage') && victim) {
-        const tint = style === 'dirt' ? '#a16207' : style === 'barrage' ? '#93c5fd' : '#f3e2a4';
+      if ((style === 'toss' || style === 'dirt' || style === 'barrage' || style === 'bolt' || style === 'heads') && victim) {
+        const tint = style === 'dirt' ? '#a16207' : style === 'barrage' ? '#93c5fd' : style === 'bolt' ? '#c4b5fd' : style === 'heads' ? '#fb923c' : '#f3e2a4';
         window.setTimeout(() => {
           if (!view.el.isConnected || !bout) return;
           shot(view, victim, 'magic', tint, true);
@@ -1521,10 +1519,13 @@
 
   function paintRaidScene(fight) {
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-raid-wait');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-raid-wait');
     if (!fight || fight.formation !== 'raid') return;
     const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
-    const scene = fight.scene || { mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', elvarg: 'is-crandor', chaos: 'is-wild', leviathan: 'is-pool' }[boss && boss.monster];
+    const scene = fight.scene || {
+      mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', elvarg: 'is-crandor', chaos: 'is-wild', leviathan: 'is-pool',
+      obor: 'is-hillcave', vorkath: 'is-ungael', cerberus: 'is-kennel',
+    }[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
 
@@ -1578,6 +1579,35 @@
     });
     layer.querySelectorAll('.fall-rock').forEach((el) => {
       if (live.indexOf(Number(el.dataset.rock)) < 0) el.remove();
+    });
+  }
+
+  // Acid spits and firebombs arc from the boss (x1, y1) and land on the mark at t1.
+  function drawLobs(t) {
+    const layer = fallLayer();
+    if (!layer || !bout) return;
+    const live = [];
+    (bout.hazards || []).forEach((hz, i) => {
+      if (hz.attack !== 'spit' && hz.attack !== 'bomb') return;
+      const span = Math.max(0.2, Number(hz.t1) - Number(hz.t0));
+      const launch = Number(hz.t0) + (hz.attack === 'bomb' ? span * 0.35 : 0);
+      if (t < launch || t > hz.t1) return;
+      live.push(i);
+      let el = layer.querySelector('[data-lob="' + i + '"]');
+      if (!el) {
+        el = document.createElement('div');
+        el.className = 'lob is-' + hz.attack;
+        el.dataset.lob = String(i);
+        layer.appendChild(el);
+      }
+      const u = Math.max(0, Math.min(1, (t - launch) / Math.max(0.1, Number(hz.t1) - launch)));
+      const x = Number(hz.x1) + (Number(hz.x) - Number(hz.x1)) * u;
+      const y = Number(hz.y1) + (Number(hz.y) - Number(hz.y1)) * u - Math.sin(u * Math.PI) * 9;
+      el.style.left = (x / bout.width * 100) + '%';
+      el.style.top = (y / bout.height * 100) + '%';
+    });
+    layer.querySelectorAll('.lob').forEach((el) => {
+      if (live.indexOf(Number(el.dataset.lob)) < 0) el.remove();
     });
   }
 
@@ -1652,11 +1682,15 @@
         markup += '<line class="' + cls + tone + '" x1="' + hz.x1 + '" y1="' + hz.y1 + '" x2="' + hz.x2 + '" y2="' + hz.y2 + '" stroke-width="' + hz.w + '"></line>';
       } else if (hz.attack === 'rocks') {
         markup += '<ellipse class="' + cls + ' tone-shadow" cx="' + hz.x + '" cy="' + hz.y + '" rx="' + hz.r + '" ry="' + (Number(hz.r) * 0.42).toFixed(2) + '"></ellipse>';
+      } else if (hz.kind === 'pool') {
+        const grow = Math.min(1, (t - hz.t0) / 0.5);
+        const fade = t > hz.t1 ? Math.max(0, 1 - (t - hz.t1) / 0.45) : 1;
+        markup += '<circle class="is-pool tone-acid" cx="' + hz.x + '" cy="' + hz.y + '" r="' + (Number(hz.r) * grow).toFixed(2) + '" opacity="' + fade.toFixed(2) + '"></circle>';
       } else {
         const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
         markup += '<circle class="' + cls + tone + '" cx="' + hz.x + '" cy="' + hz.y + '" r="' + hz.r + '"></circle>';
       }
-      if (hz.attack !== 'rocks') {
+      if (hz.attack !== 'rocks' && hz.label) {
         let lx = hz.kind === 'lane' ? (Number(hz.x1) + Number(hz.x2)) / 2 : hz.x;
         let ly = hz.kind === 'lane' ? (Number(hz.y1) + Number(hz.y2)) / 2 : hz.y;
         if (hz.kind === 'cone') {
@@ -1668,6 +1702,7 @@
     }
     svg.innerHTML = markup;
     drawFalls(t);
+    drawLobs(t);
     drawRubble(t);
     const fighter = (bout.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'dragon' && f.monster !== 'rat');
     const view = fighter ? actors.get(fighter.id) : null;
@@ -1683,7 +1718,8 @@
       view.wrap.classList.remove('is-left');
       view.el.style.setProperty('--turn', ((c < 0 ? -1 : 1) * Math.max(0.1, size)).toFixed(3));
     }
-    ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage', 'slash', 'fire', 'discord', 'confusion', 'madness', 'orb', 'roar', 'smoke'].forEach((id) => {
+    ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage', 'slash', 'fire', 'discord', 'confusion', 'madness', 'orb', 'roar', 'smoke',
+      'club', 'maul', 'heads', 'lava', 'bolt', 'breath', 'bomb', 'acid'].forEach((id) => {
       const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
       view.el.classList.toggle('is-wind-' + id, winding);
     });
