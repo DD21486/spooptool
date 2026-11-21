@@ -1747,7 +1747,7 @@
   function relationRow(row) {
     const label = row.label
       ? '<span class="spoop-rel-label is-' + escapeHtml(row.label) + '">' + escapeHtml(row.labelName) + '</span>'
-      : '<span class="spoop-rel-label">' + (row.affinity < 0 ? 'Cool on' : 'Warm to') + '</span>';
+      : '<span class="spoop-rel-label">' + (Math.abs(row.affinity) < 5 ? 'Neutral' : row.affinity < 0 ? 'Cool on' : 'Warm to') + '</span>';
     const numbers = 'Likes ' + row.affinity + ' · Respects ' + row.respect;
     const spot = Math.max(0, Math.min(100, (Number(row.affinity) + 100) / 2));
     return '<li class="spoop-rel" title="' + escapeHtml(numbers) + '">' +
