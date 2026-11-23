@@ -27,6 +27,7 @@
   let playFrom = 0;
   let shownHit = 0;
   let shownDeath = 0;
+  let shownPhase = 0;
   let rageShown = false;
   let nightDone = null;
   let onFightDone = null;
@@ -792,6 +793,21 @@
     return 'hsl(' + hue + ' 72% 42%)';
   }
 
+  function setTrail(bar, pct) {
+    const trail = bar && bar.parentNode && bar.parentNode.querySelector('.hp-trail');
+    if (!trail) return;
+    const next = Math.max(0, pct * 100);
+    const prev = trail.dataset.pct == null ? 100 : Number(trail.dataset.pct);
+    trail.dataset.pct = String(next);
+    if (next >= prev) {
+      trail.style.transition = 'none';
+      trail.style.width = next + '%';
+      return;
+    }
+    trail.style.transition = '';
+    trail.style.width = next + '%';
+  }
+
   function setHp(fighter, hp) {
     const pct = fighter.maxHp ? Math.max(0, Math.min(1, hp / fighter.maxHp)) : 0;
     const view = actors.get(fighter.id);
@@ -799,10 +815,12 @@
     view.hp = hp;
     view.bar.style.width = Math.max(0, pct * 100) + '%';
     view.bar.style.background = hpColor(pct);
+    setTrail(view.bar, pct);
     setBossBar(fighter, hp);
     if (view.cardBar) {
       view.cardBar.style.width = Math.max(0, pct * 100) + '%';
       view.cardBar.style.background = hpColor(pct);
+      setTrail(view.cardBar, pct);
     }
   }
 
@@ -814,7 +832,7 @@
     el.className = 'boss-bar';
     el.hidden = true;
     el.innerHTML = '<div class="boss-bar-line"><strong class="boss-bar-name"></strong><span class="boss-bar-lvl"></span></div>' +
-      '<div class="boss-bar-track" aria-hidden="true"><span></span></div>';
+      '<div class="boss-bar-track" aria-hidden="true"><i class="hp-trail"></i><span></span></div>';
     pit.appendChild(el);
     return el;
   }
@@ -858,6 +876,7 @@
     const span = el.querySelector('.boss-bar-track > span');
     if (!span) return;
     span.style.width = (pct * 100) + '%';
+    setTrail(span, pct);
   }
 
   function paintPot(purse) {
@@ -964,7 +983,7 @@
         (f.monster
           ? '<img class="tile-dragon" alt="" src="' + (f.monster === 'dragon' ? '/assets/dragon/idle.png' : escapeHtml(f.sprite || '/assets/bosses/Brutus.png')) + '">'
           : '<canvas width="16" height="24" data-spoop="' + escapeHtml(f.name) + '"></canvas>') +
-        '<div class="tile-hp"><span></span></div>' +
+        '<div class="tile-hp"><i class="hp-trail"></i><span></span></div>' +
         pray +
       '</li>';
     }).join('');
@@ -975,8 +994,28 @@
     });
   }
 
+  function startHp(fighter) {
+    const start = Number(fighter.startHp);
+    return start > 0 ? Math.min(start, fighter.maxHp) : fighter.maxHp;
+  }
+
+  // A bar that opens below full jumps there, so the trail doesn't read as a hit.
+  function openHp(fighter, view) {
+    const hp = startHp(fighter);
+    setHp(fighter, hp);
+    const pct = fighter.maxHp ? Math.max(0, Math.min(1, hp / fighter.maxHp)) * 100 : 0;
+    [view && view.bar, view && view.cardBar].forEach((bar) => {
+      const trail = bar && bar.parentNode && bar.parentNode.querySelector('.hp-trail');
+      if (!trail) return;
+      trail.style.transition = 'none';
+      trail.style.width = pct + '%';
+      trail.dataset.pct = String(pct);
+    });
+  }
+
   function poolMaxHp(fight, fighter) {
     const listed = Math.max(1, Number(fighter.maxHp) || 1);
+    if (Number(fighter.startHp) > 0) return listed;
     const hits = (fight && fight.hits) || [];
     for (let i = 0; i < hits.length; i++) {
       const hit = hits[i];
@@ -1002,7 +1041,8 @@
       f.maxHp = poolMaxHp(fight, f);
       const el = document.createElement('div');
       const bossKind = f.monster && f.monster !== 'dragon' ? ' is-' + String(f.monster).replace(/[^a-z0-9-]/g, '') : '';
-      el.className = 'actor' + (f.monster ? ' is-boss' : '') + (f.minion ? ' is-minion' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '');
+      el.className = 'actor' + (f.monster ? ' is-boss' : '') + (f.minion ? ' is-minion' : '') + bossKind + (f.face === 'left' ? ' is-flip' : '') +
+        (f.name === 'Growthling' ? ' is-growthling' : '');
       el.setAttribute('data-id', f.id);
       const pray = !f.monster && f.prayer
         ? '<div class="pray" title="' + escapeHtml(f.prayer.name) + '">' +
@@ -1028,7 +1068,7 @@
           pray +
           '<div class="hud-name">' + escapeHtml(f.name) + '</div>' +
           '<div class="hud-cb">' + rank + '</div>' +
-          '<div class="hp-track"><span></span></div>' +
+          '<div class="hp-track"><i class="hp-trail"></i><span></span></div>' +
         '</div>' +
         sprite +
         (f.monster || !(f.attack > 0)
@@ -1063,7 +1103,7 @@
         cardBar: card ? card.querySelector('.tile-hp > span') : null,
         cardPray: card ? card.querySelector('.tile-pray > span') : null,
         pts: tracks[f.id] || [],
-        hp: f.maxHp,
+        hp: startHp(f),
         dead: false,
         x: 0,
         y: 0,
@@ -1077,7 +1117,7 @@
       place(el, start.x, start.y, fight.width, fight.height);
       applyGlow(view);
       paintLayers(view, 'idle');
-      setHp(f, f.maxHp);
+      openHp(f, view);
       setPrayer(view, 0);
       setSpeed(view, 0);
     });
@@ -1322,6 +1362,8 @@
         discord: 'is-discord', confusion: 'is-confusion', madness: 'is-madness',
         club: 'is-club', maul: 'is-maul', heads: 'is-heads', lava: 'is-lava',
         bolt: 'is-bolt', breath: 'is-breath', bomb: 'is-bomb', spit: 'is-spit', pool: 'is-spit',
+        slash: 'is-slash', blast: 'is-blast', fire: 'is-fire', ice: 'is-ice', poison: 'is-poison', shock: 'is-shock',
+        bounce: 'is-bounce', swoop: 'is-swoop',
       };
       const cls = poses[style] || 'is-stomp';
       const posed = ['is-stomp'].concat(Object.values(poses));
@@ -1329,8 +1371,9 @@
       void view.el.offsetWidth;
       view.el.classList.add(cls);
       const hold = style === 'charge' ? 620 : style === 'barrage' || style === 'rocks' ? 640 : style === 'toss' || style === 'dirt' ? 520 : style === 'claw' || style === 'bite' ? 500 : 680;
-      if ((style === 'toss' || style === 'dirt' || style === 'barrage' || style === 'bolt' || style === 'heads') && victim) {
-        const tint = style === 'dirt' ? '#a16207' : style === 'barrage' ? '#93c5fd' : style === 'bolt' ? '#c4b5fd' : style === 'heads' ? '#fb923c' : '#f3e2a4';
+      const tints = { dirt: '#a16207', barrage: '#93c5fd', bolt: '#c4b5fd', heads: '#fb923c', shock: '#facc15', toss: '#f3e2a4' };
+      if (tints[style] && victim) {
+        const tint = tints[style];
         window.setTimeout(() => {
           if (!view.el.isConnected || !bout) return;
           shot(view, victim, 'magic', tint, true);
@@ -1408,6 +1451,7 @@
     const bias = victim.monster ? splatBias(hit.from) : null;
     const miss = (hit.miss || !(hit.amount > 0)) && hit.effect !== 'madness';
     if (hit.effect === 'madness') to.madUntil = Number(hit.until) || Number(hit.t) + 5;
+    if (hit.effect === 'freeze') to.frozenUntil = Number(hit.until) || Number(hit.t) + 3;
     if (hit.effect !== 'madness' && miss) {
       floater(to.x, to.y, 0, true, bias);
       playMissSound();
@@ -1452,6 +1496,15 @@
     else if (miss) pushFeed(escapeHtml(attacker.name) + ' misses ' + escapeHtml(victim.name), 'miss');
     else pushFeed(escapeHtml(attacker.name) + ' hits ' + escapeHtml(victim.name) + ' ' + hit.amount, 'hit');
     if (!from) return;
+    if (hit.attack === 'bounce') {
+      const origin = hit.via ? actors.get(hit.via) : from;
+      if (!hit.via) {
+        faceView(from, to);
+        playAttack(from, 'bounce', to);
+      }
+      if (origin) shot(origin, to, 'magic', '#c084fc', true);
+      return;
+    }
     faceView(from, to);
     const swing = hit.verb ? hit.attack : hit.attack === 'fire' ? 'fire' : hit.attack === 'claw' ? 'melee' : hit.style;
     playAttack(from, swing, to);
@@ -1473,7 +1526,7 @@
       view.attackGen = (view.attackGen || 0) + 1;
       if (view.attackRaf) cancelAnimationFrame(view.attackRaf);
       view.el.classList.add('is-dead');
-      view.el.classList.remove('is-lunge', 'is-draw', 'is-cast', 'is-mad');
+      view.el.classList.remove('is-lunge', 'is-draw', 'is-cast', 'is-mad', 'is-frozen');
       if (view.card) view.card.classList.remove('is-mad');
       if (view.weaponGlow) view.weaponGlow.classList.remove('is-hot');
       paintLayers(view, 'idle');
@@ -1484,6 +1537,36 @@
       const fallen = bout && bout.fighters.find((f) => f.id === death.id);
       if (fallen) pushFeed(escapeHtml(fallen.name) + ' is defeated', 'dead');
     }
+  }
+
+  function raidBoss() {
+    return bout && (bout.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat' && f.monster !== 'dragon');
+  }
+
+  // A boss with another form refills its bar instead of dying. mountActors resets maxHp on a replay.
+  function applyPhase(phase) {
+    const boss = raidBoss();
+    const view = boss && actors.get(boss.id);
+    if (!view) return;
+    const img = view.el.querySelector('.boss-sprite');
+    if (img && phase.sprite) img.src = phase.sprite;
+    const tile = view.card && view.card.querySelector('.tile-dragon');
+    if (tile && phase.sprite) tile.src = phase.sprite;
+    view.el.classList.add('is-form-' + String(phase.form || '').replace(/[^a-z0-9-]/g, ''));
+    if (phase.hp) {
+      boss.maxHp = phase.hp;
+      setHp(boss, phase.hp);
+    }
+    burst(view.x, view.y - 2, '#fde68a', 'swell');
+    pushFeed(escapeHtml(phase.name || boss.name) + ' ' + escapeHtml(phase.verb || 'changes form'), 'hit');
+  }
+
+  function paintMolt(t) {
+    const boss = raidBoss();
+    const view = boss && actors.get(boss.id);
+    if (!view || view.dead) return;
+    const molting = (bout.phases || []).some((p) => t >= p.t && t < p.until);
+    view.el.classList.toggle('is-molting', molting);
   }
 
   function bloodPool(x, y) {
@@ -1515,16 +1598,46 @@
     if (svg) svg.innerHTML = '';
     const falls = pit && pit.querySelector('.raid-falls');
     if (falls) falls.innerHTML = '';
+    const labels = pit && pit.querySelector('.raid-labels');
+    if (labels) labels.innerHTML = '';
+  }
+
+  // Soft centre-out fills for the breath and spell marks. Referenced from arena.css by id.
+  const HAZARD_DEFS = '<defs>' + [
+    ['fire', '#fde68a', '#f97316', '#9a3412'],
+    ['ice', '#f0f9ff', '#7dd3fc', '#0369a1'],
+    ['poison', '#dcfce7', '#4ade80', '#166534'],
+    ['shock', '#fefce8', '#facc15', '#a16207'],
+    ['moss', '#ecfccb', '#84cc16', '#3f6212'],
+    ['bomb', '#fdf2f8', '#ec4899', '#9d174d'],
+    ['lava', '#fef3c7', '#f97316', '#7c2d12'],
+    ['acid', '#ecfccb', '#84cc16', '#365314'],
+  ].map(([id, a, b, c]) => '<radialGradient id="hz-' + id + '">' +
+    '<stop offset="0%" stop-color="' + a + '" stop-opacity="0.55"/>' +
+    '<stop offset="55%" stop-color="' + b + '" stop-opacity="0.42"/>' +
+    '<stop offset="100%" stop-color="' + c + '" stop-opacity="0.5"/></radialGradient>').join('') +
+    '</defs>';
+
+  function hazardLabelLayer() {
+    const stage = pit && pit.querySelector('.pit-stage');
+    if (!stage) return null;
+    let layer = stage.querySelector('.raid-labels');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.className = 'raid-labels';
+      stage.appendChild(layer);
+    }
+    return layer;
   }
 
   function paintRaidScene(fight) {
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-raid-wait');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair', 'is-raid-wait');
     if (!fight || fight.formation !== 'raid') return;
     const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
     const scene = fight.scene || {
       mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', elvarg: 'is-crandor', chaos: 'is-wild', leviathan: 'is-pool',
-      obor: 'is-hillcave', vorkath: 'is-ungael', cerberus: 'is-kennel',
+      obor: 'is-hillcave', vorkath: 'is-ungael', cerberus: 'is-kennel', bryophyta: 'is-mossy', kbd: 'is-kbdlair', kq: 'is-kqlair',
     }[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
@@ -1582,15 +1695,25 @@
     });
   }
 
-  // Acid spits and firebombs arc from the boss (x1, y1) and land on the mark at t1.
+  // Thrown and breathed marks fly from the boss (x1, y1) and land on the mark at t1.
+  // lead is the share of the warn before it leaves the mouth. arc is how high it lobs.
+  const LOBS = {
+    spit: { lead: 0, arc: 9 },
+    bomb: { lead: 0.35, arc: 9 },
+    ice: { lead: 0.45, arc: 3 },
+    poison: { lead: 0.45, arc: 3 },
+    blast: { lead: 0.4, arc: 4 },
+  };
+
   function drawLobs(t) {
     const layer = fallLayer();
     if (!layer || !bout) return;
     const live = [];
     (bout.hazards || []).forEach((hz, i) => {
-      if (hz.attack !== 'spit' && hz.attack !== 'bomb') return;
+      const lob = LOBS[hz.attack];
+      if (!lob || !(Number(hz.x1) || Number(hz.y1))) return;
       const span = Math.max(0.2, Number(hz.t1) - Number(hz.t0));
-      const launch = Number(hz.t0) + (hz.attack === 'bomb' ? span * 0.35 : 0);
+      const launch = Number(hz.t0) + span * lob.lead;
       if (t < launch || t > hz.t1) return;
       live.push(i);
       let el = layer.querySelector('[data-lob="' + i + '"]');
@@ -1602,7 +1725,7 @@
       }
       const u = Math.max(0, Math.min(1, (t - launch) / Math.max(0.1, Number(hz.t1) - launch)));
       const x = Number(hz.x1) + (Number(hz.x) - Number(hz.x1)) * u;
-      const y = Number(hz.y1) + (Number(hz.y) - Number(hz.y1)) * u - Math.sin(u * Math.PI) * 9;
+      const y = Number(hz.y1) + (Number(hz.y) - Number(hz.y1)) * u - Math.sin(u * Math.PI) * lob.arc;
       el.style.left = (x / bout.width * 100) + '%';
       el.style.top = (y / bout.height * 100) + '%';
     });
@@ -1669,6 +1792,7 @@
     if (!svg || !bout || bout.formation !== 'raid') return;
     const list = bout.hazards || [];
     let markup = '';
+    let labels = '';
     for (const hz of list) {
       if (t < hz.t0 || t > hz.t1 + 0.45) continue;
       const cls = t >= hz.t1 ? 'is-hit' : t >= hz.t1 - 0.16 ? 'is-hot' : 'is-warn';
@@ -1697,10 +1821,15 @@
           lx = Number(hz.x) + Math.cos(hz.a) * hz.r * 0.62;
           ly = Number(hz.y) + Math.sin(hz.a) * hz.r * 0.62;
         }
-        markup += '<text class="hazard-label" x="' + lx + '" y="' + ly + '">' + escapeHtml(hz.label || '') + '</text>';
+        const word = String(hz.label || '');
+        const tone = hz.tone ? ' tone-' + String(hz.tone).replace(/[^a-z0-9-]/g, '') : '';
+        labels += '<span class="hazard-label' + tone + (cls === 'is-warn' ? '' : ' ' + cls) + '" style="left:' + (lx / bout.width * 100).toFixed(2) + '%;top:' + (ly / bout.height * 100).toFixed(2) + '%">' +
+          escapeHtml(word.charAt(0) + word.slice(1).toLowerCase()) + '</span>';
       }
     }
-    svg.innerHTML = markup;
+    svg.innerHTML = HAZARD_DEFS + markup;
+    const labelLayer = hazardLabelLayer();
+    if (labelLayer && labelLayer.innerHTML !== labels) labelLayer.innerHTML = labels;
     drawFalls(t);
     drawLobs(t);
     drawRubble(t);
@@ -1719,7 +1848,7 @@
       view.el.style.setProperty('--turn', ((c < 0 ? -1 : 1) * Math.max(0.1, size)).toFixed(3));
     }
     ['stomp', 'toss', 'charge', 'claw', 'dirt', 'burrow', 'bite', 'rocks', 'barrage', 'slash', 'fire', 'discord', 'confusion', 'madness', 'orb', 'roar', 'smoke',
-      'club', 'maul', 'heads', 'lava', 'bolt', 'breath', 'bomb', 'acid'].forEach((id) => {
+      'club', 'maul', 'heads', 'lava', 'bolt', 'breath', 'bomb', 'acid', 'blast', 'ice', 'poison', 'shock', 'bounce', 'swoop'].forEach((id) => {
       const winding = !!(active && active.attack === id) && !view.el.classList.contains('is-' + id);
       view.el.classList.toggle('is-wind-' + id, winding);
     });
@@ -1802,7 +1931,7 @@
       if (!hz) continue;
       let at = 0;
       let play = null;
-      if (hz.attack === 'charge') {
+      if (hz.attack === 'charge' || hz.attack === 'swoop') {
         at = hz.t0 + (hz.t1 - hz.t0) * 0.62;
         play = playChargeSound;
       } else if (mole && (hz.attack === 'claw' || hz.attack === 'dirt' || hz.attack === 'burrow')) {
@@ -1828,6 +1957,11 @@
       if (!view || view.dead) continue;
       if (f.monster && f.monster !== 'rat') view.el.classList.toggle('is-enraged', enraged);
       const pos = sampleTrack(view.pts, t);
+      if (view.wasHidden && !pos.hidden && view.el.classList.contains('is-growthling')) {
+        view.el.classList.add('is-sprout');
+        window.setTimeout(() => view.el.classList.remove('is-sprout'), 620);
+      }
+      view.wasHidden = !!pos.hidden;
       view.el.classList.toggle('is-hidden', !!pos.hidden);
       if (pos.hidden) continue;
       const prevX = view.x;
@@ -1841,6 +1975,7 @@
       const mad = !!view.madUntil && t < view.madUntil;
       view.el.classList.toggle('is-mad', mad);
       if (view.card) view.card.classList.toggle('is-mad', mad);
+      view.el.classList.toggle('is-frozen', !!view.frozenUntil && t < view.frozenUntil);
       setPrayer(view, t);
       setSpeed(view, t);
     }
@@ -1852,6 +1987,12 @@
       applyDeath(bout.deaths[shownDeath]);
       shownDeath += 1;
     }
+    const phases = bout.phases || [];
+    while (shownPhase < phases.length && phases[shownPhase].t <= t) {
+      applyPhase(phases[shownPhase]);
+      shownPhase += 1;
+    }
+    paintMolt(t);
     drawHazards(t);
     cueBossSounds(t);
     drawAims();
@@ -1888,6 +2029,7 @@
     playSpeed = (title || '') === 'PK' ? PK_SPEED : ARENA_SPEED;
     shownHit = 0;
     shownDeath = 0;
+    shownPhase = 0;
     rageShown = false;
     if (pit) pit.classList.remove('is-enraged');
     clearFeed();
@@ -2037,6 +2179,7 @@
     playFightMusic(false);
     shownHit = 0;
     shownDeath = 0;
+    shownPhase = 0;
     playFrom = 0;
     soundT = 0;
     playOrigin = performance.now();
@@ -2059,7 +2202,7 @@
       if (view.weaponGlow) view.weaponGlow.classList.remove('is-hot');
       paintLayers(view, 'idle');
       if (view.card) view.card.classList.remove('is-dead', 'is-winner');
-      setHp(f, f.maxHp);
+      openHp(f, view);
       setPrayer(view, 0);
       setSpeed(view, 0);
       const startPos = sampleTrack(view.pts, 0);

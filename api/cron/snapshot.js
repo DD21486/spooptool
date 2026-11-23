@@ -151,9 +151,13 @@ module.exports = async function handler(req, res) {
   if (req.query.arena_reminder === '1' || req.query.arena_reminder === 'true') {
     try {
       const { syncWorld } = require('../spoops');
+      const { load } = require('../../lib/spoop/store');
+      const { nextArenaPostAt } = require('../../lib/spoop/publish');
       const pk = await syncPk(new Date());
       await syncWorld(false);
-      return res.status(200).json({ ok: true, pk });
+      const next = nextArenaPostAt(await load());
+      const nextPostIn = next ? Math.max(1, Math.ceil((new Date(next).getTime() - Date.now()) / 1000)) : null;
+      return res.status(200).json({ ok: true, pk, nextPostIn });
     } catch (err) {
       console.error('arena reminder', err);
       return res.status(500).json({ error: err.message || String(err) });

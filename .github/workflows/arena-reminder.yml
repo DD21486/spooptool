@@ -1,5 +1,7 @@
 # Every 5 minutes. GitHub drops a every-minute schedule, and this run also
 # advances the world so hourly spoop posts are not left until the long snapshot.
+# During a raid the endpoint answers with nextPostIn, and the run stays to call
+# back right when each per-boss Discord post is due.
 name: Arena reminders
 
 on:
@@ -7,12 +9,35 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch:
 
+concurrency:
+  group: arena-reminder
+  cancel-in-progress: false
+
 jobs:
   remind:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - name: Send due Spoopfight reminders
+      - name: Send due Spoopfight reminders and raid posts
         run: |
-          curl --fail-with-body -sS \
-            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
-            "https://spooptool.vercel.app/api/cron/snapshot?arena_reminder=1"
+          deadline=$(( $(date +%s) + 15 * 60 ))
+          stuck=0
+          while :; do
+            out=$(curl --fail-with-body -sS \
+              -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+              "https://spooptool.vercel.app/api/cron/snapshot?arena_reminder=1")
+            echo "$out"
+            wait=$(echo "$out" | jq -r '.nextPostIn // empty')
+            [ -z "$wait" ] && break
+            [ "$wait" -gt 600 ] && break
+            [ $(( $(date +%s) + wait )) -gt "$deadline" ] && break
+            # A post that is already due but did not go out: back off, then give up.
+            if [ "$wait" -le 1 ]; then
+              stuck=$(( stuck + 1 ))
+              [ "$stuck" -ge 3 ] && break
+              sleep 20
+              continue
+            fi
+            stuck=0
+            sleep $(( wait + 2 ))
+          done

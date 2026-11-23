@@ -145,6 +145,23 @@
     });
   }
 
+  function hpPct(row) {
+    return row && row.maxHp ? Math.max(0, Math.min(1, (Number(row.hp) || 0) / row.maxHp)) : 0;
+  }
+
+  function hpColor(pct) {
+    return 'hsl(' + Math.round(120 * pct) + ' 72% 42%)';
+  }
+
+  // Health carries into the next room, so the summary shows what each survivor walks out with.
+  function hpLine(row) {
+    if (!row || !(row.maxHp > 0)) return '';
+    const pct = hpPct(row);
+    return '<i class="raid-hp" title="' + escapeHtml(row.hp + ' / ' + row.maxHp + ' hitpoints') + '">' +
+      '<b style="width:' + (pct * 100).toFixed(1) + '%;background:' + hpColor(pct) + '"></b>' +
+      '<small>' + row.hp + '/' + row.maxHp + '</small></i>';
+  }
+
   function renderSummary(loot, party, bout) {
     const goldById = new Map((loot.shares || []).map((row) => [row.id, row.gold]));
     const takerId = loot.spooply && loot.spooply.id;
@@ -167,7 +184,7 @@
         return '<div class="raid-share is-down' + taker + best + '"><strong>' + escapeHtml(row.name) + '</strong><span>Down</span>' + dmg + '</div>';
       }
       const gold = share ? share.toLocaleString('en-US') + ' gp' : '0 gp';
-      return '<div class="raid-share' + taker + best + '"><strong>' + escapeHtml(row.name) + '</strong><span>' + gold + '</span>' + dmg + '</div>';
+      return '<div class="raid-share' + taker + best + '"><strong>' + escapeHtml(row.name) + '</strong><span>' + gold + '</span>' + dmg + hpLine(row) + '</div>';
     }).join('');
     let prize = '';
     if (!loot.wiped && drop) {
@@ -280,6 +297,13 @@
       return row;
     }
     (raid.rooms || []).forEach((room) => {
+      if (room.kind === 'treasure') {
+        (room.shares || []).forEach((share) => {
+          if (share) person(share.id, share.name).gold += Number(share.gold) || 0;
+        });
+        return;
+      }
+      if (room.kind === 'rest') return;
       const bout = room.bout || {};
       const bossName = (room.boss && room.boss.name) || 'the room';
       const monsters = new Set(((bout.fighters || []).filter((f) => f.monster).map((f) => f.id)));
@@ -316,8 +340,22 @@
     const lastRoom = rooms[rooms.length - 1];
     const fellTo = (lastRoom && lastRoom.boss && lastRoom.boss.name) || 'the raid';
     const killed = rooms
-      .filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name)
+      .filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name && !room.boss.skirmish)
       .map((room) => room.boss.name);
+    const chests = rooms.filter((room) => room.kind === 'treasure' && room.chest).map((room) => room.chest.name);
+    const map = raid.map && !Array.isArray(raid.map) ? raid.map : null;
+    const depth = map && map.layers
+      ? 'Reached ' + (raid.route || []).length + ' of ' + map.layers + ' rooms.'
+      : '';
+    const headline = raid.cleared
+      ? 'The party cleared the raid.'
+      : 'The party fell to ' + fellTo + '.';
+    const awardHtml = (raid.awards || []).length
+      ? '<ul class="raid-awards">' + raid.awards.map((award) =>
+        '<li class="raid-award is-' + escapeHtml(award.id) + '" title="' + escapeHtml(award.detail || '') + '">' +
+          '<span>' + escapeHtml(award.name) + '</span><strong>' + escapeHtml(award.who) + '</strong></li>'
+      ).join('') + '</ul>'
+      : '';
     const topDamage = rows.reduce((best, row) => Math.max(best, row.damage), 0);
     const topGold = rows.reduce((best, row) => Math.max(best, row.gold), 0);
     const byDamage = rows.slice().sort((a, b) => b.damage - a.damage || a.name.localeCompare(b.name));
@@ -348,13 +386,16 @@
           '<em>from ' + escapeHtml(row.drop.from) + '</em></span></li>';
       }).join('')
       : '<li class="raid-recap-empty">Nobody took a drop.</li>';
-    const path = killed.length
+    const path = (killed.length
       ? 'Killed ' + joinNames(killed) + '.'
-      : 'No room was cleared.';
+      : 'No boss went down.') +
+      (chests.length ? ' Opened a ' + joinNames(chests) + '.' : '') +
+      (depth ? ' ' + depth : '');
     if (kickerEl) kickerEl.textContent = 'Raid over';
     if (phaseEl) phaseEl.textContent = raid.name || 'The raid';
-    stageEl.innerHTML = '<p class="raid-recap-fell">The party fell to ' + escapeHtml(fellTo) + '.</p>' +
+    stageEl.innerHTML = '<p class="raid-recap-fell' + (raid.cleared ? ' is-clear' : '') + '">' + escapeHtml(headline) + '</p>' +
       '<p class="raid-recap-path">' + escapeHtml(path) + '</p>' +
+      awardHtml +
       '<div class="raid-recap-cols">' +
         '<section><h3>Damage</h3><ol class="raid-recap-list">' + damageHtml + '</ol></section>' +
         '<section><h3>Gold</h3><ol class="raid-recap-list">' + goldHtml + '</ol></section>' +
@@ -379,7 +420,7 @@
   function countdown(seconds, token) {
     return new Promise((resolve) => {
       let left = seconds;
-      const line = stamp('Next fight in ' + left);
+      const line = stamp('Moving on in ' + left);
       const timer = window.setInterval(() => {
         if (token !== rollToken) {
           window.clearInterval(timer);
@@ -389,10 +430,10 @@
         left -= 1;
         if (left <= 0) {
           window.clearInterval(timer);
-          if (line) line.textContent = 'Next fight';
+          if (line) line.textContent = 'Moving on';
           resolve(true);
         } else if (line) {
-          line.textContent = 'Next fight in ' + left;
+          line.textContent = 'Moving on in ' + left;
         }
       }, 1000);
     });
@@ -405,77 +446,290 @@
     return cleared && token === rollToken;
   }
 
-  function drawMap(nodes, rooms, revealed, tokenPos) {
-    const pts = (nodes || []).map((node) => node.x + ',' + node.y).join(' ');
-    let marks = '';
-    (nodes || []).forEach((node, i) => {
-      const room = rooms && rooms[i];
-      const sprite = i < revealed && room && room.boss && room.boss.sprite;
-      marks += '<circle class="map-node" cx="' + node.x + '" cy="' + node.y + '" r="6.2"></circle>';
-      if (sprite) {
-        marks += '<image href="' + escapeHtml(sprite) + '" x="' + (node.x - 4.4) + '" y="' + (node.y - 4.4) + '" width="8.8" height="8.8"></image>';
-      } else {
-        marks += '<text class="map-q" x="' + node.x + '" y="' + (node.y + 0.6) + '">?</text>';
-      }
+  // Same waits as RAID_SHOW in lib/spoop/engine.js.
+  const SHOW = { open: 3400, fork: 3600, travel: 5000, camp: 7000, chest: 8000 };
+
+  // Raids from before the branching map stored a plain list of points, one per room.
+  function raidMap(data) {
+    if (data && data.map && !Array.isArray(data.map) && Array.isArray(data.map.nodes)) {
+      return { nodes: data.map.nodes, layers: data.map.layers || 0, route: data.route || [], choices: data.choices || [] };
+    }
+    const rooms = (data && data.rooms) || [];
+    const pts = Array.isArray(data && data.map) && data.map.length
+      ? data.map
+      : rooms.map((room, i) => ({ x: 12 + (i / Math.max(1, rooms.length - 1)) * 76, y: 32 }));
+    const nodes = pts.map((pt, i) => {
+      const boss = (rooms[i] && rooms[i].boss) || {};
+      return {
+        id: 'n' + i,
+        layer: i,
+        x: pt.x,
+        y: pt.y,
+        kind: boss.skirmish ? 'swarm' : 'boss',
+        name: boss.name || '',
+        sprite: boss.sprite || '',
+        next: i < pts.length - 1 ? ['n' + (i + 1)] : [],
+      };
     });
-    const tokenMark = tokenPos
-      ? '<circle class="map-token" cx="' + tokenPos.x.toFixed(2) + '" cy="' + tokenPos.y.toFixed(2) + '" r="2.15"></circle>'
-      : '';
-    stageEl.innerHTML = '<svg class="raid-map" viewBox="0 0 100 64" role="img" aria-label="Raid map">' +
-      '<polyline class="map-path" points="' + pts + '"></polyline>' +
-      marks + tokenMark + '</svg>';
+    rooms.forEach((room, i) => {
+      if (room && !room.node && nodes[i]) room.node = nodes[i].id;
+    });
+    return { nodes, layers: nodes.length, route: nodes.slice(0, rooms.length).map((node) => node.id), choices: [] };
   }
 
-  function showOpening(data, token) {
+  function nodeArt(node) {
+    if (node.sprite) return node.sprite;
+    if (node.icon) return '/api/spoops?icon=1&id=' + Number(node.icon);
+    return '';
+  }
+
+  function nodeLabel(node) {
+    if (!node) return '';
+    if (node.kind === 'rest' || node.kind === 'treasure') return node.name;
+    return node.name + (node.tierName ? ' · ' + node.tierName : '');
+  }
+
+  // What the map shows at a step: the nodes walked so far, and every option seen at a fork.
+  // The ones the party passed up stay face up, dimmed.
+  function mapView(map, step) {
+    const walked = map.route.slice(0, step + 1);
+    const seen = new Set(walked);
+    const skipped = new Set();
+    (map.choices || []).forEach((choice) => {
+      const at = map.route.indexOf(choice.at);
+      if (at < 0 || at >= step) return;
+      choice.options.forEach((id) => {
+        seen.add(id);
+        if (id !== choice.pick) skipped.add(id);
+      });
+    });
+    return { walked, seen, skipped, options: [], on: '', token: null, caption: '' };
+  }
+
+  function drawMap(map, view) {
+    const byId = new Map(map.nodes.map((node) => [node.id, node]));
+    const walked = view.walked || [];
+    const steps = new Set();
+    for (let i = 1; i < walked.length; i++) steps.add(walked[i - 1] + '>' + walked[i]);
+    const options = new Set(view.options || []);
+    const here = walked[walked.length - 1];
+    let edges = '';
+    map.nodes.forEach((node) => {
+      (node.next || []).forEach((id) => {
+        const to = byId.get(id);
+        if (!to) return;
+        const cls = steps.has(node.id + '>' + id)
+          ? ' is-walked'
+          : node.id === here && options.has(id) ? ' is-open' : '';
+        edges += '<line class="map-edge' + cls + '" x1="' + node.x + '" y1="' + node.y + '" x2="' + to.x + '" y2="' + to.y + '"></line>';
+      });
+    });
+    let marks = '';
+    map.nodes.forEach((node) => {
+      const face = view.seen.has(node.id) || options.has(node.id);
+      const art = face ? nodeArt(node) : '';
+      const cls = 'map-stop is-' + escapeHtml(node.kind || 'boss') +
+        (walked.indexOf(node.id) >= 0 ? ' is-past' : '') +
+        (options.has(node.id) ? ' is-option' : '') +
+        (view.on === node.id ? ' is-on' : '') +
+        (view.skipped && view.skipped.has(node.id) ? ' is-skipped' : '');
+      marks += '<g class="' + cls + '" data-node="' + escapeHtml(node.id) + '">' +
+        '<title>' + escapeHtml(face ? nodeLabel(node) : 'Unknown room') + '</title>' +
+        '<circle class="map-node" cx="' + node.x + '" cy="' + node.y + '" r="4.6"></circle>' +
+        (art
+          ? '<image href="' + escapeHtml(art) + '" x="' + (node.x - 3.5) + '" y="' + (node.y - 3.5) + '" width="7" height="7" preserveAspectRatio="xMidYMid meet"></image>'
+          : '<text class="map-q" x="' + node.x + '" y="' + (node.y + 0.4) + '">?</text>') +
+      '</g>';
+    });
+    const token = view.token
+      ? '<circle class="map-token" cx="' + view.token.x.toFixed(2) + '" cy="' + view.token.y.toFixed(2) + '" r="1.9"></circle>'
+      : '';
+    stageEl.innerHTML = '<svg class="raid-map" viewBox="0 0 100 64" role="img" aria-label="Raid map">' +
+      edges + marks + token + '</svg>' +
+      (view.caption ? '<p class="raid-map-line">' + escapeHtml(view.caption) + '</p>' : '');
+  }
+
+  function mapCard(data) {
+    if (kickerEl) kickerEl.textContent = 'Tonight';
+    if (phaseEl) phaseEl.textContent = data.name || 'The raid';
+    lootEl.classList.add('is-intro');
+    lootEl.hidden = false;
+    if (banner) banner.hidden = true;
+  }
+
+  function showOpening(map, data, token) {
     return new Promise((resolve) => {
-      if (!lootEl || !stageEl) {
+      if (!lootEl || !stageEl || !map.nodes.length) {
         resolve(token === rollToken);
         return;
       }
-      if (kickerEl) kickerEl.textContent = 'Tonight';
-      if (phaseEl) phaseEl.textContent = data.name || 'The raid';
-      const nodes = data.map || [];
-      const start = nodes[0] ? { x: Math.max(3, nodes[0].x - 9), y: nodes[0].y } : null;
-      drawMap(nodes, data.rooms, 0, start);
-      lootEl.classList.add('is-intro');
-      lootEl.hidden = false;
-      if (banner) banner.hidden = true;
-      window.setTimeout(() => resolve(token === rollToken), 3200);
+      mapCard(data);
+      const first = map.nodes[0];
+      const view = mapView(map, -1);
+      view.token = { x: Math.max(2.5, first.x - 6), y: first.y };
+      view.caption = map.layers + ' rooms deep. The path stays hidden until you get there.';
+      drawMap(map, view);
+      window.setTimeout(() => resolve(token === rollToken), SHOW.open);
     });
   }
 
-  function showTravel(data, fromIndex, token) {
+  // The options turn face up and the highlight hops between them until it lands on the party's pick.
+  async function showFork(map, data, step, choice, token) {
+    if (!lootEl || !stageEl) return token === rollToken;
+    const started = performance.now();
+    const byId = new Map(map.nodes.map((node) => [node.id, node]));
+    const here = byId.get(map.route[step]);
+    mapCard(data);
+    if (phaseEl) phaseEl.textContent = 'The road splits';
+    const view = mapView(map, step);
+    view.options = choice.options;
+    view.token = here ? { x: here.x, y: here.y } : null;
+    view.caption = choice.options.map((id) => nodeLabel(byId.get(id))).join('  or  ');
+    drawMap(map, view);
+    const els = choice.options.map((id) => stageEl.querySelector('[data-node="' + id + '"]')).filter(Boolean);
+    const land = Math.max(0, choice.options.indexOf(choice.pick));
+    await spin(els, land, token);
+    if (token !== rollToken) return false;
+    const pick = byId.get(choice.pick);
+    const line = stageEl.querySelector('.raid-map-line');
+    if (line && pick) line.textContent = 'The party heads for ' + nodeLabel(pick) + '.';
+    await wait(Math.max(400, SHOW.fork - (performance.now() - started)));
+    return token === rollToken;
+  }
+
+  function showTravel(map, data, step, token) {
     return new Promise((resolve) => {
-      const nodes = data.map || [];
-      const a = nodes[fromIndex];
-      const b = nodes[fromIndex + 1];
+      const byId = new Map(map.nodes.map((node) => [node.id, node]));
+      const a = byId.get(map.route[step]);
+      const b = byId.get(map.route[step + 1]);
       if (!lootEl || !stageEl || !a || !b) {
         resolve(token === rollToken);
         return;
       }
-      if (kickerEl) kickerEl.textContent = 'Tonight';
-      if (phaseEl) phaseEl.textContent = data.name || 'The raid';
-      lootEl.classList.add('is-intro');
-      lootEl.hidden = false;
-      if (banner) banner.hidden = true;
+      mapCard(data);
+      const view = mapView(map, step + 1);
+      view.caption = 'Next: ' + nodeLabel(b);
       const started = performance.now();
       function frame(now) {
         if (token !== rollToken) {
           resolve(false);
           return;
         }
-        const u = Math.min(1, (now - started) / 5000);
+        const u = Math.min(1, (now - started) / SHOW.travel);
         const ease = u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
-        drawMap(nodes, data.rooms, fromIndex + 1, {
-          x: a.x + (b.x - a.x) * ease,
-          y: a.y + (b.y - a.y) * ease,
-        });
+        view.token = { x: a.x + (b.x - a.x) * ease, y: a.y + (b.y - a.y) * ease };
+        drawMap(map, view);
         if (u < 1) requestAnimationFrame(frame);
         else resolve(true);
       }
-      drawMap(nodes, data.rooms, fromIndex + 1, { x: a.x, y: a.y });
+      view.token = { x: a.x, y: a.y };
+      drawMap(map, view);
       requestAnimationFrame(frame);
     });
+  }
+
+  // The bars of whoever gets patched up fill to full a beat after the card opens.
+  function showCamp(room, node, token) {
+    return new Promise((resolve) => {
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      const healed = new Map((room.healed || []).map((row) => [row.id, row]));
+      if (kickerEl) kickerEl.textContent = 'Camp';
+      if (phaseEl) phaseEl.textContent = 'A short rest';
+      const names = (room.party || []).filter((row) => healed.has(row.id)).map((row) => row.name);
+      const line = names.length
+        ? joinNames(names) + (names.length === 1 ? ' gets' : ' get') + ' patched up.'
+        : 'Nobody needed patching up.';
+      const rows = (room.party || []).map((row) => {
+        const heal = healed.get(row.id);
+        const before = heal ? { hp: heal.from, maxHp: heal.maxHp } : row;
+        return '<div class="raid-share raid-camp-row' + (heal ? ' is-healed' : '') + '" data-id="' + escapeHtml(row.id) + '">' +
+          '<strong>' + escapeHtml(row.name) + '</strong>' +
+          hpLine(before) +
+          (heal ? '<em class="raid-camp-gain">+' + (heal.to - heal.from) + '</em>' : '') +
+        '</div>';
+      }).join('');
+      stageEl.innerHTML = '<div class="raid-camp">' +
+        iconHtml((node && node.icon) || 385, 56) +
+        '<p class="raid-chosen">' + escapeHtml(line) + '</p>' +
+        '<div class="raid-shares">' + rows + '</div>' +
+      '</div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => {
+        if (token !== rollToken) return;
+        healed.forEach((heal, id) => {
+          const el = stageEl.querySelector('.raid-camp-row[data-id="' + id + '"]');
+          if (!el) return;
+          el.classList.add('is-full');
+          const bar = el.querySelector('.raid-hp b');
+          const text = el.querySelector('.raid-hp small');
+          if (bar) {
+            bar.style.width = '100%';
+            bar.style.background = hpColor(1);
+          }
+          if (text) text.textContent = heal.to + '/' + heal.maxHp;
+        });
+      }, 1400);
+      window.setTimeout(() => resolve(token === rollToken), SHOW.camp);
+    });
+  }
+
+  // The chest rattles, opens, and the gold counts up before the split shows.
+  function showChest(room, token) {
+    return new Promise((resolve) => {
+      const chest = room.chest || {};
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      if (kickerEl) kickerEl.textContent = 'Treasure';
+      if (phaseEl) phaseEl.textContent = chest.name || 'A chest';
+      stageEl.innerHTML = '<div class="raid-chest is-' + escapeHtml(chest.id || 'small') + ' is-shut">' +
+        '<div class="raid-chest-box">' + iconHtml(chest.osrsId, 72) + '</div>' +
+        '<p class="raid-gold raid-chest-gold">? gold</p>' +
+        '<div class="raid-shares"></div>' +
+      '</div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      const box = stageEl.querySelector('.raid-chest');
+      const goldEl = stageEl.querySelector('.raid-chest-gold');
+      const sharesEl = stageEl.querySelector('.raid-chest .raid-shares');
+      const total = Number(chest.gold) || 0;
+      window.setTimeout(() => {
+        if (token !== rollToken || !box) return;
+        box.classList.remove('is-shut');
+        box.classList.add('is-open');
+        const started = performance.now();
+        function count(now) {
+          if (token !== rollToken) return;
+          const u = Math.min(1, (now - started) / 1400);
+          const shown = Math.round(total * (1 - Math.pow(1 - u, 3)));
+          if (goldEl) goldEl.innerHTML = shown.toLocaleString('en-US') + ' gold' + (u >= 1 ? ' <span>split by the living</span>' : '');
+          if (u < 1) requestAnimationFrame(count);
+          else if (sharesEl) {
+            sharesEl.innerHTML = (room.shares || []).map((share) =>
+              '<div class="raid-share"><strong>' + escapeHtml(share.name) + '</strong><span>' +
+                Number(share.gold || 0).toLocaleString('en-US') + ' gp</span></div>'
+            ).join('');
+          }
+        }
+        requestAnimationFrame(count);
+      }, 1800);
+      window.setTimeout(() => resolve(token === rollToken), SHOW.chest);
+    });
+  }
+
+  // After the last card the full recap takes over, unless a wipe already put it up.
+  async function closeOut(data, token) {
+    if (!lootEl || lootEl.classList.contains('is-recap')) return;
+    await wait(7000);
+    if (token !== rollToken) return;
+    showRaidRecap(data);
   }
 
   function showFightCard(boss, index, token) {
@@ -519,44 +773,66 @@
     last = data;
     hideLoot();
     const token = rollToken;
+    const map = raidMap(data);
     const rooms = data.rooms || [];
-    const total = (data.map && data.map.length) || rooms.length;
+    const total = map.layers || map.route.length;
+    const byId = new Map(map.nodes.map((node) => [node.id, node]));
     if (statusEl) statusEl.textContent = data.name || 'Tonight';
-    if (notesEl) notesEl.textContent = total + ' rooms. The path stays hidden until you arrive. Anyone who dies stays down.';
-    if (data.map && data.map.length) {
-      const opened = await showOpening(data, token);
-      if (!opened || token !== rollToken) return;
-      clearLoot();
-    }
-    for (let i = 0; i < rooms.length; i++) {
+    if (notesEl) notesEl.textContent = total + ' rooms deep. Damage carries from room to room, and the camp after the second boss patches up three. Anyone who dies stays down.';
+    const opened = await showOpening(map, data, token);
+    if (!opened || token !== rollToken) return;
+    clearLoot();
+    let fights = 0;
+    for (let step = 0; step < map.route.length; step++) {
       if (token !== rollToken) return;
-      const room = rooms[i];
-      const boss = room.boss || {};
-      if (statusEl) statusEl.textContent = (i + 1) + ' / ' + total + ' · ' + (data.name || 'Tonight');
-      if (notesEl) notesEl.textContent = 'Room ' + (i + 1) + ' of ' + total;
-      paintScene(boss);
-      const card = await showFightCard(boss, i, token);
-      if (!card || token !== rollToken) return;
-      if (notesEl) notesEl.textContent = bossLine(boss);
-      clearLoot();
-      await playBout(room.bout);
-      if (token !== rollToken) return;
-      const more = i < rooms.length - 1;
-      const cleared = await showLoot(room, { wait: more, closing: !more });
-      if (!cleared || !more || token !== rollToken) return;
-      if (data.map && data.map.length > i + 1) {
-        const moved = await showTravel(data, i, token);
-        if (!moved || token !== rollToken) return;
+      const node = byId.get(map.route[step]) || {};
+      const here = rooms.filter((room) => room.node === node.id);
+      for (const room of here) {
+        if (token !== rollToken) return;
+        const more = rooms.indexOf(room) < rooms.length - 1;
+        if (statusEl) statusEl.textContent = (step + 1) + ' / ' + total + ' · ' + (data.name || 'Tonight');
+        if (notesEl) notesEl.textContent = 'Room ' + (step + 1) + ' of ' + total;
+        if (room.kind === 'rest' || room.kind === 'treasure') {
+          const shown = room.kind === 'rest' ? await showCamp(room, node, token) : await showChest(room, token);
+          if (!shown || token !== rollToken) return;
+          clearLoot();
+          continue;
+        }
+        const boss = room.boss || {};
+        paintScene(boss);
+        const card = await showFightCard(boss, fights, token);
+        fights += 1;
+        if (!card || token !== rollToken) return;
+        if (notesEl) notesEl.textContent = bossLine(boss);
+        clearLoot();
+        await playBout(room.bout);
+        if (token !== rollToken) return;
+        const wiped = !!(room.bout && room.bout.loot && room.bout.loot.wiped);
+        const cleared = await showLoot(room, { wait: more && !wiped, closing: !more || wiped });
+        if (token !== rollToken) return;
+        if (!cleared || !more) {
+          await closeOut(data, token);
+          return;
+        }
+        clearLoot();
       }
-      clearLoot();
+      if (step < map.route.length - 1) {
+        const choice = (map.choices || []).find((row) => row.at === node.id);
+        if (choice && !(await showFork(map, data, step, choice, token))) return;
+        if (!(await showTravel(map, data, step, token))) return;
+        clearLoot();
+      }
     }
   }
 
   function paintScene(boss) {
     const pit = document.getElementById('arena-pit');
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair');
     const known = {
+      kq: 'is-kqlair',
+      bryophyta: 'is-mossy',
+      kbd: 'is-kbdlair',
       obor: 'is-hillcave',
       vorkath: 'is-ungael',
       cerberus: 'is-kennel',
@@ -639,7 +915,7 @@
     const tonight = bossEl.value === 'raid';
     tierEl.disabled = tonight;
     tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
-    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough' }[bossEl.value];
+    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough', bryophyta: 'easy', kbd: 'medium', kq: 'hard' }[bossEl.value];
     if (!tonight && home && bossEl.dataset.home !== bossEl.value) tierEl.value = home;
     bossEl.dataset.home = bossEl.value;
   }

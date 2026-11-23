@@ -1455,7 +1455,8 @@ body[data-page="detail"] .build-tab.is-on.is-magic:hover {
 .spoop-rel-label.is-pal { color: #5dff6a; }
 .spoop-rel-label.is-idol { color: #fff34d; }
 
-.spoop-relations > summary {
+.spoop-relations > summary,
+.spoop-raids > summary {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1464,9 +1465,11 @@ body[data-page="detail"] .build-tab.is-on.is-magic:hover {
   user-select: none;
 }
 
-.spoop-relations > summary::-webkit-details-marker { display: none; }
+.spoop-relations > summary::-webkit-details-marker,
+.spoop-raids > summary::-webkit-details-marker { display: none; }
 
-.spoop-relations > summary::before {
+.spoop-relations > summary::before,
+.spoop-raids > summary::before {
   content: "";
   width: 0;
   height: 0;
@@ -1476,9 +1479,75 @@ body[data-page="detail"] .build-tab.is-on.is-magic:hover {
   transition: transform 0.15s ease;
 }
 
-.spoop-relations[open] > summary::before { transform: rotate(90deg); }
+.spoop-relations[open] > summary::before,
+.spoop-raids[open] > summary::before { transform: rotate(90deg); }
 
-.spoop-relations > summary h3 { margin: 0; }
+.spoop-relations > summary h3,
+.spoop-raids > summary h3 { margin: 0; }
+
+.spoop-raids > summary p { margin: 0 0 0 auto; }
+
+.spoop-raid-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 6px;
+  margin: 12px 0 0;
+}
+
+.spoop-raid-stat {
+  padding: 7px 9px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.6);
+}
+
+.spoop-raid-stat dt {
+  color: #94a3b8;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.spoop-raid-stat dd {
+  margin: 2px 0 0;
+  color: #f1f5f9;
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.spoop-raid-stat dd small { color: #94a3b8; font-size: 11px; }
+
+.spoop-raid-awards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+}
+
+.spoop-raid-award {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 5px 10px;
+  border: 1px solid #6b4e2e;
+  border-radius: 999px;
+  background: #24180e;
+  color: #f0d878;
+  font-size: 12px;
+}
+
+.spoop-raid-award strong { color: #fff6c8; font-variant-numeric: tabular-nums; }
+.spoop-raid-award.is-zero { opacity: 0.35; }
+
+.spoop-raid-last {
+  margin: 12px 0 0;
+  color: #94a3b8;
+  font-size: 12px;
+}
+
+.spoop-raid-last strong { color: #e2e8f0; font-weight: 600; }
 
 .spoop-rel-meter {
   position: relative;

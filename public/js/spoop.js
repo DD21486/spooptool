@@ -1797,6 +1797,73 @@
     '</details>';
   }
 
+  const RAIDS_OPEN_KEY = 'spoop-raids-open';
+
+  function raidsOpen() {
+    try {
+      return window.localStorage.getItem(RAIDS_OPEN_KEY) === '1';
+    } catch (err) {
+      return false;
+    }
+  }
+
+  function bindRaidsToggle(root) {
+    const panel = root.querySelector('[data-raids]');
+    if (!panel) return;
+    panel.addEventListener('toggle', () => {
+      try {
+        window.localStorage.setItem(RAIDS_OPEN_KEY, panel.open ? '1' : '0');
+      } catch (err) {}
+    });
+  }
+
+  function raidsSection(spoop) {
+    const stats = spoop.raids;
+    const num = (n) => Number(n || 0).toLocaleString();
+    const head = stats
+      ? num(stats.raids) + (stats.raids === 1 ? ' raid' : ' raids') + ' · ' + num(stats.clears) + (stats.clears === 1 ? ' clear' : ' clears')
+      : 'No raids yet';
+    let body = '<p class="text-slate-600 text-sm mt-3">' + escapeHtml(spoop.name) + ' hasn’t been on a raid yet.</p>';
+    if (stats) {
+      const tile = (label, value, extra) =>
+        '<div class="spoop-raid-stat"><dt>' + escapeHtml(label) + '</dt><dd>' + value + (extra ? ' <small>' + extra + '</small>' : '') + '</dd></div>';
+      const tiles = [
+        tile('Raids', num(stats.raids)),
+        tile('Clears', num(stats.clears)),
+        tile('Deaths', num(stats.deaths)),
+        tile('Deepest room', num(stats.deepest)),
+        tile('Rooms cleared', num(stats.rooms)),
+        tile('Bosses killed', num(stats.bosses)),
+        tile('Damage dealt', num(stats.damage)),
+        tile('Best raid', num(stats.bestDamage), 'dmg'),
+        tile('Damage taken', num(stats.taken)),
+        tile('Gold', num(stats.gold)),
+        tile('Drops', num(stats.drops), stats.rares ? num(stats.rares) + ' rare' : ''),
+        tile('Chests', num(stats.chests)),
+        tile('Camp heals', num(stats.healed)),
+      ].join('');
+      const awards = (stats.awards || []).map((award) =>
+        '<li class="spoop-raid-award' + (award.count ? '' : ' is-zero') + '" title="' + escapeHtml(award.detail) + '">' +
+          escapeHtml(award.name) + ' <strong>×' + num(award.count) + '</strong></li>'
+      ).join('');
+      const lastRaid = stats.last;
+      const lastLine = lastRaid
+        ? '<p class="spoop-raid-last">Last raid: <strong>' + escapeHtml(lastRaid.name) + '</strong> · ' +
+            escapeHtml(lastRaid.cleared && lastRaid.alive ? 'Cleared' : lastRaid.alive ? 'Survived' : 'Fell to ' + (lastRaid.fell || 'the raid')) +
+            ' · ' + num(lastRaid.damage) + ' dmg · ' + num(lastRaid.gold) + ' gold' +
+            (lastRaid.awards && lastRaid.awards.length ? ' · ' + escapeHtml(lastRaid.awards.join(', ')) : '') +
+          '</p>'
+        : '';
+      body = '<dl class="spoop-raid-stats">' + tiles + '</dl>' +
+        '<ul class="spoop-raid-awards">' + awards + '</ul>' +
+        lastLine;
+    }
+    return '<details class="spoop-raids mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4" data-raids' + (raidsOpen() ? ' open' : '') + '>' +
+      '<summary><h3 class="text-sm text-slate-300">Raids</h3><p class="text-xs text-slate-500 tabular-nums">' + escapeHtml(head) + '</p></summary>' +
+      body +
+    '</details>';
+  }
+
   const FEUD_VERBS = {
     nemesis: 'wants revenge on',
     rival: 'has it out for',
@@ -1999,6 +2066,7 @@
       statsHtml +
       spoopControlsHtml(spoop, build, buildTabs) +
       bossGrid(spoop) +
+      raidsSection(spoop) +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<h3 class="text-sm text-slate-300 mb-2">Crates</h3>' +
         '<div class="flex items-center gap-2 mb-1">' + bar(goal.progress) + '</div>' +
@@ -2101,6 +2169,7 @@
     bindEquipTips(root);
     bindBankTips(root);
     bindRelationsToggle(root);
+    bindRaidsToggle(root);
   }
 
   function placeBankTips(slot) {

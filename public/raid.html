@@ -8,7 +8,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
-  <link rel="stylesheet" href="/css/arena.css?v=vorkath" />
+  <link rel="stylesheet" href="/css/arena.css?v=raid-map" />
 </head>
 <body class="arena-page" data-page="raid">
   <header class="arena-bar">
@@ -25,7 +25,10 @@
           <option value="chaos">Chaos Elemental</option>
           <option value="leviathan">The Leviathan</option>
           <option value="obor">Obor</option>
+          <option value="bryophyta">Bryophyta</option>
+          <option value="kbd">King Black Dragon</option>
           <option value="vorkath">Vorkath</option>
+          <option value="kq">Kalphite Queen</option>
         </select>
       </label>
       <label>Tier
@@ -53,7 +56,7 @@
       <p id="arena-status" class="text-xs text-slate-400">Pick the party and send them in.</p>
     </div>
   </header>
-  <p id="pit-notes" class="pit-notes">Tonight's path is hidden until you reach each room. Anyone who dies stays down. The living heal, split the gold, and the party moves on after the summary.</p>
+  <p id="pit-notes" class="pit-notes">One boss, then the road splits. Damage carries from room to room, and the camp after the second boss patches up three. Anyone who dies stays down.</p>
   <ul id="arena-roster" class="roster"></ul>
   <div id="arena-pit" class="pit" aria-label="Raid">
     <div class="pit-post pit-post-nw"></div>
@@ -75,7 +78,7 @@
     </div>
   </div>
   <script src="/js/spoop.js"></script>
-  <script src="/js/arena.js?v=vorkath"></script>
-  <script src="/js/raid.js?v=vorkath"></script>
+  <script src="/js/arena.js?v=raid-map"></script>
+  <script src="/js/raid.js?v=raid-map"></script>
 </body>
 </html>
