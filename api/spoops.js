@@ -347,8 +347,8 @@ async function handleArena(req, res) {
       await locked(() => syncWorld(false));
       card = await peekArenaCard();
     }
-    if (!card) return res.status(200).json(await replaySnapshot());
-    return res.status(200).json(card);
+    if (!card) card = await replaySnapshot();
+    return res.status(200).json({ ...card, serverNow: new Date().toISOString() });
   } catch (err) {
     console.error('arena', err);
     return res.status(500).json({ error: 'Could not load the Spoopfight', detail: err.message || String(err) });

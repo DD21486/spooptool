@@ -3714,7 +3714,8 @@
       if (!res.ok) throw new Error(data.error || 'Could not load the Spoopfight');
       worldNowMs = Date.parse(data.now);
       simMode = !!data.useSim;
-      clockOffset = worldNowMs - Date.now();
+      const serverNowMs = Date.parse(data.serverNow || '');
+      clockOffset = (Number.isFinite(serverNowMs) ? serverNowMs : worldNowMs) - Date.now();
       nextAtMs = data.nextAt ? Date.parse(data.nextAt) : 0;
       nextLabel = data.nextLabel || '';
       nextTitle = data.nextTitle || 'Tournament';
