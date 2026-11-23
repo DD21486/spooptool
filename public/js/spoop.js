@@ -1168,9 +1168,22 @@
       apply();
     }
 
+    // A plain wheel scrolls the page. Ctrl or Cmd, or a trackpad pinch (which arrives as ctrl+wheel), zooms.
+    const hint = document.createElement('div');
+    hint.className = 'gielinor-hint';
+    hint.textContent = (/Mac|iPhone|iPad/.test(navigator.platform) ? '⌘' : 'Ctrl') + ' + scroll to zoom the map';
+    view.appendChild(hint);
+    let hintTimer = 0;
     view.addEventListener('wheel', (ev) => {
+      if (!ev.ctrlKey && !ev.metaKey) {
+        hint.classList.add('is-on');
+        clearTimeout(hintTimer);
+        hintTimer = setTimeout(() => hint.classList.remove('is-on'), 1200);
+        return;
+      }
       ev.preventDefault();
-      const factor = ev.deltaY < 0 ? 1.12 : 1 / 1.12;
+      hint.classList.remove('is-on');
+      const factor = Math.min(1.25, Math.max(0.8, Math.exp(-ev.deltaY * 0.01)));
       zoomAt(ev.clientX, ev.clientY, scale * factor);
     }, { passive: false });
 

@@ -525,6 +525,25 @@ body[data-page="list"] #spoop-root {
 
 .gielinor-tile.is-in { opacity: 1; }
 
+.gielinor-hint {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 14px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(9, 11, 16, 0.8);
+  color: #f1f5f9;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(-50%);
+  transition: opacity 0.2s ease;
+}
+
+.gielinor-hint.is-on { opacity: 1; }
+
 .gielinor-zoom {
   position: absolute;
   z-index: 8;
