@@ -48,6 +48,7 @@
     'unholy-book': ['#8a2424', '#e07070', '#3a1010'],
     'book-law': ['#f2f4f8', '#ffffff', '#3a4e9a'],
     'mages-book': ['#5a3a8a', '#c9a0e8', '#2a1840'],
+    'tome-fire': ['#a8321e', '#f0a050', '#4a140c'],
   };
 
   const SHIELD_TINTS = {
