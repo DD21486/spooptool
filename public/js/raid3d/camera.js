@@ -54,8 +54,14 @@ export function createDirector(world) {
     const end = info.duration || 0;
     const key = [];
     // Deaths come first: every one gets its moment.
+    const bosses = new Set(info.bossIds && info.bossIds.length ? info.bossIds : (info.bossId ? [info.bossId] : []));
+    let lastBossDeath = -1;
     (info.deaths || []).forEach((d) => {
-      if (d.id === info.bossId) key.push({ type: 'finale', start: d.t - 0.6, end: d.t + 3.2, id: d.id });
+      if (bosses.has(d.id)) lastBossDeath = Math.max(lastBossDeath, d.t);
+    });
+    (info.deaths || []).forEach((d) => {
+      if (bosses.has(d.id) && d.t === lastBossDeath) key.push({ type: 'finale', start: d.t - 0.6, end: d.t + 3.2, id: d.id });
+      else if (bosses.has(d.id)) key.push({ type: 'fall', start: d.t - 0.6, end: d.t + 2.6, id: d.id });
       else key.push({ type: 'fall', start: d.t - 0.7, end: d.t + 6.2, id: d.id });
     });
     // Big attacks next, spaced out so it never cuts every two seconds.

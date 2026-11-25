@@ -15,6 +15,10 @@ const BOSS = {
   kbd: { h: 3.0, mouth: [-0.38, 0.38] },
   vorkath: { h: 2.6, mouth: [-0.42, 0.45] },
   kq: { h: 3.0, mouth: [-0.03, 0.8] },
+  sarachnis: { h: 3.4, mouth: [-0.2, 0.45] },
+  dusk: { h: 4.4, mouth: [-0.2, 0.55] },
+  dawn: { h: 3.2, mouth: [-0.15, 0.62] },
+  skotizo: { h: 4.2, mouth: [-0.18, 0.5] },
 };
 // Minions are sized by their art, since a growthling fights under the rat's name.
 const MINION = { 'Giant_rat.png': 0.9, 'Growthling.png': 1.15, 'Cow.png': 1.4, 'Venenatis_spiderling.png': 0.8 };

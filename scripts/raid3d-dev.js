@@ -75,7 +75,9 @@ http.createServer((req, res) => {
     req.on('data', (c) => { body += c; });
     req.on('end', () => {
       const b = JSON.parse(body || '{}');
-      const r = e.testRaid(state, b.names || [], String(b.seed || Date.now()), b.boss, b.tier);
+      const r = String(b.boss || '') === 'raid'
+        ? e.testRaidNight(state, b.names || [], String(b.seed || Date.now()))
+        : e.testRaid(state, b.names || [], String(b.seed || Date.now()), b.boss, b.tier);
       res.writeHead(r.error ? 400 : 200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(r.error ? { error: r.error } : r));
     });

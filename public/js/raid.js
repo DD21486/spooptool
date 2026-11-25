@@ -916,7 +916,7 @@
     const tonight = bossEl.value === 'raid';
     tierEl.disabled = tonight;
     tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
-    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough', bryophyta: 'easy', kbd: 'medium', kq: 'hard' }[bossEl.value];
+    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough' }[bossEl.value];
     if (!tonight && home && bossEl.dataset.home !== bossEl.value) tierEl.value = home;
     bossEl.dataset.home = bossEl.value;
   }

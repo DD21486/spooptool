@@ -133,7 +133,7 @@ const THEMES = {
 export const BOSS_SCENE = {
   brutus: 'pasture', cow: 'pasture', mole: 'lair', scurrius: 'sewer', rat: 'sewer', elvarg: 'crandor',
   chaos: 'wild', spider: 'wild', leviathan: 'pool', obor: 'hillcave', bryophyta: 'mossy', kbd: 'kbdlair',
-  vorkath: 'ungael', kq: 'kqlair',
+  vorkath: 'ungael', kq: 'kqlair', sarachnis: 'mossy', dusk: 'hillcave', dawn: 'hillcave', skotizo: 'wild',
 };
 
 function heightFor(theme, x, z) {

@@ -435,9 +435,10 @@ function loadFight(fight, opts) {
     const monster = !!f.monster;
     const obj = monster ? buildBoss(f) : buildSpoop(f);
     world.scene.add(obj.root);
+    const primary = monster && !f.minion && f.monster !== 'rat' && f.id === 'boss';
+    const tag = makeTag(f, primary);
     const maxHp = poolMaxHp(fight, f);
     const start = Number(f.startHp) > 0 ? Math.min(Number(f.startHp), maxHp) : maxHp;
-    const tag = makeTag(f, monster && !f.minion);
     const unit = monster ? null : makeUnit(f);
     const meter = monster || preview ? null : makeMeter(f);
     const buried = [];
@@ -512,14 +513,19 @@ function loadFight(fight, opts) {
     boss.phases = (fight.phases || []).slice().sort((a, b) => a.t - b.t);
     boss.baseMax = boss.maxHp;
   }
-  callouts = preview || !boss ? [] : planCallouts(fight, boss.f.name);
+  callouts = preview || !boss ? [] : planCallouts(fight, fight.bossName || boss.f.name);
   calloutEl.hidden = true;
+  const bossIds = [];
+  actors.forEach((actor) => {
+    if (actor.monster && !actor.f.minion && actor.f.monster !== 'rat') bossIds.push(actor.f.id);
+  });
   director.plan({
     preview,
     duration: Number(fight.duration) || 0,
     hazards: fight.hazards || [],
     deaths: fight.deaths || [],
     bossId: boss ? boss.f.id : null,
+    bossIds,
   });
   endAt = preview ? PREVIEW_LOOP : (Number(fight.duration) || 0) + 0.8;
   scrub.max = String(endAt);
@@ -531,10 +537,13 @@ function loadFight(fight, opts) {
 }
 
 function bossActor() {
+  let first = null;
   for (const actor of actors.values()) {
-    if (actor.monster && !actor.f.minion && actor.f.monster !== 'rat') return actor;
+    if (!(actor.monster && !actor.f.minion && actor.f.monster !== 'rat')) continue;
+    if (!first) first = actor;
+    if (actor.deathT == null || t < actor.deathT) return actor;
   }
-  return null;
+  return first;
 }
 
 const WANDER_SPEED = 3.5;
@@ -1919,6 +1928,23 @@ function planLive(last) {
   return null;
 }
 
+// A full night from the test bench. Clock starts at the opening map, and the scrubber stays.
+function startTestShow(raid) {
+  leaveLive();
+  live = planLive({ raid, revealAt: new Date().toISOString(), showMs: 1 });
+  if (!live) {
+    statusEl.textContent = 'That raid had nothing to play.';
+    return;
+  }
+  live.clock = 0;
+  live.view = {};
+  live.playing = true;
+  scrub.max = String(live.total / 1000);
+  scrub.value = '0';
+  setPlaying(true);
+  statusEl.textContent = (raid.name || 'Test raid') + ' · test';
+}
+
 function startLivePlayback(last) {
   live = planLive(last);
   if (!live) return;
@@ -2042,9 +2068,15 @@ async function fight() {
       body: JSON.stringify({ action: 'raid-test', names, seed: seedEl.value.trim(), boss: bossEl.value, tier: tierEl.value }),
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || !data.bout) throw new Error(data.error || 'Could not run the fight');
+    if (!res.ok) throw new Error(data.error || 'Could not run the fight');
     if (data.seed) seedEl.value = data.seed;
-    play(data);
+    if (bossEl.value === 'raid') {
+      if (!data.rooms) throw new Error(data.error || 'Could not run the raid');
+      startTestShow(data);
+    } else {
+      if (!data.bout) throw new Error(data.error || 'Could not run the fight');
+      play(data);
+    }
   } catch (err) {
     statusEl.textContent = err.message;
   } finally {
@@ -2054,17 +2086,19 @@ async function fight() {
 }
 
 // Each boss's usual tier, same as /js/raid.js.
-const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard' };
+const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough' };
+const testBench = document.body.classList.contains('is-test');
 bossEl.addEventListener('change', () => {
   if (HOME_TIER[bossEl.value]) tierEl.value = HOME_TIER[bossEl.value];
-  tierEl.disabled = bossEl.value === 'live';
+  tierEl.disabled = bossEl.value === 'live' || bossEl.value === 'raid';
   fightBtn.textContent = bossEl.value === 'live' ? 'Watch' : 'Fight';
   if (bossEl.value === 'live') watchLive();
   else leaveLive();
 });
+if (bossEl.value === 'raid') tierEl.disabled = true;
 
-// /raid3d.html?live opens straight onto the live raid.
-if (new URLSearchParams(location.search).has('live')) {
+// /raid3d.html?live opens straight onto the live raid. /testraid.html keeps the controls.
+if (!testBench && new URLSearchParams(location.search).has('live')) {
   document.body.classList.add('is-watch');
   bossEl.value = 'live';
   tierEl.disabled = true;
