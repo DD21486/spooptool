@@ -121,6 +121,12 @@ const THEMES = {
     sky: '#1a1206', fog: ['#3a2a10', 18, 50], hemi: ['#ffe0a0', '#3a2a10', 0.75], sun: ['#ffe8b8', 1.1],
     props: ['eggs', 'hive', 'cave-rocks', 'torches'], particles: 'dust',
   },
+  // The spoop-vs-spoop pit: packed sand, a wooden lip, corner posts, and stands around it.
+  pit: {
+    shape: 'pit', floor: ['#e4c98a', '#d7b56e', '#c9a45a', '#edd6a0'], worn: '#b48a42', wall: ['#3a322c', '#2e2824', '#463c34'],
+    sky: '#c9b59a', fog: ['#d2c2aa', 28, 72], hemi: ['#fff4e0', '#6a5030', 1.2], sun: ['#ffe6b8', 1.85],
+    props: ['pit'], particles: 'dust',
+  },
 };
 
 // Which room each boss fights in.
@@ -154,6 +160,12 @@ function heightFor(theme, x, z) {
     if (d <= 0) return smoothNoise(x * 0.5, z * 0.5) * 0.08;
     return -Math.min(1.6, d * 0.35) + (n - 0.5) * 0.6 * Math.min(1, d / 3);
   }
+  if (shape === 'pit') {
+    const d = outside(x, z, 0.15);
+    if (d <= 0) return smoothNoise(x * 0.9, z * 0.9) * 0.04;
+    if (d < 0.85) return 0.32;
+    return Math.min(2.6, 0.4 + (d - 0.85) * 0.7);
+  }
   return 0;
 }
 
@@ -174,9 +186,10 @@ function buildGround(theme) {
     const tx = Math.floor(cx);
     const tz = Math.floor(cz);
     const pick = Math.floor(noise2(tx, tz) * 4) % 4;
-    const walled = (theme.shape === 'bowl' || theme.shape === 'sewer') && cy > 0.6;
+    const walled = ((theme.shape === 'bowl' || theme.shape === 'sewer') && cy > 0.6) || (theme.shape === 'pit' && cy > 0.2);
     c.copy(walled ? wall[pick % wall.length] : floor[pick % floor.length]);
     c.offsetHSL(0, 0, (smoothNoise(tx * 0.18, tz * 0.18) - 0.5) * 0.08);
+    if (theme.shape === 'pit' && cy > 0.12 && cy < 0.5) c.set(noise2(tz, tx) > 0.5 ? '#6e5840' : '#8d6d48');
     if (theme.shape === 'island' && cy < -0.15) c.lerp(new THREE.Color(theme.wall[0]), 0.6);
     const inner = Math.hypot(cx / (HALF_W + 1), cz / (HALF_H + 1));
     if (inner < 1 && !walled) c.lerp(worn, Math.max(0, 0.42 - inner * 0.42) * (0.6 + noise2(tz, tx) * 0.4));
@@ -306,6 +319,27 @@ function buildProps(theme, group, lights, r) {
         const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.3 + r() * 0.2, 4), lambert(r() < 0.5 ? '#3f6e22' : '#6a9a3a'));
         tuft.position.set(x, heightFor(theme, x, z) + 0.12, z);
         add(tuft);
+      }
+    }
+    if (kind === 'pit') {
+      const wood = '#6e5840';
+      const beam = '#8d6d48';
+      [[-HALF_W, -HALF_H], [HALF_W, -HALF_H], [-HALF_W, HALF_H], [HALF_W, HALF_H]].forEach(([x, z]) => {
+        add(piece(new THREE.BoxGeometry(0.38, 1.7, 0.38), wood, x, 0.85, z));
+        add(piece(new THREE.BoxGeometry(0.5, 0.16, 0.5), beam, x, 1.72, z));
+      });
+      add(piece(new THREE.BoxGeometry(HALF_W * 2, 0.28, 0.22), wood, 0, 0.42, -HALF_H));
+      add(piece(new THREE.BoxGeometry(HALF_W * 2, 0.22, 0.22), wood, 0, 0.28, HALF_H));
+      [-HALF_W, HALF_W].forEach((x) => add(piece(new THREE.BoxGeometry(0.22, 0.28, HALF_H * 2), wood, x, 0.42, 0)));
+      // Stands on the far side and both flanks. The near side stays a low rail so the camera can see in.
+      for (let i = -4; i <= 4; i++) {
+        const x = i * 2.3;
+        add(piece(new THREE.BoxGeometry(2.1, 1.15, 1.3), '#3a322c', x, 0.7, -HALF_H - 2.1));
+        add(piece(new THREE.BoxGeometry(2.1, 1.7, 1.1), '#2e2824', x, 0.95, -HALF_H - 3.3));
+      }
+      for (let i = -2; i <= 2; i++) {
+        const z = i * 2.4;
+        [-1, 1].forEach((side) => add(piece(new THREE.BoxGeometry(1.2, 1.2, 2.2), '#3a322c', side * (HALF_W + 2.1), 0.72, z)));
       }
     }
     if (kind === 'fence') {

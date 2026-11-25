@@ -496,7 +496,9 @@ function loadFight(fight, opts) {
 
   fx.setHazards(fight.hazards || []);
   fx.setRubble(fight.rubble || []);
-  world.setScene(preview ? 'grass' : (BOSS_SCENE[boss && boss.f.monster] || 'grass'));
+  const pvp = !!(live && live.segs && !live.raid);
+  const scene = (opts && opts.scene) || (preview ? 'grass' : pvp ? 'pit' : (BOSS_SCENE[boss && boss.f.monster] || 'grass'));
+  world.setScene(scene);
   // Status effects on spoops: frozen by ice breath, or driven mad.
   hits.forEach((hit) => {
     const v = actors.get(hit.to);
@@ -573,7 +575,7 @@ function wander(i, hx, hy) {
 
 // The party milling about before a fight, now and then taking a swing, so gear and
 // animations can be checked without running the fight.
-function showPreview() {
+function showPreview(scene) {
   const list = spoopList.slice(0, 14);
   const n = list.length;
   const fighters = list.map((spoop, i) => {
@@ -590,7 +592,7 @@ function showPreview() {
     return { id: f.id, pts: plan.pts };
   });
   hits.sort((a, b) => a.t - b.t);
-  loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true });
+  loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true, scene: scene || 'grass' });
   playing = true;
   statusEl.textContent = n ? 'The party, warming up. Pick a boss and fight.' : 'No spoops to show.';
 }
@@ -1935,6 +1937,7 @@ function startLivePlayback(last) {
   if (live.clock > live.total) live.clock = live.total;
   scrub.max = String(live.total / 1000);
   setPlaying(true);
+  if (!live.raid) world.setScene('pit');
   const title = (live.raid && live.raid.name) || live.title || 'The fight';
   statusEl.textContent = title + (Date.now() < live.startAt + live.total ? ' · live' : ' · replay');
 }
@@ -1956,13 +1959,15 @@ async function watchLive() {
       return Number.isFinite(start) && now >= start - 8000 && (!Number.isFinite(end) || now < end + 20000);
     };
     const specialAt = card.special ? Date.parse(card.special.at) : 0;
-    const raidCoversSpecial = last && last.kind === 'raid' && Date.parse(last.at) >= specialAt - 1000;
-    if (specialAt && !raidCoversSpecial && now < specialAt) {
+    const specialTourney = card.special && card.special.kind === 'tournament';
+    const coversSpecial = last && Date.parse(last.at) >= specialAt - 1000 && (specialTourney ? last.kind === 'tournament' : last.kind === 'raid');
+    if (specialAt && !coversSpecial && now < specialAt) {
       const left = Math.max(0, specialAt - now);
       const mm = Math.floor(left / 60000);
       const ss = Math.floor((left % 60000) / 1000);
-      showCard('Raid', 'Starts ' + card.special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p><p class="is-dim">The party warms up while you wait.</p>');
-      if (!bout || preview) showPreview();
+      const purse = specialTourney && card.special.pot ? '<p class="is-dim">' + Number(card.special.pot).toLocaleString('en-US') + ' gold on the line.</p>' : '';
+      showCard(specialTourney ? 'Tournament' : 'Raid', 'Starts ' + card.special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p>' + purse + '<p class="is-dim">The party warms up while you wait.</p>');
+      if (!bout || preview) showPreview(specialTourney ? 'pit' : undefined);
       livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : left > 0 ? 4000 : 2000);
       return;
     }
@@ -1975,7 +1980,7 @@ async function watchLive() {
       const ss = Math.floor((left % 60000) / 1000);
       showCard(card.nextTitle || 'Arena', card.nextLabel || 'Next fight', '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p>' +
         (card.nextDetail ? '<p class="is-dim">' + esc(card.nextDetail) + '</p>' : ''));
-      if (!bout || preview) showPreview();
+      if (!bout || preview) showPreview(card.nextKind && card.nextKind !== 'raid' ? 'pit' : 'grass');
       livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : 4000);
       return;
     }
