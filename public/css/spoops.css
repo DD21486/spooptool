@@ -599,6 +599,8 @@ body[data-page="list"] #spoop-root {
   border: 1px solid #3a2c1c;
 }
 
+.spoop-stats div.is-wide { grid-column: 1 / -1; }
+
 .spoop-stats dt {
   font-size: 9px;
   letter-spacing: 0.06em;

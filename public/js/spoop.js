@@ -1534,8 +1534,9 @@
           '<dl class="spoop-stats">' +
             '<div><dt>Combat</dt><dd>' + spoop.combat + '</dd></div>' +
             '<div><dt title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1.">Gear</dt><dd>' + (spoop.gearRating || 0) + '</dd></div>' +
-            '<div><dt>Gold</dt><dd>' + Number(spoop.gold || 0).toLocaleString() + '</dd></div>' +
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
+            '<div><dt>Duels</dt><dd>' + (spoop.duelWins || 0) + '–' + (spoop.duelLosses || 0) + '</dd></div>' +
+            '<div class="is-wide"><dt>Gold</dt><dd>' + Number(spoop.gold || 0).toLocaleString() + '</dd></div>' +
           '</dl>' +
           '<p class="spoop-act">' + escapeHtml(spoop.activity.name) + '</p>' +
           (spoop.follower
@@ -2042,6 +2043,7 @@
             '<ul class="spoop-pills">' +
               '<li class="spoop-pill is-gold"><span>Gold</span><strong>' + Number(spoop.gold || 0).toLocaleString() + '</strong></li>' +
               '<li class="spoop-pill"><span>Arena</span><strong class="win">' + spoop.arenaWins + 'W</strong><strong class="loss">' + spoop.arenaLosses + 'L</strong></li>' +
+              '<li class="spoop-pill"><span>Duels</span><strong class="win">' + (spoop.duelWins || 0) + 'W</strong><strong class="loss">' + (spoop.duelLosses || 0) + 'L</strong></li>' +
             '</ul>' +
             follower +
             pk +
