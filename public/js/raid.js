@@ -447,7 +447,7 @@
   }
 
   // Same waits as RAID_SHOW in lib/spoop/engine.js.
-  const SHOW = { open: 3400, fork: 3600, travel: 5000, camp: 7000, chest: 8000 };
+  const SHOW = { open: 10000, fork: 3600, travel: 5000, camp: 7000, chest: 8000 };
 
   // Raids from before the branching map stored a plain list of points, one per room.
   function raidMap(data) {

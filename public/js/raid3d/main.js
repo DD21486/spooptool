@@ -1014,6 +1014,7 @@ scrub.addEventListener('pointerup', () => { dragging = false; });
 scrub.addEventListener('input', () => {
   if (live && live.segs) {
     live.clock = (Number(scrub.value) || 0) * 1000;
+    live.view = {};
     snapFacing = true;
     return;
   }
@@ -1094,9 +1095,17 @@ window.raid3d = {
 // ---- Live raid ----
 // The night's rooms in order, on the same clock the engine uses for the show (RAID_SHOW and
 // fightPlaybackMs in lib/spoop/engine.js), so this stays in step with the 2D page and Discord.
-const SHOW = { open: 3400, card: 3200, loot: 19000, split: 11000, travel: 5000, fork: 3600, camp: 7000, chest: 8000 };
+const SHOW = { open: 10000, card: 3200, loot: 22000, split: 12000, travel: 5000, fork: 3600, camp: 7000, chest: 8000 };
+// Inside a loot card: who loots, then the drop reel, then the split for the rest of the card.
+const ROLL = { spin: 3000, up: 1500, reel: 5100, land: 900 };
+const ROLL_MS = ROLL.spin + ROLL.up + ROLL.reel + ROLL.land;
+const FORK_SPIN = 2400;
 const LIVE_SPEED = 1.5;
 const cardEl = $('r3d-card');
+const raidEl = $('r3d-raid');
+const raidKicker = raidEl.querySelector('.raid-kicker');
+const raidPhase = raidEl.querySelector('.raid-phase');
+const raidStage = raidEl.querySelector('.raid-stage');
 let live = null;
 let livePoll = 0;
 
@@ -1133,21 +1142,20 @@ function planRaid(last) {
       push('card', SHOW.card, { room, index, n: fights });
       const dur = Number(room.duration || (room.bout && room.bout.duration)) || 0;
       push('fight', Math.round((dur / (LIVE_SPEED * PACE)) * 1000), { room, index, dur });
-      if (more) {
-        const loot = room.bout && room.bout.loot;
-        push('loot', loot && loot.drop ? SHOW.loot : SHOW.split, { room, index, dur });
-      }
+      const loot = room.bout && room.bout.loot;
+      push('loot', loot && loot.drop ? SHOW.loot : SHOW.split, { room, index, dur, closing: !more });
     });
     if (step < route.length - 1) {
       const choice = choices.find((row) => row.at === nodeId);
-      if (choice) push('fork', SHOW.fork, { choice });
-      push('travel', SHOW.travel, { next: nodes.get(route[step + 1]) });
+      if (choice) push('fork', SHOW.fork, { choice, step });
+      push('travel', SHOW.travel, { next: nodes.get(route[step + 1]), step });
     }
   });
   const total = at;
   push('recap', 3600 * 1000);
   const startAt = new Date(last.revealAt).getTime() - (Number(last.showMs) || total);
-  return { segs, total, startAt, raid, nodes, clock: 0, playing: true, room: -1, seg: null };
+  const map = { nodes: (raid.map && raid.map.nodes) || [], layers: (raid.map && raid.map.layers) || route.length, route, choices, byId: nodes };
+  return { segs, total, startAt, raid, nodes, map, clock: 0, playing: true, room: -1, seg: null, view: {} };
 }
 
 function showCard(kicker, title, body) {
@@ -1157,75 +1165,489 @@ function showCard(kicker, title, body) {
   cardEl.hidden = false;
 }
 
-function lootBody(room) {
+function joinNames(list) {
+  const names = (list || []).filter(Boolean);
+  if (names.length < 2) return names[0] || '';
+  if (names.length === 2) return names[0] + ' and ' + names[1];
+  return names.slice(0, -1).join(', ') + ', and ' + names[names.length - 1];
+}
+
+function iconHtml(osrsId, size) {
+  if (!osrsId) return '';
+  const px = size || 36;
+  return '<img src="/api/spoops?icon=1&id=' + Number(osrsId) + '" alt="" width="' + px + '" height="' + px + '">';
+}
+
+function hpColor(pct) {
+  return 'hsl(' + Math.round(120 * pct) + ' 72% 42%)';
+}
+
+function hpLine(row) {
+  if (!row || !(row.maxHp > 0)) return '';
+  const pct = Math.max(0, Math.min(1, (Number(row.hp) || 0) / row.maxHp));
+  return '<i class="raid-hp" title="' + esc(row.hp + ' / ' + row.maxHp + ' hitpoints') + '">' +
+    '<b style="width:' + (pct * 100).toFixed(1) + '%;background:' + hpColor(pct) + '"></b>' +
+    '<small>' + row.hp + '/' + row.maxHp + '</small></i>';
+}
+
+function tierSlug(name) {
+  return String(name || 'medium').toLowerCase().replace(/[^a-z]/g, '');
+}
+
+function showRaid(kicker, phase, cls) {
+  raidKicker.textContent = kicker || '';
+  raidPhase.textContent = phase || '';
+  raidEl.className = 'raid-loot r3d-raid' + (cls ? ' ' + cls : '');
+  raidEl.hidden = false;
+  cardEl.hidden = true;
+}
+
+// Which chip is lit at a point in a spin: quick hops that slow down, landing on `land` at `span`.
+function spinPlan(n, land, span) {
+  const steps = Math.max(n * 2, 8) + land;
+  const gaps = [];
+  let sum = 0;
+  for (let i = 0; i < steps; i++) {
+    const u = i / steps;
+    gaps.push(36 + u * u * 220);
+    sum += gaps[i];
+  }
+  let acc = 0;
+  return gaps.map((gap) => (acc += (gap * span) / sum));
+}
+
+function spinIndex(plan, n, land, ms) {
+  let i = 0;
+  while (i < plan.length && ms >= plan[i]) i++;
+  return i >= plan.length ? land : i % n;
+}
+
+function lightChips(els, idx, landed) {
+  els.forEach((el, n) => {
+    el.classList.toggle('is-on', n === idx);
+    el.classList.toggle('is-landed', landed && n === idx);
+  });
+}
+
+// ---- Map ----
+
+function nodeArt(node) {
+  if (node.sprite) return node.sprite;
+  if (node.icon) return '/api/spoops?icon=1&id=' + Number(node.icon);
+  return '';
+}
+
+// The rooms walked by a step, and every option seen at a fork; the ones passed up stay dimmed.
+function mapView(map, step) {
+  const walked = map.route.slice(0, step + 1);
+  const seen = new Set(walked);
+  const skipped = new Set();
+  (map.choices || []).forEach((choice) => {
+    const at = map.route.indexOf(choice.at);
+    if (at < 0 || at >= step) return;
+    choice.options.forEach((id) => {
+      seen.add(id);
+      if (id !== choice.pick) skipped.add(id);
+    });
+  });
+  return { walked, seen, skipped, options: [], on: '', token: null };
+}
+
+function mapHtml(map, view) {
+  const walked = view.walked || [];
+  const steps = new Set();
+  for (let i = 1; i < walked.length; i++) steps.add(walked[i - 1] + '>' + walked[i]);
+  const options = new Set(view.options || []);
+  const here = walked[walked.length - 1];
+  let edges = '';
+  map.nodes.forEach((node) => {
+    (node.next || []).forEach((id) => {
+      const to = map.byId.get(id);
+      if (!to) return;
+      const cls = steps.has(node.id + '>' + id) ? ' is-walked' : node.id === here && options.has(id) ? ' is-open' : '';
+      edges += '<line class="map-edge' + cls + '" x1="' + node.x + '" y1="' + node.y + '" x2="' + to.x + '" y2="' + to.y + '"></line>';
+    });
+  });
+  let marks = '';
+  map.nodes.forEach((node) => {
+    const face = view.seen.has(node.id) || options.has(node.id);
+    const art = face ? nodeArt(node) : '';
+    const cls = 'map-stop is-' + esc(node.kind || 'boss') +
+      (walked.indexOf(node.id) >= 0 ? ' is-past' : '') +
+      (options.has(node.id) ? ' is-option' : '') +
+      (view.on === node.id ? ' is-on' : '') +
+      (view.skipped && view.skipped.has(node.id) ? ' is-skipped' : '');
+    marks += '<g class="' + cls + '" data-node="' + esc(node.id) + '">' +
+      '<title>' + esc(face ? nodeLabel(node) : 'Unknown room') + '</title>' +
+      '<circle class="map-node" cx="' + node.x + '" cy="' + node.y + '" r="4.6"></circle>' +
+      (art
+        ? '<image href="' + esc(art) + '" x="' + (node.x - 3.5) + '" y="' + (node.y - 3.5) + '" width="7" height="7" preserveAspectRatio="xMidYMid meet"></image>'
+        : '<text class="map-q" x="' + node.x + '" y="' + (node.y + 0.4) + '">?</text>') +
+    '</g>';
+  });
+  const token = view.token ? '<circle class="map-token" cx="' + view.token.x.toFixed(2) + '" cy="' + view.token.y.toFixed(2) + '" r="1.9"></circle>' : '';
+  return '<svg class="raid-map" viewBox="0 0 100 64" role="img" aria-label="Raid map">' + edges + marks + token + '</svg>';
+}
+
+function moveToken(x, y) {
+  const el = raidStage.querySelector('.map-token');
+  if (!el) return;
+  el.setAttribute('cx', x.toFixed(2));
+  el.setAttribute('cy', y.toFixed(2));
+}
+
+function ease(u) {
+  return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+}
+
+// ---- Live raid screens ----
+// Each screen is drawn from how far into its segment the clock is, so a late join, a scrub,
+// and the first viewer all see the same thing. `v` holds what the segment has built so far.
+
+function drawOpen(ms, v) {
+  const map = live.map;
+  const raid = live.raid;
+  const first = map.byId.get(map.route[0]);
+  if (!v.phase) {
+    v.phase = 'open';
+    showRaid('Tonight', raid.name || 'The raid', 'is-intro');
+    const party = ((raid.rooms && raid.rooms[0] && raid.rooms[0].party) || []);
+    const byName = new Map(spoopList.map((s) => [s.name, s]));
+    const chips = party.map((row) => {
+      const spoop = byName.get(row.name);
+      const weapon = spoop && spoop.equipped && spoop.equipped.weapon;
+      const meta = spoop ? 'Cb ' + spoop.combat + ' · ' + ((weapon && weapon.style) || 'melee') : row.maxHp + ' hp';
+      return '<div class="raid-chip">' + esc(row.name) + '<small>' + esc(meta) + '</small></div>';
+    }).join('');
+    v.start = first ? { x: Math.max(2.5, first.x - 6), y: first.y } : null;
+    const view = mapView(map, -1);
+    view.token = v.start;
+    raidStage.innerHTML = (map.nodes.length ? mapHtml(map, view) : '') +
+      '<p class="raid-map-line">' + esc((map.layers || '') + ' rooms deep. Forks are picked on the way, so the rest of the path stays hidden.') + '</p>' +
+      '<div class="raid-who r3d-roster">' + chips + '</div>';
+    v.chips = Array.from(raidStage.querySelectorAll('.r3d-roster .raid-chip'));
+  }
+  const shown = Math.floor((ms - 600) / 260);
+  v.chips.forEach((el, i) => el.classList.toggle('is-in', i <= shown));
+  if (ms >= 5500 && v.phase === 'open' && first) {
+    v.phase = 'first';
+    const view = mapView(map, -1);
+    view.seen.add(first.id);
+    view.on = first.id;
+    view.token = v.start;
+    raidStage.querySelector('.raid-map').outerHTML = mapHtml(map, view);
+    raidStage.querySelector('.raid-map-line').textContent = 'First up: ' + nodeLabel(first);
+  }
+  if (v.phase === 'first' && v.start) {
+    const u = ease(Math.max(0, Math.min(1, (ms - 6500) / 3000)));
+    moveToken(v.start.x + (first.x - v.start.x) * u, v.start.y + (first.y - v.start.y) * u);
+  }
+}
+
+function drawCard(seg, v) {
+  if (v.phase) return;
+  v.phase = 'card';
+  const boss = seg.room.boss || {};
+  const tier = boss.tierName || 'Medium';
+  showRaid('Raid fight ' + seg.n, boss.name || 'Boss', 'is-intro is-light');
+  raidStage.innerHTML = '<div class="raid-intro">' +
+    (boss.sprite ? '<img class="raid-boss-art" alt="" src="' + esc(boss.sprite) + '">' : '') +
+    '<p class="raid-diff-label">Difficulty</p>' +
+    '<p class="raid-diff is-' + tierSlug(tier) + '">' + esc(tier) + '</p>' +
+  '</div>';
+}
+
+function drawFork(seg, ms, v) {
+  const map = live.map;
+  const choice = seg.choice;
+  const land = Math.max(0, choice.options.indexOf(choice.pick));
+  if (!v.phase) {
+    v.phase = 'spin';
+    showRaid('The road splits', 'Which way?', 'is-intro');
+    const here = map.byId.get(map.route[seg.step]);
+    const view = mapView(map, seg.step);
+    view.options = choice.options;
+    view.token = here ? { x: here.x, y: here.y } : null;
+    raidStage.innerHTML = mapHtml(map, view) +
+      '<p class="raid-map-line">' + esc(choice.options.map((id) => nodeLabel(map.byId.get(id))).join('  or  ')) + '</p>';
+    v.els = choice.options.map((id) => raidStage.querySelector('[data-node="' + id + '"]')).filter(Boolean);
+    v.plan = spinPlan(v.els.length, land, FORK_SPIN);
+  }
+  if (!v.els.length) return;
+  const done = ms >= FORK_SPIN;
+  lightChips(v.els, spinIndex(v.plan, v.els.length, land, ms), done);
+  if (done && v.phase === 'spin') {
+    v.phase = 'picked';
+    raidStage.querySelector('.raid-map-line').textContent = 'The party heads for ' + nodeLabel(map.byId.get(choice.pick)) + '.';
+  }
+}
+
+function drawTravel(seg, ms, v) {
+  const map = live.map;
+  const a = map.byId.get(map.route[seg.step]);
+  const b = map.byId.get(map.route[seg.step + 1]);
+  if (!v.phase) {
+    v.phase = 'travel';
+    showRaid('Onward', live.raid.name || 'The raid', 'is-intro');
+    const view = mapView(map, seg.step + 1);
+    view.token = a ? { x: a.x, y: a.y } : null;
+    raidStage.innerHTML = (map.nodes.length ? mapHtml(map, view) : '') +
+      '<p class="raid-map-line">' + esc('Next: ' + nodeLabel(b)) + '</p>';
+  }
+  if (!a || !b) return;
+  const u = ease(Math.min(1, ms / SHOW.travel));
+  moveToken(a.x + (b.x - a.x) * u, a.y + (b.y - a.y) * u);
+}
+
+function drawCamp(seg, ms, v) {
+  const room = seg.room;
+  const healed = new Map((room.healed || []).map((row) => [row.id, row]));
+  if (!v.phase) {
+    v.phase = 'camp';
+    showRaid('Camp', 'A short rest', 'is-intro');
+    const names = (room.party || []).filter((row) => healed.has(row.id)).map((row) => row.name);
+    const line = names.length ? joinNames(names) + (names.length === 1 ? ' gets' : ' get') + ' patched up.' : 'Nobody needed patching up.';
+    const node = live.nodes.get(room.node);
+    const rows = (room.party || []).map((row) => {
+      const heal = healed.get(row.id);
+      const before = heal ? { hp: heal.from, maxHp: heal.maxHp } : row;
+      return '<div class="raid-share raid-camp-row' + (heal ? ' is-healed' : '') + '" data-id="' + esc(row.id) + '">' +
+        '<strong>' + esc(row.name) + '</strong>' + hpLine(before) +
+        (heal ? '<em class="raid-camp-gain">+' + (heal.to - heal.from) + '</em>' : '') +
+      '</div>';
+    }).join('');
+    raidStage.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 385, 56) +
+      '<p class="raid-chosen">' + esc(line) + '</p><div class="raid-shares">' + rows + '</div></div>';
+  }
+  if (ms >= 1400 && v.phase === 'camp') {
+    v.phase = 'healed';
+    healed.forEach((heal, id) => {
+      const el = raidStage.querySelector('.raid-camp-row[data-id="' + id + '"]');
+      if (!el) return;
+      el.classList.add('is-full');
+      const bar = el.querySelector('.raid-hp b');
+      const text = el.querySelector('.raid-hp small');
+      if (bar) {
+        bar.style.width = '100%';
+        bar.style.background = hpColor(1);
+      }
+      if (text) text.textContent = heal.to + '/' + heal.maxHp;
+    });
+  }
+}
+
+function drawChest(seg, ms, v) {
+  const room = seg.room;
+  const chest = room.chest || {};
+  const total = Number(chest.gold) || 0;
+  if (!v.phase) {
+    v.phase = 'shut';
+    showRaid('Treasure', chest.name || 'A chest', 'is-intro');
+    raidStage.innerHTML = '<div class="raid-chest is-' + esc(chest.id || 'small') + ' is-shut">' +
+      '<div class="raid-chest-box">' + iconHtml(chest.osrsId, 72) + '</div>' +
+      '<p class="raid-gold raid-chest-gold">? gold</p><div class="raid-shares"></div></div>';
+  }
+  if (ms < 1800) return;
+  const box = raidStage.querySelector('.raid-chest');
+  const goldEl = raidStage.querySelector('.raid-chest-gold');
+  if (v.phase === 'shut') {
+    v.phase = 'open';
+    box.classList.remove('is-shut');
+    box.classList.add('is-open');
+  }
+  const u = Math.min(1, (ms - 1800) / 1400);
+  if (v.phase === 'open') {
+    goldEl.innerHTML = Math.round(total * (1 - Math.pow(1 - u, 3))).toLocaleString('en-US') + ' gold' + (u >= 1 ? ' <span>split by the living</span>' : '');
+  }
+  if (u >= 1 && v.phase === 'open') {
+    v.phase = 'split';
+    raidStage.querySelector('.raid-chest .raid-shares').innerHTML = (room.shares || []).map((share) =>
+      '<div class="raid-share"><strong>' + esc(share.name) + '</strong><span>' + Number(share.gold || 0).toLocaleString('en-US') + ' gp</span></div>'
+    ).join('');
+  }
+}
+
+function summaryHtml(room) {
+  const bout = room.bout || {};
+  const loot = bout.loot || {};
+  const party = bout.party || [];
+  const goldById = new Map((loot.shares || []).map((row) => [row.id, row.gold]));
+  const takerId = loot.spooply && loot.spooply.id;
+  const monsters = new Set((bout.fighters || []).filter((f) => f.monster).map((f) => f.id));
+  const dealt = new Map();
+  (bout.hits || []).forEach((hit) => {
+    if (!hit || !(hit.amount > 0) || monsters.has(hit.from)) return;
+    dealt.set(hit.from, (dealt.get(hit.from) || 0) + hit.amount);
+  });
+  let top = 0;
+  dealt.forEach((amount) => { if (amount > top) top = amount; });
+  const shares = party.map((row) => {
+    const amount = dealt.get(row.id) || 0;
+    const taker = row.alive && row.id === takerId ? ' is-taker' : '';
+    const best = top > 0 && amount === top ? ' is-top' : '';
+    const dmg = '<em class="raid-dmg">' + amount.toLocaleString('en-US') + ' dmg</em>';
+    if (!row.alive) return '<div class="raid-share is-down' + taker + best + '"><strong>' + esc(row.name) + '</strong><span>Down</span>' + dmg + '</div>';
+    const share = goldById.get(row.id);
+    return '<div class="raid-share' + taker + best + '"><strong>' + esc(row.name) + '</strong><span>' + (share ? share.toLocaleString('en-US') : '0') + ' gp</span>' + dmg + hpLine(row) + '</div>';
+  }).join('');
+  let prize = '';
+  if (!loot.wiped && loot.drop) {
+    const drop = loot.drop;
+    prize = '<div class="raid-prize' + (drop.rare ? ' is-rare' : '') + '">' + iconHtml(drop.osrsId, 64) +
+      (drop.jackpot ? '<p class="raid-rare-tag">Jackpot · 500,000 gp</p>' : drop.rare ? '<p class="raid-rare-tag">Rare</p>' : '') +
+      '<p class="raid-take">' + esc((loot.spooply && loot.spooply.name) || 'Someone') + ' takes the ' + esc(drop.name) + '.</p></div>';
+  }
+  const goldLine = loot.wiped
+    ? (party.some((row) => row.alive) ? 'Time called. <span>No kill, so no loot.</span>' : 'The party fell. <span>No one is left to loot.</span>')
+    : Number(loot.gold || 0).toLocaleString('en-US') + ' gold <span>split by the living</span>';
+  return '<div class="raid-summary"><p class="raid-gold">' + goldLine + '</p>' + prize + '<div class="raid-shares">' + shares + '</div></div>';
+}
+
+// Who loots, the drop reel, then the split with a countdown to the next room. The last fight
+// of the night has no next room, so it closes on a line instead of a countdown.
+function drawLoot(room, ms, span, v, closing) {
   const bout = room.bout || {};
   const loot = bout.loot || {};
   const party = bout.party || [];
   const alive = party.filter((row) => row.alive);
-  const bossName = (room.boss && room.boss.name) || bout.bossName || 'The boss';
-  if (loot.wiped) {
-    return { title: alive.length ? bossName + ' wins' : 'The party fell', body: '<p class="is-dim">No kill, so no loot.</p>' };
+  const bossName = (room.boss && room.boss.name) || bout.bossName || 'Boss';
+  const rolls = !loot.wiped && loot.drop && loot.spooply;
+  let phase = 'split';
+  if (rolls && ms < ROLL.spin) phase = 'who';
+  else if (rolls && ms < ROLL.spin + ROLL.up) phase = 'up';
+  else if (rolls && ms < ROLL.spin + ROLL.up + ROLL.reel) phase = 'reel';
+  else if (rolls && ms < ROLL_MS) phase = 'land';
+  const living = alive.length ? alive : [loot.spooply];
+  const who = Math.max(0, living.findIndex((row) => row.id === (loot.spooply && loot.spooply.id)));
+  const fresh = v.phase !== phase;
+  if (fresh) {
+    v.phase = phase;
+    showRaid(bossName, { who: 'Who loots', up: 'Who loots', reel: 'The drop', land: 'The drop', split: loot.wiped ? 'No loot' : 'The split' }[phase]);
   }
-  let body = '';
-  if (loot.drop && loot.spooply) {
-    body += '<p class="' + (loot.drop.rare ? 'is-rare' : 'is-pick') + '">' + esc(loot.spooply.name) + ' takes the ' + esc(loot.drop.name) + (loot.drop.jackpot ? ' · Jackpot!' : loot.drop.rare ? ' · Rare!' : '') + '</p>';
+  if (phase === 'who' || phase === 'up') {
+    if (fresh) {
+      raidStage.innerHTML = '<div class="raid-who">' + living.map((row) => '<div class="raid-chip">' + esc(row.name) + '</div>').join('') + '</div>' +
+        (phase === 'up' ? '<p class="raid-chosen">' + esc(loot.spooply.name) + ' is up.</p>' : '');
+      v.els = Array.from(raidStage.querySelectorAll('.raid-chip'));
+      v.plan = spinPlan(v.els.length, who, ROLL.spin);
+    }
+    lightChips(v.els, phase === 'up' ? who : spinIndex(v.plan, v.els.length, who, ms), phase === 'up');
+    return;
   }
-  body += '<p>' + Number(loot.gold || 0).toLocaleString('en-US') + ' gold, split by the living</p>';
-  const down = party.filter((row) => !row.alive).map((row) => row.name);
-  if (down.length) body += '<p class="is-dim">' + esc(down.join(', ')) + (down.length === 1 ? ' stays down.' : ' stay down.') + '</p>';
-  return { title: bossName + ' is down', body };
+  if (phase === 'reel' || phase === 'land') {
+    const drop = loot.drop;
+    if (fresh || !v.strip) {
+      const reel = drop.reel || [];
+      raidStage.innerHTML = '<div class="roll-window"><div class="roll-marker"></div><div class="roll-strip">' +
+        reel.map((item, i) => '<div class="roll-card' + (item && item.rare ? ' is-rare' : '') + '" data-i="' + i + '">' + iconHtml(item && item.osrsId, 42) + '<span>' + esc(item ? item.name : '') + '</span></div>').join('') +
+        '</div></div><p class="raid-land"></p>';
+      v.strip = raidStage.querySelector('.roll-strip');
+      const win = raidStage.querySelector('.roll-card[data-i="' + drop.winIndex + '"]');
+      const viewW = raidStage.querySelector('.roll-window').clientWidth || 640;
+      const cardW = ((win && win.offsetWidth) || 112) + 8;
+      const maxShift = Math.max(0, v.strip.scrollWidth - viewW);
+      v.target = Math.max(0, Math.min(maxShift, (win ? win.offsetLeft : drop.winIndex * cardW) - viewW / 2 + ((win && win.offsetWidth) || 112) / 2));
+      v.from = Math.min(maxShift, v.target + cardW * 11);
+      v.win = win;
+    }
+    const u = phase === 'land' ? 1 : (ms - ROLL.spin - ROLL.up) / ROLL.reel;
+    const shift = v.from + (v.target - v.from) * (1 - Math.pow(1 - u, 4));
+    v.strip.style.transform = 'translateX(' + (-shift) + 'px)';
+    if (phase === 'land' && fresh) {
+      if (v.win) v.win.classList.add('is-win');
+      raidStage.querySelector('.raid-land').textContent = drop.name || '';
+    }
+    return;
+  }
+  if (fresh) {
+    v.strip = null;
+    raidStage.innerHTML = summaryHtml(room) + '<p class="raid-next"></p>';
+    v.next = raidStage.querySelector('.raid-next');
+  }
+  const cleared = !loot.wiped && alive.length > 0;
+  const left = Math.ceil((span - ms) / 1000);
+  v.next.textContent = closing ? (cleared ? 'Raid complete.' : 'The raid ends here.') : left > 0 ? 'Moving on in ' + left : 'Moving on';
 }
 
-function recapBody(raid) {
-  const gold = new Map();
-  const drops = [];
+function raidTallies(raid) {
+  const people = new Map();
+  const person = (id, name) => {
+    let row = people.get(id);
+    if (!row) people.set(id, (row = { name: name || 'Spoop', damage: 0, gold: 0, drops: [], fell: '' }));
+    return row;
+  };
   (raid.rooms || []).forEach((room) => {
-    const shares = room.kind === 'treasure' ? room.shares : room.bout && room.bout.loot && !room.bout.loot.wiped ? room.bout.loot.shares : null;
-    (shares || []).forEach((row) => { if (row) gold.set(row.name, (gold.get(row.name) || 0) + (Number(row.gold) || 0)); });
-    const loot = room.bout && room.bout.loot;
-    if (loot && !loot.wiped && loot.drop && loot.spooply) drops.push({ who: loot.spooply.name, drop: loot.drop, from: room.boss && room.boss.name });
+    if (room.kind === 'treasure') return (room.shares || []).forEach((s) => { if (s) person(s.id, s.name).gold += Number(s.gold) || 0; });
+    if (room.kind === 'rest') return;
+    const bout = room.bout || {};
+    const bossName = (room.boss && room.boss.name) || 'the room';
+    const named = new Map((bout.party || []).map((row) => [row.id, row.name]));
+    (bout.hits || []).forEach((hit) => {
+      if (hit && hit.amount > 0 && named.has(hit.from)) person(hit.from, named.get(hit.from)).damage += hit.amount;
+    });
+    const loot = bout.loot || {};
+    (loot.shares || []).forEach((s) => { if (s) person(s.id, s.name).gold += Number(s.gold) || 0; });
+    if (!loot.wiped && loot.drop && loot.drop.name && loot.spooply) person(loot.spooply.id, loot.spooply.name).drops.push({ name: loot.drop.name, osrsId: loot.drop.osrsId, rare: !!loot.drop.rare, from: bossName });
+    (bout.party || []).forEach((row) => { if (!row.alive) person(row.id, row.name).fell = bossName; });
   });
-  let body = '<p>' + (raid.cleared ? 'The party cleared the raid.' : 'The raid is over.') + '</p>';
-  if (drops.length) {
-    body += drops.map((row) => '<p class="' + (row.drop.rare ? 'is-rare' : 'is-pick') + '">' + esc(row.who) + ': ' + esc(row.drop.name) + (row.from ? ' <span class="is-dim">from ' + esc(row.from) + '</span>' : '') + '</p>').join('');
-  }
-  const rows = Array.from(gold.entries()).sort((a, b) => b[1] - a[1]);
-  if (rows.length) body += '<ul>' + rows.map(([name, g]) => '<li><span>' + esc(name) + '</span><span>' + g.toLocaleString('en-US') + ' gp</span></li>').join('') + '</ul>';
-  return body;
+  return Array.from(people.values());
 }
 
-function paintSeg(seg) {
+function drawRecap(v) {
+  if (v.phase === 'recap') return;
+  v.phase = 'recap';
   const raid = live.raid;
+  const rows = raidTallies(raid);
+  const rooms = raid.rooms || [];
+  const lastRoom = rooms[rooms.length - 1];
+  const killed = rooms.filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name && !room.boss.skirmish).map((room) => room.boss.name);
+  const chests = rooms.filter((room) => room.kind === 'treasure' && room.chest).map((room) => room.chest.name);
+  const depth = live.map.layers ? ' Reached ' + live.map.route.length + ' of ' + live.map.layers + ' rooms.' : '';
+  const headline = raid.cleared ? 'The party cleared the raid.' : 'The party fell to ' + ((lastRoom && lastRoom.boss && lastRoom.boss.name) || 'the raid') + '.';
+  const path = (killed.length ? 'Killed ' + joinNames(killed) + '.' : 'No boss went down.') + (chests.length ? ' Opened a ' + joinNames(chests) + '.' : '') + depth;
+  const awards = (raid.awards || []).length
+    ? '<ul class="raid-awards">' + raid.awards.map((a) => '<li class="raid-award is-' + esc(a.id) + '" title="' + esc(a.detail || '') + '"><span>' + esc(a.name) + '</span><strong>' + esc(a.who) + '</strong></li>').join('') + '</ul>'
+    : '';
+  const list = (sorted, key, unit) => {
+    const top = sorted.some((row) => row[key] !== sorted[0][key]) ? sorted.reduce((best, row) => Math.max(best, row[key]), 0) : 0;
+    return sorted.map((row) => {
+      const best = top > 0 && row[key] === top ? ' is-best' : '';
+      const where = key === 'damage' && row.fell ? '<span class="meta">Fell to ' + esc(row.fell) + '</span>' : '';
+      return '<li class="raid-recap-row' + best + '"><span class="who">' + esc(row.name) + (best ? '<em>Most</em>' : '') + '</span><span class="num">' + row[key].toLocaleString('en-US') + unit + '</span>' + where + '</li>';
+    }).join('');
+  };
+  const drops = [];
+  rows.forEach((row) => row.drops.forEach((drop) => drops.push({ who: row.name, drop })));
+  const dropHtml = drops.length
+    ? drops.map((row) => '<li class="raid-recap-drop' + (row.drop.rare ? ' is-rare' : '') + '">' + iconHtml(row.drop.osrsId, 36) +
+      '<span><strong>' + esc(row.who) + '</strong><span>' + esc(row.drop.name) + '</span><em>from ' + esc(row.drop.from) + '</em></span></li>').join('')
+    : '<li class="raid-recap-empty">Nobody took a drop.</li>';
+  showRaid('Raid over', raid.name || 'The raid', 'is-recap');
+  raidStage.innerHTML = '<p class="raid-recap-fell' + (raid.cleared ? ' is-clear' : '') + '">' + esc(headline) + '</p>' +
+    '<p class="raid-recap-path">' + esc(path) + '</p>' + awards +
+    '<div class="raid-recap-cols">' +
+      '<section><h3>Damage</h3><ol class="raid-recap-list">' + list(rows.slice().sort((a, b) => b.damage - a.damage || a.name.localeCompare(b.name)), 'damage', '') + '</ol></section>' +
+      '<section><h3>Gold</h3><ol class="raid-recap-list">' + list(rows.slice().sort((a, b) => b.gold - a.gold || a.name.localeCompare(b.name)), 'gold', ' gp') + '</ol></section>' +
+      '<section><h3>Drops</h3><ol class="raid-recap-list">' + dropHtml + '</ol></section>' +
+    '</div>';
+}
+
+function drawSeg(seg, ms) {
+  if (live.view.seg !== seg) live.view = { seg };
+  const v = live.view;
   if (seg.kind === 'fight') {
+    raidEl.hidden = true;
     cardEl.hidden = true;
     return;
   }
-  if (seg.kind === 'open') return showCard('Raid', raid.name || 'The raid', '<p>' + ((raid.map && raid.map.layers) || '') + ' rooms deep. The path stays hidden until you get there.</p>');
-  if (seg.kind === 'card') {
-    const boss = seg.room.boss || {};
-    return showCard('Raid fight ' + seg.n, boss.name || 'Boss', '<p>' + esc(boss.tierName || '') + (boss.level ? ' · level ' + boss.level : '') + '</p>');
-  }
-  if (seg.kind === 'loot') {
-    const out = lootBody(seg.room);
-    return showCard('Loot', out.title, out.body);
-  }
-  if (seg.kind === 'fork') {
-    const opts = seg.choice.options.map((id) => {
-      const label = nodeLabel(live.nodes.get(id));
-      return '<p class="' + (id === seg.choice.pick ? 'is-pick' : 'is-dim') + '">' + esc(label) + (id === seg.choice.pick ? ' ←' : '') + '</p>';
-    }).join('');
-    return showCard('The road splits', 'Which way?', opts);
-  }
-  if (seg.kind === 'travel') return showCard('Onward', 'Next: ' + nodeLabel(seg.next), '');
-  if (seg.kind === 'camp') {
-    const healed = (seg.room.healed || []).map((row) => (seg.room.party || []).find((p) => p.id === row.id)).filter(Boolean).map((row) => row.name);
-    return showCard('Camp', 'A short rest', '<p>' + (healed.length ? esc(healed.join(', ')) + (healed.length === 1 ? ' gets' : ' get') + ' patched up.' : 'Nobody needed patching up.') + '</p>');
-  }
-  if (seg.kind === 'chest') {
-    const chest = seg.room.chest || {};
-    return showCard('Treasure', chest.name || 'A chest', '<p>' + Number(chest.gold || 0).toLocaleString('en-US') + ' gold, split by the living</p>');
-  }
-  if (seg.kind === 'recap') return showCard('Raid over', raid.name || 'The raid', recapBody(raid));
+  if (seg.kind === 'open') return drawOpen(ms, v);
+  if (seg.kind === 'card') return drawCard(seg, v);
+  if (seg.kind === 'loot') return drawLoot(seg.room, ms, seg.end - seg.start, v, seg.closing);
+  if (seg.kind === 'fork') return drawFork(seg, ms, v);
+  if (seg.kind === 'travel') return drawTravel(seg, ms, v);
+  if (seg.kind === 'camp') return drawCamp(seg, ms, v);
+  if (seg.kind === 'chest') return drawChest(seg, ms, v);
+  if (seg.kind === 'recap') return drawRecap(v);
 }
 
 function tickLive(dt) {
@@ -1242,10 +1664,8 @@ function tickLive(dt) {
   if (seg.kind === 'card') t = 0;
   else if (seg.kind === 'fight') t = ((clock - seg.start) / 1000) * LIVE_SPEED * PACE;
   else if (seg.kind === 'loot') t = endAt;
-  if (seg !== live.seg) {
-    live.seg = seg;
-    paintSeg(seg);
-  }
+  live.seg = seg;
+  drawSeg(seg, clock - seg.start);
   const shown = Math.min(clock, live.total);
   if (!dragging) scrub.value = String(shown / 1000);
   const mm = Math.floor(shown / 60000);
@@ -1256,6 +1676,7 @@ function tickLive(dt) {
 function startLivePlayback(last) {
   live = planRaid(last);
   live.clock = Math.max(0, Date.now() - live.startAt);
+  // Joining after the end goes straight to the night's totals.
   if (live.clock > live.total) live.clock = live.total;
   scrub.max = String(live.total / 1000);
   setPlaying(true);
@@ -1278,7 +1699,7 @@ async function watchLive() {
       const ss = Math.floor((left % 60000) / 1000);
       showCard('Raid', 'Starts ' + special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p><p class="is-dim">The party warms up while you wait.</p>');
       if (!bout) showPreview();
-      livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : 4000);
+      livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : left > 0 ? 4000 : 2000);
       return;
     }
     if (!lastIsRaid) {
@@ -1376,6 +1797,7 @@ function leaveLive() {
   window.clearTimeout(livePoll);
   live = null;
   cardEl.hidden = true;
+  raidEl.hidden = true;
 }
 
 fightBtn.addEventListener('click', () => {
@@ -1389,6 +1811,7 @@ fightBtn.addEventListener('click', () => {
 replayBtn.addEventListener('click', () => {
   if (live && live.segs) {
     live.clock = 0;
+    live.view = {};
     live.playing = true;
     setPlaying(true);
     return;

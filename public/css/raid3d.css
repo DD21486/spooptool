@@ -104,6 +104,26 @@
 }
 
 .r3d-card[hidden] { display: none; }
+
+/* The live raid's map, loot rolls, and recap, drawn with the 2D page's raid card styles. */
+.r3d-raid { z-index: 30; background: rgba(8, 6, 4, 0.6); }
+.r3d-raid.is-light { background: rgba(8, 6, 4, 0.28); }
+.r3d-raid .raid-card { max-height: calc(100% - 8px); overflow: auto; }
+.r3d-raid.is-recap .raid-card { max-height: 100%; }
+.r3d-roster { gap: 6px; margin: 10px 0 0; }
+.r3d-roster .raid-chip {
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 5px 10px;
+  font-size: 13px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+.r3d-roster .raid-chip.is-in { opacity: 1; transform: none; }
+.r3d-roster small { font-size: 11px; color: #c8b896; }
 .r3d-card-kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #c8a050; }
 .r3d-card-title { margin: 2px 0 8px; font-family: "RuneScape Bold 12", "RuneScape", sans-serif; font-size: 22px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
 .r3d-card-body { font-size: 13px; line-height: 1.5; }
