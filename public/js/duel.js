@@ -6,7 +6,8 @@
   const waitWhen = document.getElementById('arena-wait-when');
   const pit = document.getElementById('arena-pit');
   const params = new URLSearchParams(window.location.search);
-  const token = String(params.get('w') || '').trim();
+  const pathMatch = window.location.pathname.match(/^\/w\/([a-z0-9]+)\/?$/i);
+  const token = String(params.get('w') || (pathMatch ? pathMatch[1] : '')).trim();
 
   let clockOffset = 0;
   let fightAtMs = 0;
