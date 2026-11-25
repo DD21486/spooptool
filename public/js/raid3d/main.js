@@ -576,6 +576,8 @@ function wander(i, hx, hy) {
 // The party milling about before a fight, now and then taking a swing, so gear and
 // animations can be checked without running the fight.
 function showPreview(scene) {
+  const chosen = scene || (preview ? world.sceneId : 'grass');
+  if (showPreview.settled && preview && world.sceneId === chosen && actors.size) return;
   const list = spoopList.slice(0, 14);
   const n = list.length;
   const fighters = list.map((spoop, i) => {
@@ -592,7 +594,8 @@ function showPreview(scene) {
     return { id: f.id, pts: plan.pts };
   });
   hits.sort((a, b) => a.t - b.t);
-  loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true, scene: scene || 'grass' });
+  loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true, scene: chosen });
+  showPreview.settled = true;
   playing = true;
   statusEl.textContent = n ? 'The party, warming up. Pick a boss and fight.' : 'No spoops to show.';
 }
@@ -1967,7 +1970,7 @@ async function watchLive() {
       const ss = Math.floor((left % 60000) / 1000);
       const purse = specialTourney && card.special.pot ? '<p class="is-dim">' + Number(card.special.pot).toLocaleString('en-US') + ' gold on the line.</p>' : '';
       showCard(specialTourney ? 'Tournament' : 'Raid', 'Starts ' + card.special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p>' + purse + '<p class="is-dim">The party warms up while you wait.</p>');
-      if (!bout || preview) showPreview(specialTourney ? 'pit' : undefined);
+      if (!bout || preview) showPreview(specialTourney ? 'pit' : 'grass');
       livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : left > 0 ? 4000 : 2000);
       return;
     }
@@ -2106,7 +2109,8 @@ fetch('/api/spoops')
   .then((data) => {
     spoopList = data.spoops || [];
     renderPicks(spoopList);
-    if (!bout || preview) showPreview();
+    showPreview.settled = false;
+    if (!bout || preview) showPreview(preview ? world.sceneId : undefined);
   })
   .catch(() => {
     statusEl.textContent = 'Could not load spoops.';
