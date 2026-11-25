@@ -8,6 +8,7 @@ import { buildBoss } from './boss.js';
 import { createFx } from './fx.js';
 import { createDirector } from './camera.js';
 import { createSound } from './sound.js';
+import { planTournament, planField, planPk } from './show.js';
 
 // Same pacing as /js/arena.js: fight seconds advance at speed x PACE per real second.
 const PACE = 0.55;
@@ -1084,7 +1085,7 @@ window.addEventListener('keydown', (ev) => {
 // How far through a live boss's entrance card we are, or null outside one.
 function introAt() {
   const seg = live && live.segs && live.seg;
-  const on = !!seg && seg.kind === 'card';
+  const on = !!seg && (seg.kind === 'card' || seg.kind === 'intro');
   document.body.classList.toggle('is-entrance', on);
   if (!on) return null;
   return Math.max(0, Math.min(1, (live.clock - seg.start) / (seg.end - seg.start)));
@@ -1112,14 +1113,15 @@ function syncSound() {
   const seg = liveOn && live.seg;
   let mode = 'off';
   if (liveOn && seg) {
-    const cleared = !!(live.raid && live.raid.cleared);
-    mode = seg.kind === 'recap' ? (cleared ? 'victory' : 'off') : 'fight';
+    const done = seg.kind === 'recap' || seg.kind === 'crown' || seg.kind === 'results';
+    const cleared = seg.kind !== 'recap' || !!(live.raid && live.raid.cleared);
+    mode = done ? (cleared ? 'victory' : 'off') : 'fight';
   } else if (bout && !preview) {
     const wiped = !!(bout.loot && bout.loot.wiped);
     mode = ended ? (wiped ? 'off' : 'victory') : 'fight';
   }
   sound.music(mode);
-  const fighting = bout && !preview && (liveOn ? seg && seg.kind === 'fight' : true);
+  const fighting = bout && !preview && (!liveOn || (seg && seg.kind === 'fight'));
   if (!fighting) {
     soundAt = t;
     return;
@@ -1756,6 +1758,124 @@ function recordsHtml(records) {
   }).join('') + '</ul></section>';
 }
 
+function personName(cast, id) {
+  if (cast && typeof cast.get === 'function') {
+    const row = cast.get(id);
+    return row ? row.name : '';
+  }
+  const row = (cast || []).find((entry) => entry.id === id);
+  return row ? row.name : '';
+}
+
+function versusHtml(a, b, note) {
+  return '<p class="r3d-vs"><b>' + esc(a || 'Someone') + '</b><span>vs</span><b>' + esc(b || 'Someone') + '</b></p>' +
+    (note ? '<p class="raid-map-line">' + esc(note) + '</p>' : '');
+}
+
+function placeList(results) {
+  return '<ol class="raid-recap-list">' + (results || []).map((row) =>
+    '<li class="raid-recap-row' + (row.place === 1 ? ' is-best' : '') + '"><span class="who">' + esc(row.place + '. ' + row.name) + '</span><span class="num">' +
+      (Number(row.gold) || 0).toLocaleString('en-US') + ' gp</span></li>'
+  ).join('') + '</ol>';
+}
+
+function drawMeet(seg, ms) {
+  if (live.view.phase === seg.kind && seg.kind === 'entrance') {
+    const shown = Math.floor(ms / 2000);
+    live.view.chips.forEach((el, i) => el.classList.toggle('is-in', i <= shown));
+    return;
+  }
+  if (live.view.phase) return;
+  live.view.phase = seg.kind;
+  const cast = seg.cast || (seg.tourney && seg.tourney.cast);
+  if (seg.kind === 'title') {
+    showRaid('Tonight', 'Tournament', 'is-intro');
+    raidStage.innerHTML = '<p class="raid-map-line">One on one, up the bracket. The final is best of 3.</p>';
+    return;
+  }
+  if (seg.kind === 'entrance') {
+    showRaid('Tournament', 'The field', 'is-intro');
+    raidStage.innerHTML = '<div class="raid-who r3d-roster">' + (seg.cast || []).map((row) =>
+      '<div class="raid-chip">' + esc(row.name) + '<small>Cb ' + esc(row.combat) + '</small></div>'
+    ).join('') + '</div>';
+    live.view.chips = Array.from(raidStage.querySelectorAll('.raid-chip'));
+    return;
+  }
+  if (seg.kind === 'bye') {
+    const names = (seg.byes || []).map((bye) => personName(cast, bye.playerId)).filter(Boolean);
+    showRaid('Tournament', 'Byes', 'is-intro');
+    raidStage.innerHTML = '<p class="raid-map-line">' + esc(joinNames(names) + (names.length === 1 ? ' moves on.' : ' move on.')) + '</p>';
+    return;
+  }
+  if (seg.kind === 'bracket') {
+    const matches = (seg.tourney && seg.tourney.matches) || [];
+    showRaid('Tournament', seg.played ? 'The bracket' : 'The draw', 'is-intro');
+    raidStage.innerHTML = '<div class="raid-who">' + matches.map((match, i) =>
+      '<div class="raid-chip' + (i < seg.played ? ' is-in' : '') + '">' + esc(personName(cast, match.aId) + ' vs ' + personName(cast, match.bId)) +
+      '<small>' + esc(match.roundName || '') + (i < seg.played ? ' · ' + personName(cast, match.winnerId) : '') + '</small></div>'
+    ).join('') + '</div>';
+    return;
+  }
+  if (seg.kind === 'versus') {
+    const match = seg.match || {};
+    const stake = seg.stake ? Number(seg.stake).toLocaleString('en-US') + ' gold each' : '';
+    showRaid(match.roundName || (seg.stake ? 'Duel' : 'Match'), 'Face off', 'is-intro');
+    raidStage.innerHTML = versusHtml(seg.a || personName(cast, match.aId), seg.b || personName(cast, match.bId), stake);
+    return;
+  }
+  if (seg.kind === 'best') {
+    showRaid('Final', 'Best 2 of 3', 'is-intro');
+    raidStage.innerHTML = '';
+    return;
+  }
+  if (seg.kind === 'score') {
+    const match = seg.match || {};
+    const tally = new Map([[match.aId, 0], [match.bId, 0]]);
+    (seg.games || []).forEach((game) => tally.set(game.winnerId, (tally.get(game.winnerId) || 0) + 1));
+    showRaid('Final', 'The score', 'is-intro');
+    raidStage.innerHTML = versusHtml(personName(cast, match.aId), personName(cast, match.bId),
+      (tally.get(match.aId) || 0) + ' – ' + (tally.get(match.bId) || 0));
+    return;
+  }
+  if (seg.kind === 'intro') {
+    const match = seg.match || {};
+    const game = seg.games > 1 ? ' · game ' + (seg.gameIndex + 1) : '';
+    showRaid((match.roundName || 'Fight') + game, 'Fight', 'is-title');
+    raidStage.innerHTML = versusHtml(seg.a || personName(cast, match.aId), seg.b || personName(cast, match.bId));
+    return;
+  }
+  if (seg.kind === 'advance') {
+    const match = seg.match || {};
+    showRaid(match.roundName || 'Match', personName(cast, match.winnerId) + ' wins', 'is-intro');
+    raidStage.innerHTML = '<p class="raid-map-line">' + esc(personName(cast, match.winnerId) + ' moves on.') + '</p>';
+    return;
+  }
+  if (seg.kind === 'crown') {
+    const champ = personName(cast, seg.tourney && seg.tourney.championId) || (seg.results[0] && seg.results[0].name) || 'Nobody';
+    showRaid('Tournament', champ + ' wins', 'is-recap');
+    raidStage.innerHTML = '<p class="raid-recap-fell is-clear">' + esc(champ) + ' takes the tournament.</p>' +
+      (seg.pot ? '<p class="raid-map-line">' + Number(seg.pot).toLocaleString('en-US') + ' gold in the pot.</p>' : '') +
+      placeList(seg.results);
+    return;
+  }
+  if (seg.kind === 'field') {
+    const names = ((seg.bout && seg.bout.fighters) || []).map((f) => f.name);
+    showRaid('Tonight', 'Spoopfight', 'is-intro');
+    raidStage.innerHTML = '<p class="raid-map-line">' + esc((seg.formation ? seg.formation + ' formation. ' : '') + 'Everyone is in. Last one standing takes it.') + '</p>' +
+      '<div class="raid-who r3d-roster">' + names.map((name) => '<div class="raid-chip is-in">' + esc(name) + '</div>').join('') + '</div>';
+    return;
+  }
+  if (seg.kind === 'gap') {
+    raidEl.hidden = true;
+    return;
+  }
+  const stake = seg.staked && seg.stake ? Number(seg.stake).toLocaleString('en-US') + ' gold each. ' : '';
+  showRaid(seg.staked ? 'Duel' : live.title || 'Spoopfight', seg.winner || 'Result', 'is-recap');
+  raidStage.innerHTML = '<p class="raid-recap-fell is-clear">' + esc((seg.winner || 'Someone') + (seg.loser ? ' beat ' + seg.loser + '.' : ' wins.')) + '</p>' +
+    (stake || seg.pot ? '<p class="raid-map-line">' + esc(stake + (seg.pot ? Number(seg.pot).toLocaleString('en-US') + ' gold pot.' : '')) + '</p>' : '') +
+    placeList(seg.results);
+}
+
 function drawSeg(seg, ms) {
   if (live.view.seg !== seg) live.view = { seg };
   const v = live.view;
@@ -1772,6 +1892,7 @@ function drawSeg(seg, ms) {
   if (seg.kind === 'camp') return drawCamp(seg, ms, v);
   if (seg.kind === 'chest') return drawChest(seg, ms, v);
   if (seg.kind === 'recap') return drawRecap(v);
+  return drawMeet(seg, ms);
 }
 
 function tickLive(dt) {
@@ -1779,15 +1900,16 @@ function tickLive(dt) {
   if (live.playing && !dragging) live.clock += dt * 1000;
   const clock = live.clock;
   const seg = live.segs.find((row) => clock >= row.start && clock < row.end) || live.segs[live.segs.length - 1];
-  if (seg.index != null && seg.room && seg.room.bout && seg.index !== live.room) {
-    live.room = seg.index;
-    loadFight(seg.room.bout, { preview: false });
+  const boutNow = (seg.room && seg.room.bout) || seg.bout;
+  if (boutNow && boutNow !== bout) {
+    live.room = seg.key || seg.index;
+    loadFight(boutNow, { preview: false });
     bannerEl.hidden = true;
     snapFacing = true;
   }
-  if (seg.kind === 'card') t = 0;
-  else if (seg.kind === 'fight') t = ((clock - seg.start) / 1000) * LIVE_SPEED * PACE;
-  else if (seg.kind === 'loot') t = endAt;
+  if (seg.kind === 'card' || seg.kind === 'intro') t = 0;
+  else if (seg.kind === 'fight') t = ((clock - seg.start) / 1000) * (seg.speed || LIVE_SPEED) * PACE;
+  else if (seg.kind === 'loot' || seg.bout) t = endAt;
   live.seg = seg;
   drawSeg(seg, clock - seg.start);
   const shown = Math.min(clock, live.total);
@@ -1797,15 +1919,26 @@ function tickLive(dt) {
   clockEl.textContent = mm + ':' + String(ss).padStart(2, '0') + ' / ' + Math.floor(live.total / 60000) + ':' + String(Math.floor((live.total % 60000) / 1000)).padStart(2, '0');
 }
 
+function planLive(last) {
+  if (last && last.raid) return planRaid(last);
+  if (last && last.tournament) return planTournament(last);
+  if (last && (last.aName || last.bName) && last.bout) return planPk(last);
+  if (last && last.bout) return planField(last);
+  return null;
+}
+
 function startLivePlayback(last) {
-  live = planRaid(last);
+  live = planLive(last);
+  if (!live) return;
   live.clock = Math.max(0, Date.now() - live.startAt);
   // Joining after the end goes straight to the night's totals.
   if (live.clock > live.total) live.clock = live.total;
   scrub.max = String(live.total / 1000);
   setPlaying(true);
-  statusEl.textContent = (live.raid.name || 'Raid') + (Date.now() < live.startAt + live.total ? ' · live' : ' · replay');
+  const title = (live.raid && live.raid.name) || live.title || 'The fight';
+  statusEl.textContent = title + (Date.now() < live.startAt + live.total ? ' · live' : ' · replay');
 }
+window.raid3d.playLive = startLivePlayback;
 
 // Wait for the raid, then play it. Joining late jumps to where everyone else is.
 async function watchLive() {
@@ -1813,26 +1946,46 @@ async function watchLive() {
   live = live && live.segs ? live : { waiting: true };
   try {
     const card = await (await fetch('/api/arena')).json();
-    const special = card.special;
+    const now = Date.now();
     const last = card.last;
-    const lastIsRaid = last && last.kind === 'raid' && last.hasReplay;
-    const due = special ? Date.parse(special.at) : 0;
-    if (special && (!lastIsRaid || Date.parse(last.at) < due)) {
-      const left = Math.max(0, due - Date.now());
+    const pk = card.lastPk;
+    const onAir = (row) => {
+      if (!row || !row.hasReplay || !row.at) return false;
+      const start = Date.parse(row.at);
+      const end = Date.parse(row.revealAt || '');
+      return Number.isFinite(start) && now >= start - 8000 && (!Number.isFinite(end) || now < end + 20000);
+    };
+    const specialAt = card.special ? Date.parse(card.special.at) : 0;
+    const raidCoversSpecial = last && last.kind === 'raid' && Date.parse(last.at) >= specialAt - 1000;
+    if (specialAt && !raidCoversSpecial && now < specialAt) {
+      const left = Math.max(0, specialAt - now);
       const mm = Math.floor(left / 60000);
       const ss = Math.floor((left % 60000) / 1000);
-      showCard('Raid', 'Starts ' + special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p><p class="is-dim">The party warms up while you wait.</p>');
-      if (!bout) showPreview();
+      showCard('Raid', 'Starts ' + card.special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p><p class="is-dim">The party warms up while you wait.</p>');
+      if (!bout || preview) showPreview();
       livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : left > 0 ? 4000 : 2000);
       return;
     }
-    if (!lastIsRaid) {
-      showCard('Raid', 'No raid to watch', '<p class="is-dim">The next one shows up here when it starts.</p>');
+    const pkLive = onAir(pk);
+    const arenaLive = onAir(last);
+    const playPk = pkLive && (!arenaLive || Date.parse(pk.at) >= Date.parse(last.at));
+    if (!pkLive && !arenaLive && card.nextAt && Date.parse(card.nextAt) > now) {
+      const left = Math.max(0, Date.parse(card.nextAt) - now);
+      const mm = Math.floor(left / 60000);
+      const ss = Math.floor((left % 60000) / 1000);
+      showCard(card.nextTitle || 'Arena', card.nextLabel || 'Next fight', '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p>' +
+        (card.nextDetail ? '<p class="is-dim">' + esc(card.nextDetail) + '</p>' : ''));
+      if (!bout || preview) showPreview();
+      livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : 4000);
       return;
     }
     const full = await (await fetch('/api/arena?replay=1')).json();
-    if (!full.last || !full.last.raid) throw new Error('no raid');
-    startLivePlayback(full.last);
+    const event = playPk ? full.lastPk : full.last;
+    if (!event || !planLive(event)) {
+      showCard('Arena', 'Nothing to watch', '<p class="is-dim">The next fight shows up here when it starts.</p>');
+      return;
+    }
+    startLivePlayback(event);
   } catch (err) {
     showCard('Raid', 'Could not load the raid', '<p class="is-dim">Trying again shortly.</p>');
     livePoll = window.setTimeout(watchLive, 10000);

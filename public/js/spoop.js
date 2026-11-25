@@ -2028,7 +2028,7 @@
     const pk = state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
       ? '<p class="spoop-hero-pk">' + (state.pk.staked
         ? escapeHtml('Duel vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a) + ' · ' + Number(state.pk.stake || 0).toLocaleString() + ' gold')
-        : '<a href="/arena.html">' + escapeHtml('PK vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a)) + '</a>') + '</p>'
+        : '<a href="/raid3d.html?live">' + escapeHtml('PK vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a)) + '</a>') + '</p>'
       : '';
 
     root.innerHTML =
@@ -2374,7 +2374,7 @@
       ? 'Duel · ' + pk.a + ' vs ' + pk.b + ' · ' + Number(pk.stake || 0).toLocaleString() + ' gold each'
       : 'PK · ' + pk.a + ' vs ' + pk.b + ' · ' + (pk.reason || '');
     if (pk.staked) return '<p class="spoop-pk">' + escapeHtml(text) + '</p>';
-    return '<a class="spoop-pk" href="/arena.html">' + escapeHtml(text) + '</a>';
+    return '<a class="spoop-pk" href="/raid3d.html?live">' + escapeHtml(text) + '</a>';
   }
 
   function duelBarHtml(state, spoop) {
