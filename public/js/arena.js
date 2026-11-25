@@ -622,6 +622,7 @@
   let pkA = '';
   let pkB = '';
   let pkReason = '';
+  let pkStaked = false;
   let lastFetchAt = 0;
   let replayLast = null;
   let upcomingPot = null;
@@ -2026,7 +2027,7 @@
     const styleName = { ring: 'Ring', pairs: 'Pairs', scatter: 'Random', dragon: 'Dragon', duel: 'Duel' };
     const style = fight && styleName[fight.formation] ? styleName[fight.formation] : '';
     fightTitle = (title || 'Spoopfight') + (style ? ' · ' + style : '');
-    playSpeed = (title || '') === 'PK' ? PK_SPEED : ARENA_SPEED;
+    playSpeed = (title || '') === 'PK' || (title || '') === 'Duel' ? PK_SPEED : ARENA_SPEED;
     shownHit = 0;
     shownDeath = 0;
     shownPhase = 0;
@@ -2602,8 +2603,8 @@
   function showPkWait(text) {
     countdownEl.classList.add('is-pk');
     waitEl.classList.add('is-pk');
-    if (waitKicker) waitKicker.textContent = 'PK';
-    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + 'PK ' + text;
+    if (waitKicker) waitKicker.textContent = pkStaked ? 'Duel' : 'PK';
+    countdownEl.textContent = (simMode ? 'Simulated · ' : '') + (pkStaked ? 'Duel ' : 'PK ') + text;
     waitClock.textContent = text;
     waitWhen.textContent = pkA + ' vs ' + pkB + (pkReason ? ' — ' + pkReason : '');
     paintOdds(true);
@@ -3724,10 +3725,12 @@
       oddsBoard = data.odds || null;
       oddsTrail = Array.isArray(data.oddsTrail) ? data.oddsTrail : [];
       await hydrateReplay(data, false);
-      pkAtMs = data.pk && data.pk.fightAt ? Date.parse(data.pk.fightAt) : 0;
-      pkA = data.pk ? data.pk.a || '' : '';
-      pkB = data.pk ? data.pk.b || '' : '';
-      pkReason = data.pk ? data.pk.reason || '' : '';
+      const duelAside = !!(data.pk && data.pk.staked);
+      pkAtMs = duelAside || !data.pk || !data.pk.fightAt ? 0 : Date.parse(data.pk.fightAt);
+      pkA = duelAside || !data.pk ? '' : (data.pk.a || '');
+      pkB = duelAside || !data.pk ? '' : (data.pk.b || '');
+      pkReason = duelAside || !data.pk ? '' : (data.pk.reason || '');
+      pkStaked = !duelAside && !!(data.pk && data.pk.staked);
       if (tourneyBusy || playing) return;
       const last = data.last;
       upcomingPot = data.pot || null;
@@ -3738,23 +3741,25 @@
       const lastPk = data.lastPk;
       replayLast = last && (last.bout || last.tournament || last.raid || last.hasReplay) ? last : null;
       const waiting = !!(pkAtMs && worldMs() < pkAtMs);
-      const pkLive = !!(lastPk && lastPk.bout && !waiting && holdPk !== lastPk.at && seenPk() !== lastPk.at && liveFor(Date.parse(lastPk.at), lastPk.bout, PK_SPEED));
+      const pkLive = !!(lastPk && !lastPk.staked && lastPk.bout && !waiting && holdPk !== lastPk.at && seenPk() !== lastPk.at && liveFor(Date.parse(lastPk.at), lastPk.bout, PK_SPEED));
       const showMs = last && last.tournament ? last.tournament.showMs : (last && last.showMs) || 0;
       const nightLive = !!(last && (last.tournament || last.bout || last.raid) && !waiting && !pkLive && holdNight !== last.at && seenAt() !== last.at && liveFor(Date.parse(last.at), last.bout, ARENA_SPEED, showMs));
       if (pkLive) {
         resultsEl.hidden = true;
         waitEl.hidden = true;
-        lastPk.bout.pkNote = lastPk.item ? 'Took ' + lastPk.item : '';
+        lastPk.bout.pkNote = lastPk.staked
+          ? Number(lastPk.stake || 0).toLocaleString() + ' gold each'
+          : (lastPk.item ? 'Took ' + lastPk.item : '');
         nightDone = function () {
           holdPk = lastPk.at;
           markPk(lastPk.at);
           restPit();
-          statusEl.textContent = (lastPk.winner || 'Someone') + ' won the PK.';
+          statusEl.textContent = (lastPk.winner || 'Someone') + (lastPk.staked ? ' won the duel.' : ' won the PK.');
           syncReplay();
           tickCountdown();
           loadNight();
         };
-        arm(lastPk.bout, 'PK');
+        arm(lastPk.bout, lastPk.staked ? 'Duel' : 'PK');
         beginFight(worldMs() - Date.parse(lastPk.at) < 15000);
       } else if (nightLive && last.raid) {
         markSeen(last.at);
@@ -3810,15 +3815,21 @@
   }
 
   const labPage = document.body.getAttribute('data-page');
-  if (labPage === 'pit' || labPage === 'raid') {
+  if (labPage === 'pit' || labPage === 'raid' || labPage === 'duel') {
     window.ArenaPit = {
-      play(fight, speed, done) {
+      play(fight, speed, done, seekSec) {
         if (waitEl) waitEl.hidden = true;
         nightDone = typeof done === 'function' ? done : null;
-        const title = labPage === 'raid' ? (fight && fight.bossName) || 'Raid' : 'Test fight';
+        const title = labPage === 'raid' ? (fight && fight.bossName) || 'Raid' : (labPage === 'duel' ? 'Duel' : 'Test fight');
         arm(fight, title);
         const next = Number(speed);
         playSpeed = next > 0 ? next : ARENA_SPEED;
+        const seek = Number(seekSec) || 0;
+        if (seek > 0) {
+          beginFight(false);
+          playFrom = seek;
+          return;
+        }
         beginFight(labPage !== 'raid');
       },
       playTournament(tourney, speed) {

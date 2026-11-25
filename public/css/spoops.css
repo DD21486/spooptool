@@ -296,6 +296,163 @@ body[data-page="list"] #spoop-root {
 
 .spoop-pk:hover { color: #fff; }
 
+.spoop-duel-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(240, 216, 120, 0.45);
+  background: rgba(42, 33, 18, 0.72);
+  color: #fde68a;
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spoop-duel-bar:hover { color: #fff; }
+.spoop-duel-view {
+  flex: 0 0 auto;
+  color: #fff6df;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.duel-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.duel-form label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #cbd5e1;
+  font-size: 13px;
+}
+
+.duel-form select,
+.duel-gold {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid #334155;
+  background: #111827;
+  color: #fde68a;
+  font-size: 14px;
+}
+
+.duel-form select { max-width: 16rem; color: #f8fafc; }
+.duel-gold { width: 8.5rem; }
+
+.duel-send {
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid #a16207;
+  background: #b45309;
+  color: #fff7ed;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.duel-send:hover { background: #d97706; }
+.duel-send:disabled,
+.sell-tab:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.roll-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(2, 6, 23, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+
+.duel-sheet {
+  width: min(520px, 100%);
+  max-height: min(86vh, 720px);
+  overflow: auto;
+  background: #14100c;
+  border: 1px solid rgba(240, 216, 120, 0.45);
+  border-radius: 12px;
+  padding: 1rem 1rem 1.1rem;
+  color: #f6e7c1;
+}
+
+.duel-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.duel-sheet h2 {
+  margin: 0;
+  color: #f0d878;
+  font-size: 18px;
+}
+
+.duel-sheet h3 {
+  margin: 16px 0 8px;
+  color: #f0d878;
+  font-size: 13px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.duel-sheet-head button,
+.duel-actions button {
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.duel-actions button:hover,
+.duel-sheet-head button:hover { background: #334155; color: #fff; }
+
+.duel-note {
+  margin: 10px 0 0;
+  color: #fcd34d;
+  font-size: 13px;
+}
+
+.duel-sheet ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.duel-row {
+  padding: 10px 0;
+  border-top: 1px solid rgba(240, 216, 120, 0.18);
+}
+
+.duel-row p { margin: 0; font-size: 14px; }
+.duel-row a { color: #fff6df; text-decoration: none; }
+.duel-row a:hover { color: #fff; }
+.duel-row .is-short { color: #fca5a5; }
+.duel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
 .boss-kc-grid {
   display: flex;
   flex-wrap: wrap;
@@ -1355,6 +1512,15 @@ body[data-page="detail"] .crate-btn {
 
 body[data-page="detail"] .build-tab,
 body[data-page="detail"] .focus-tab,
+body[data-page="detail"] .duel-gold,
+body[data-page="detail"] .duel-form select {
+  border-radius: 2px;
+  border: 1px solid #1a120c;
+  background: #24180f;
+  color: #ffe7a8;
+  font-family: "RuneScape Bold 12", "RuneScape Plain 12", sans-serif;
+}
+
 body[data-page="detail"] .sell-tab {
   border-radius: 2px;
   border: 1px solid #1a120c;

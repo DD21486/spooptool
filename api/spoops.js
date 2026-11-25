@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 
@@ -203,6 +203,27 @@ async function handlePost(req) {
     const saved = await save(state, state.clock);
     if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
     return { status: 200, payload: presentWorld(state, debug) };
+  }
+
+  if (action === 'duel') {
+    const now = new Date(state.clock);
+    const op = String(body.op || '');
+    const result = op === 'issue'
+      ? issueDuel(state, spoop, body.target, body.gold, now)
+      : op === 'cancel'
+        ? cancelDuel(state, spoop, body.id, now)
+        : op === 'decline'
+          ? declineDuel(state, spoop, body.id, now)
+          : op === 'accept'
+            ? acceptDuel(state, spoop, body.id, now)
+            : { ok: false, error: 'Unknown duel action' };
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    if (result.call && await publishEvents([result.call], state)) {
+      await save(state, state.clock);
+    }
+    return { status: 200, payload: presentWorld(state, debug, result.text ? [result.text] : []) };
   }
 
   if (action === 'equipmode') {

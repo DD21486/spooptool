@@ -1424,7 +1424,7 @@
     const text = body || '';
     if (/^found /i.test(text) || /rare drop/i.test(text)) return { kind: 'loot', label: 'Found gear' };
     if (/followed them home/i.test(text)) return { kind: 'pet', label: 'Pet' };
-    if (/\bpk\b/i.test(text) || /^challenged /i.test(text)) return { kind: 'pk', label: 'PK' };
+    if (/\bpk\b/i.test(text) || /^challenged /i.test(text) || /\bduel\b/i.test(text)) return { kind: 'pk', label: 'PK' };
     if (/^spoopfight/i.test(text) || /^fought /i.test(text)) return { kind: 'arena', label: 'Arena' };
     if (/^died\b/i.test(text)) return { kind: 'death', label: 'Died' };
     if (/^killed /i.test(text)) return { kind: 'boss', label: 'Boss kill' };
@@ -1548,15 +1548,12 @@
         '</a>'
       );
     }).join('');
-    const pk = state.pk;
-    const pkBanner = pk
-      ? '<a class="spoop-pk" href="/arena.html">PK · ' + escapeHtml(pk.a) + ' vs ' + escapeHtml(pk.b) + ' · ' + escapeHtml(pk.reason) + '</a>'
-      : '';
     const board = cards ? '<div class="spoop-grid">' + cards + '</div>' : '<p class="spoop-log-empty">No spoops yet.</p>';
-    root.innerHTML = '<div class="spoop-main">' + pkBanner + renderMap(spoops) + feudsStrip(state) + board + '</div>' + renderFeed(spoops);
+    root.innerHTML = '<div class="spoop-main">' + duelBarHtml(state) + pkBannerHtml(state.pk) + renderMap(spoops) + feudsStrip(state) + board + '</div>' + renderFeed(spoops);
     const map = mountMapZoom(root);
     bindSpoopHover(root, map);
     bindFeedSort(root, spoops);
+    bindDuelBar(root);
     paint(state);
   }
 
@@ -2022,10 +2019,13 @@
           (spoop.follower.owned > 1 ? ' · ' + spoop.follower.owned + ' pets' : '') + '</span></p>'
       : '';
     const pk = state.pk && (state.pk.a === spoop.name || state.pk.b === spoop.name)
-      ? '<p class="spoop-hero-pk"><a href="/arena.html">PK vs ' + escapeHtml(state.pk.a === spoop.name ? state.pk.b : state.pk.a) + '</a></p>'
+      ? '<p class="spoop-hero-pk">' + (state.pk.staked
+        ? escapeHtml('Duel vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a) + ' · ' + Number(state.pk.stake || 0).toLocaleString() + ' gold')
+        : '<a href="/arena.html">' + escapeHtml('PK vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a)) + '</a>') + '</p>'
       : '';
 
     root.innerHTML =
+      duelBarHtml(state, spoop) +
       '<header class="spoop-hero">' +
         '<div class="spoop-hero-bar">' +
           '<a class="spoop-back" href="/spoops.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7.2 2.4 1.6 8l5.6 5.6 1.1-1.1L4.6 8.8H14.4V7.2H4.6l3.7-3.7z"/></svg>Back To Spoops</a>' +
@@ -2078,7 +2078,7 @@
       '</div>' +
       relationsSection(spoop) +
       statsHtml +
-      spoopControlsHtml(spoop, build, buildTabs) +
+      spoopControlsHtml(spoop, build, buildTabs, state) +
       bossGrid(spoop) +
       raidsSection(spoop) +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
@@ -2117,6 +2117,17 @@
     root.querySelectorAll('[data-focus]').forEach((btn) => {
       btn.addEventListener('click', () => chooseFocus(spoopKey(spoop), btn.getAttribute('data-focus'), spoop.focus || ''));
     });
+    bindDuelBar(root);
+    const sendDuelBtn = root.querySelector('[data-duel-send]');
+    if (sendDuelBtn) sendDuelBtn.addEventListener('click', () => sendDuel(spoopKey(spoop)));
+    const duelGold = root.querySelector('[data-duel-gold]');
+    if (duelGold) {
+      duelGold.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        sendDuel(spoopKey(spoop));
+      });
+    }
     root.querySelectorAll('[data-autosell]').forEach((btn) => {
       btn.addEventListener('click', () => chooseAutoSell(
         spoopKey(spoop),
@@ -2344,7 +2355,63 @@
     window.addEventListener('resize', reposition);
   }
 
-  function spoopControlsHtml(spoop, build, buildTabs) {
+  function pkBannerHtml(pk) {
+    if (!pk) return '';
+    const text = pk.staked
+      ? 'Duel · ' + pk.a + ' vs ' + pk.b + ' · ' + Number(pk.stake || 0).toLocaleString() + ' gold each'
+      : 'PK · ' + pk.a + ' vs ' + pk.b + ' · ' + (pk.reason || '');
+    if (pk.staked) return '<p class="spoop-pk">' + escapeHtml(text) + '</p>';
+    return '<a class="spoop-pk" href="/arena.html">' + escapeHtml(text) + '</a>';
+  }
+
+  function duelBarHtml(state, spoop) {
+    const duels = state && state.duels || [];
+    if (!duels.length) return '';
+    const key = spoop ? spoopKey(spoop) : '';
+    const out = key ? duels.filter((row) => row.fromKey === key) : [];
+    const incoming = key ? duels.filter((row) => row.toKey === key) : [];
+    let text;
+    if (out.length === 1 && !incoming.length) {
+      text = 'Challenge out to ' + out[0].to + ' for ' + Number(out[0].gold || 0).toLocaleString() + ' gold.';
+    } else if (!out.length && incoming.length === 1) {
+      text = incoming[0].from + ' challenged them for ' + Number(incoming[0].gold || 0).toLocaleString() + ' gold.';
+    } else if (out.length || incoming.length) {
+      const bits = [];
+      if (out.length) bits.push(out.length + (out.length === 1 ? ' challenge out' : ' challenges out'));
+      if (incoming.length) bits.push(incoming.length + ' incoming');
+      text = bits.join(', ') + '.';
+    } else if (duels.length === 1) {
+      text = duels[0].from + ' challenged ' + duels[0].to + ' for ' + Number(duels[0].gold || 0).toLocaleString() + ' gold.';
+    } else {
+      text = duels.length + ' duel challenges waiting.';
+    }
+    return '<button type="button" class="spoop-duel-bar" data-duel-open>' +
+      '<span>' + escapeHtml(text) + '</span><span class="spoop-duel-view">View</span></button>';
+  }
+
+  function duelFormHtml(spoop, state) {
+    const mine = spoopKey(spoop);
+    const others = (state.spoops || [])
+      .filter((row) => spoopKey(row) && spoopKey(row) !== mine)
+      .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    if (!others.length) {
+      return '<div class="control-block"><h4>Duel</h4><p class="control-note">Nobody else is here to challenge.</p></div>';
+    }
+    const options = others.map((row) =>
+      '<option value="' + escapeHtml(spoopKey(row)) + '">' + escapeHtml(row.name) + '</option>'
+    ).join('');
+    return '<div class="control-block">' +
+      '<h4>Duel</h4>' +
+      '<p class="control-note" data-control="duel">Challenge one spoop for a gold price. That gold leaves this spoop now and sits until the other spoop accepts, declines, or this is taken back. The winner takes the purse. Gear stays put. They fight 10 minutes after it is accepted.</p>' +
+      '<div class="duel-form">' +
+        '<label>Spoop <select data-duel-target aria-label="Spoop to challenge">' + options + '</select></label>' +
+        '<label>Gold <input class="duel-gold" data-duel-gold inputmode="numeric" autocomplete="off" aria-label="Duel stake in gold"></label>' +
+        '<button type="button" class="duel-send" data-duel-send>Challenge</button>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function spoopControlsHtml(spoop, build, buildTabs, state) {
     const style = build === 'ranged' ? 'ranged' : build === 'magic' ? 'magic' : 'melee';
     const current = spoop.focus || '';
     const focusSkill = (spoop.skills || []).find((skill) => skill.id === current);
@@ -2391,6 +2458,7 @@
           '<p class="control-note" data-control="sell">' + sellNote + '</p>' +
           '<div class="sell-tabs" role="tablist" aria-label="Auto-sell spare gear">' + sellTabs + '</div>' +
         '</div>' +
+        duelFormHtml(spoop, state || { spoops: [] }) +
       '</div>' +
     '</section>';
   }
@@ -2400,7 +2468,9 @@
   let settingFocus = false;
   let settingSell = false;
   let settingEquip = false;
+  let settingDuel = false;
   let wearing = false;
+  let duelModalOpen = false;
 
   function markTabs(selector, attr, value) {
     document.querySelectorAll(selector).forEach((btn) => {
@@ -2480,6 +2550,133 @@
       window.alert(err.message);
     } finally {
       wearing = false;
+    }
+  }
+
+  function bindDuelBar(root) {
+    const btn = root.querySelector('[data-duel-open]');
+    if (!btn) return;
+    btn.addEventListener('click', () => openDuelModal(lastState));
+  }
+
+  function duelRowHtml(row, booked) {
+    const gold = Number(row.gold || 0).toLocaleString();
+    const short = Number(row.toGold || 0) < Number(row.gold || 0);
+    const accept = booked
+      ? ''
+      : '<button type="button" data-duel-act="accept" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Accept</button>';
+    return '<li class="duel-row">' +
+      '<p><a href="/spoop.html?name=' + encodeURIComponent(row.fromKey) + '">' + escapeHtml(row.from) + '</a> challenged ' +
+        '<a href="/spoop.html?name=' + encodeURIComponent(row.toKey) + '">' + escapeHtml(row.to) + '</a> for <strong>' + gold + '</strong> gold.' +
+        (short ? ' <span class="is-short">' + escapeHtml(row.to) + ' is short.</span>' : '') +
+      '</p>' +
+      '<div class="duel-actions">' +
+        accept +
+        '<button type="button" data-duel-act="decline" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Decline</button>' +
+        '<button type="button" data-duel-act="cancel" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.fromKey) + '">Take back</button>' +
+      '</div>' +
+    '</li>';
+  }
+
+  let duelKeyHandler = null;
+
+  function closeDuelModal() {
+    duelModalOpen = false;
+    if (duelKeyHandler) {
+      document.removeEventListener('keydown', duelKeyHandler);
+      duelKeyHandler = null;
+    }
+    const overlay = document.querySelector('[data-duel-modal]');
+    if (overlay) overlay.remove();
+  }
+
+  function openDuelModal(state) {
+    closeDuelModal();
+    const duels = state && state.duels || [];
+    if (!duels.length) return;
+    duelModalOpen = true;
+    let focusKey = '';
+    let focusName = '';
+    if (document.body.getAttribute('data-page') === 'detail') {
+      const params = new URLSearchParams(window.location.search);
+      const spoop = findSpoop(state.spoops, params.get('name') || '');
+      if (spoop) {
+        focusKey = spoopKey(spoop);
+        focusName = spoop.name;
+      }
+    }
+    const mine = focusKey ? duels.filter((row) => row.fromKey === focusKey || row.toKey === focusKey) : duels;
+    const rest = focusKey ? duels.filter((row) => row.fromKey !== focusKey && row.toKey !== focusKey) : [];
+    const booked = !!(state && state.pk);
+    const section = (title, rows) => rows.length
+      ? '<section><h3>' + escapeHtml(title) + '</h3><ul>' + rows.map((row) => duelRowHtml(row, booked)).join('') + '</ul></section>'
+      : '';
+    const overlay = document.createElement('div');
+    overlay.className = 'roll-overlay duel-overlay';
+    overlay.setAttribute('data-duel-modal', '1');
+    overlay.innerHTML =
+      '<div class="duel-sheet" role="dialog" aria-modal="true" aria-labelledby="duel-title">' +
+        '<div class="duel-sheet-head">' +
+          '<h2 id="duel-title">Duels</h2>' +
+          '<button type="button" data-duel-close aria-label="Close">Close</button>' +
+        '</div>' +
+        (booked ? '<p class="duel-note">A fight is already booked, so nothing new can be accepted yet.</p>' : '') +
+        section(focusName ? 'For ' + focusName : 'Pending', mine) +
+        section('Other challenges', rest) +
+      '</div>';
+    const onKey = (ev) => {
+      if (ev.key === 'Escape') closeDuelModal();
+    };
+    overlay.addEventListener('click', (ev) => {
+      if (ev.target === overlay || ev.target.closest('[data-duel-close]')) {
+        closeDuelModal();
+        return;
+      }
+      const btn = ev.target.closest('[data-duel-act]');
+      if (!btn) return;
+      actDuel(btn.getAttribute('data-duel-act'), btn.getAttribute('data-duel-name'), btn.getAttribute('data-duel-id'));
+    });
+    duelKeyHandler = onKey;
+    document.addEventListener('keydown', onKey);
+    document.body.appendChild(overlay);
+    const closer = overlay.querySelector('[data-duel-close]');
+    if (closer) closer.focus();
+  }
+
+  async function sendDuel(name) {
+    if (settingDuel) return;
+    const target = document.querySelector('[data-duel-target]');
+    const input = document.querySelector('[data-duel-gold]');
+    if (!target || !input) return;
+    settingDuel = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'duel', op: 'issue', name, target: target.value, gold: input.value }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      settingDuel = false;
+    }
+  }
+
+  async function actDuel(op, name, id) {
+    if (settingDuel || !op || !name || !id) return;
+    settingDuel = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'duel', op, name, id }),
+      });
+      render(data);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      settingDuel = false;
     }
   }
 
@@ -3255,8 +3452,10 @@
   function render(state) {
     lastState = state;
     const page = document.body.getAttribute('data-page');
+    const keepDuels = duelModalOpen;
     if (page === 'detail') renderDetail(state);
     else renderList(state);
+    if (keepDuels) openDuelModal(state);
     mountDebug(state);
     const clock = document.getElementById('spoop-clock');
     if (clock) {
