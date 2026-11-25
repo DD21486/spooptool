@@ -1,6 +1,6 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
 const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, presentDuelWatch, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
-const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
+const { publishEvents, publishArena, publishPk, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 const { syncPk } = require('../lib/spoop/pk-settle');
 
@@ -388,6 +388,12 @@ async function handleDuel(req, res) {
       const pending = state && state.pk && state.pk.staked && state.pk.watch === token ? state.pk : null;
       if (pending && new Date(pending.fightAt) <= new Date()) {
         await syncPk(new Date());
+        state = await load();
+      }
+      const result = state && state.lastPk && state.lastPk.staked && state.lastPk.watch === token ? state.lastPk : null;
+      if (result && result.needsPost && new Date(result.revealAt || 0) <= new Date() && await publishPk(state)) {
+        keepReminderMarks(state);
+        await save(state, state.clock);
         state = await load();
       }
       attachReplays(state, await loadReplays());
