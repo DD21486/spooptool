@@ -641,6 +641,8 @@ export function createWorld(canvas) {
     renderer.setPixelRatio(pixel ? Math.max(0.34, dpr / 3) : dpr);
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
+    // A tall phone screen gets a wider lens, so the fight still fits side to side.
+    camera.fov = camera.aspect < 1 ? 38 + (1 - camera.aspect) * 34 : 38;
     camera.updateProjectionMatrix();
   }
 

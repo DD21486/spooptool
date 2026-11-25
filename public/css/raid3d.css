@@ -275,17 +275,18 @@
   bottom: 10px;
   margin: 0;
   padding: 8px 10px;
-  width: min(520px, calc(100% - 20px));
-  min-height: 9.5rem;
+  width: min(340px, calc(100% - 20px));
   list-style: none;
   background: rgba(0, 0, 0, 0.5);
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
-  font-size: 13px;
-  line-height: 1.4;
+  font-size: 12px;
+  line-height: 1.35;
   color: #e2e8f0;
   pointer-events: none;
 }
+
+.r3d-log li { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
 
 .r3d-log:empty { display: none; }
 
@@ -294,8 +295,8 @@
   position: absolute;
   right: 10px;
   bottom: 10px;
-  width: min(300px, calc(100% - 20px));
-  padding: 6px;
+  width: min(230px, calc(100% - 20px));
+  padding: 5px;
   background: rgba(0, 0, 0, 0.55);
   border: 1px solid rgba(255, 255, 255, 0.08);
   font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
@@ -423,11 +424,14 @@
 }
 
 @media (max-width: 640px) {
-  .r3d-party { grid-auto-columns: 78px; }
+  .r3d-party { top: 44px; grid-auto-columns: 78px; }
+  .r3d-bossbar { top: 6px; }
+  .r3d-page .pit-picks { max-height: 2.4rem; }
   .r3d-unit { height: 24px; }
   .r3d-unit > span { font-size: 10px; }
   .r3d-unit > em { font-size: 10px; }
   .r3d-view { top: auto; bottom: 10px; right: 10px; }
-  .r3d-log { display: none; }
-  .r3d-meter { width: 170px; }
+  /* On a phone the fight itself and the raid frames are what matter. */
+  .r3d-log,
+  .r3d-meter { display: none; }
 }
