@@ -1911,11 +1911,17 @@
     const focus = (spoop.activity && spoop.activity.skills) || [spoop.activity.skill];
     const skills = spoop.skills.map((s) => {
       const training = focus.indexOf(s.id) >= 0;
-      return '<div class="flex items-center gap-2 py-1' + (training ? ' text-amber-200' : '') + '">' +
+      const xp = Number(s.xp || 0).toLocaleString();
+      const left = Number(s.toNext || 0);
+      const tip = left
+        ? '<p class="skill-tip-xp">' + left.toLocaleString() + ' XP to ' + (s.level + 1) + '</p><p>' + xp + ' XP</p>'
+        : '<p class="skill-tip-xp">' + xp + ' XP</p><p>Level ' + s.level + '</p>';
+      return '<div class="skill-row flex items-center gap-2' + (training ? ' text-amber-200' : '') + '" tabindex="0" role="button" aria-label="' + escapeHtml(s.name) + ' experience">' +
         '<img src="' + SKILL_ICON[s.id] + '" alt="" width="16" height="16" class="shrink-0">' +
         '<span class="w-16 text-sm">' + escapeHtml(s.name) + '</span>' +
         '<span class="w-8 text-right text-slate-100 tabular-nums">' + s.level + '</span>' +
         bar(s.progress) +
+        '<div class="skill-tip" role="tooltip">' + tip + '</div>' +
       '</div>';
     }).join('');
     const statsHtml = renderCombatStats(spoop.combatStats);
@@ -2120,6 +2126,7 @@
       btn.addEventListener('click', () => chooseFocus(spoopKey(spoop), btn.getAttribute('data-focus'), spoop.focus || ''));
     });
     bindDuelBar(root);
+    bindSkillRows(root);
     const sendDuelBtn = root.querySelector('[data-duel-send]');
     if (sendDuelBtn) sendDuelBtn.addEventListener('click', () => sendDuel(spoopKey(spoop)));
     const duelGold = root.querySelector('[data-duel-gold]');
@@ -2553,6 +2560,42 @@
     } finally {
       wearing = false;
     }
+  }
+
+  let skillTipsBound = false;
+
+  function bindSkillTips() {
+    if (skillTipsBound) return;
+    skillTipsBound = true;
+    document.addEventListener('pointerdown', (ev) => {
+      if (ev.target.closest && ev.target.closest('.skill-row')) return;
+      document.querySelectorAll('.skill-row.is-open').forEach((row) => row.classList.remove('is-open'));
+    });
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key !== 'Escape') return;
+      document.querySelectorAll('.skill-row.is-open').forEach((row) => row.classList.remove('is-open'));
+    });
+  }
+
+  function bindSkillRows(root) {
+    bindSkillTips();
+    root.querySelectorAll('.skill-row').forEach((row) => {
+      const toggle = () => {
+        const open = row.classList.contains('is-open');
+        document.querySelectorAll('.skill-row.is-open').forEach((other) => other.classList.remove('is-open'));
+        if (!open) row.classList.add('is-open');
+      };
+      row.addEventListener('pointerup', (ev) => {
+        if (ev.pointerType === 'mouse') return;
+        ev.preventDefault();
+        toggle();
+      });
+      row.addEventListener('keydown', (ev) => {
+        if (ev.key !== 'Enter' && ev.key !== ' ') return;
+        ev.preventDefault();
+        toggle();
+      });
+    });
   }
 
   function bindDuelBar(root) {
