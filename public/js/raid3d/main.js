@@ -7,6 +7,7 @@ import { buildSpoop, attackKind, attackDuration, projectileKind, ATTACK_IMPACT }
 import { buildBoss } from './boss.js';
 import { createFx } from './fx.js';
 import { createDirector } from './camera.js';
+import { createSound } from './sound.js';
 
 // Same pacing as /js/arena.js: fight seconds advance at speed x PACE per real second.
 const PACE = 0.55;
@@ -37,6 +38,8 @@ const partyEl = $('r3d-party');
 const meterEl = $('r3d-meter');
 const meterRows = meterEl.querySelector('.r3d-meter-rows');
 const calloutEl = $('r3d-callout');
+const soundBtn = $('r3d-sound');
+const sound = createSound();
 const METER_ROW = 22;
 
 const world = createWorld(canvas);
@@ -1087,6 +1090,44 @@ function introAt() {
   return Math.max(0, Math.min(1, (live.clock - seg.start) / (seg.end - seg.start)));
 }
 
+function paintSound() {
+  soundBtn.classList.toggle('is-off', !sound.on);
+  soundBtn.setAttribute('aria-pressed', sound.on ? 'true' : 'false');
+  soundBtn.setAttribute('aria-label', sound.on ? 'Turn sound off' : 'Turn sound on');
+  soundBtn.title = sound.on ? 'Sound on' : 'Sound off';
+}
+paintSound();
+soundBtn.addEventListener('click', () => {
+  sound.setOn(!sound.on);
+  paintSound();
+});
+window.addEventListener('pointerdown', () => sound.unlock());
+window.addEventListener('keydown', () => sound.unlock());
+
+// Fight music under a live raid, a victory sting when the party clears it, and the arena's
+// hit and boss cues while a fight's clock is moving forward.
+let soundAt = 0;
+function syncSound() {
+  const liveOn = !!(live && live.segs);
+  const seg = liveOn && live.seg;
+  let mode = 'off';
+  if (liveOn && seg) {
+    const cleared = !!(live.raid && live.raid.cleared);
+    mode = seg.kind === 'recap' ? (cleared ? 'victory' : 'off') : 'fight';
+  } else if (bout && !preview) {
+    const wiped = !!(bout.loot && bout.loot.wiped);
+    mode = ended ? (wiped ? 'off' : 'victory') : 'fight';
+  }
+  sound.music(mode);
+  const fighting = bout && !preview && (liveOn ? seg && seg.kind === 'fight' : true);
+  if (!fighting) {
+    soundAt = t;
+    return;
+  }
+  sound.cue(bout, soundAt, t);
+  soundAt = t;
+}
+
 let lastNow = performance.now();
 function frame(now) {
   requestAnimationFrame(frame);
@@ -1112,12 +1153,14 @@ function frame(now) {
     world.update(dt);
     director.update({ t, actors, boss: bossActor(), intro: introAt() });
     drawOverlay();
+    syncSound();
     if (!liveOn) {
       if (!dragging) scrub.value = String(t);
       clockEl.textContent = t.toFixed(1) + 's';
     }
   } else {
     director.update({ t, actors, boss: null });
+    syncSound();
   }
   world.renderer.render(world.scene, world.camera);
 }
@@ -1130,6 +1173,7 @@ window.raid3d = {
   get actors() { return actors; },
   get bout() { return bout; },
   get live() { return live; },
+  sound,
   seek(time) {
     t = Number(time) || 0;
     snapFacing = true;

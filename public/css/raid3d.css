@@ -575,6 +575,21 @@
 
 .r3d-view button[hidden] { display: none; }
 
+.r3d-sound {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: #e2e8f0;
+}
+.r3d-sound svg { width: 16px; height: 16px; display: block; }
+.r3d-sound .icon-off { display: none; }
+.r3d-sound.is-off { color: #94a3b8; }
+.r3d-sound.is-off .icon-on { display: none; }
+.r3d-sound.is-off .icon-off { display: block; }
+
 .r3d-cams {
   display: flex;
   padding: 2px;
