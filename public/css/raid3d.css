@@ -6,6 +6,12 @@
 
 .r3d-back:hover { color: #7dd3fc; }
 
+/* The live watch link (?live): just the show, with a way home. */
+.r3d-home { display: none; }
+.r3d-page.is-watch .r3d-home { display: inline; font-size: 13px; }
+.r3d-page.is-watch .arena-bar > :not(.r3d-home),
+.r3d-page.is-watch .r3d-transport { display: none; }
+
 .r3d-status {
   margin: 0;
   font-size: 12px;

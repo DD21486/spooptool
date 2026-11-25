@@ -11,7 +11,7 @@ import { createDirector } from './camera.js';
 // Same pacing as /js/arena.js: fight seconds advance at speed x PACE per real second.
 const PACE = 0.55;
 const SPLAT_LIFE = 0.95;
-const PREVIEW_LOOP = 12;
+const PREVIEW_LOOP = 30;
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('r3d-canvas');
@@ -504,7 +504,45 @@ function bossActor() {
   return null;
 }
 
-// The party standing in a line before a fight, each swinging on a loop, so gear and
+const WANDER_SPEED = 3.5;
+
+// One spoop's warm-up loop: amble to a few spots near home, idle a bit at each, and be back
+// home by the end of the loop so it repeats without a jump.
+function wander(i, hx, hy) {
+  let s = (i + 1) * 7919;
+  const rand = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  const pts = [[0, hx, hy, '']];
+  const rests = [];
+  let at = 0.4 + rand() * 2.5;
+  let x = hx;
+  let y = hy;
+  rests.push([0, at]);
+  for (;;) {
+    const ang = rand() * Math.PI * 2;
+    const r = 3 + rand() * 8;
+    const nx = clamp(hx + Math.cos(ang) * r, 5, 95);
+    const ny = clamp(hy + Math.sin(ang) * r * 0.8, 10, 64);
+    const go = Math.hypot(nx - x, ny - y) / WANDER_SPEED;
+    const back = Math.hypot(nx - hx, ny - hy) / WANDER_SPEED;
+    if (at + go + 4 + back > PREVIEW_LOOP - 0.3) break;
+    pts.push([at, x, y, '']);
+    at += go;
+    x = nx;
+    y = ny;
+    pts.push([at, x, y, '']);
+    const rest = 1.2 + rand() * 2.6;
+    rests.push([at, at + rest]);
+    at += rest;
+  }
+  pts.push([at, x, y, '']);
+  at += Math.hypot(x - hx, y - hy) / WANDER_SPEED;
+  pts.push([at, hx, hy, ''], [1e6, hx, hy, '']);
+  rests.push([at, PREVIEW_LOOP]);
+  return { pts, rests, rand };
+}
+
+// The party milling about before a fight, now and then taking a swing, so gear and
 // animations can be checked without running the fight.
 function showPreview() {
   const list = spoopList.slice(0, 14);
@@ -513,15 +551,14 @@ function showPreview() {
     const weapon = spoop.equipped && spoop.equipped.weapon;
     return { id: 'p' + i, name: spoop.name, equipped: spoop.equipped, style: (weapon && weapon.style) || 'melee', maxHp: 10 };
   });
+  const hits = [];
   const tracks = fighters.map((f, i) => {
     const off = i - (n - 1) / 2;
-    const x = 50 + off * 7.2;
-    const y = 38 - off * off * 0.18;
-    return { id: f.id, pts: [[0, x, y, ''], [1e6, x, y, '']] };
-  });
-  const hits = [];
-  fighters.forEach((f, i) => {
-    for (let at = 1.2 + i * 0.37; at < PREVIEW_LOOP - 0.6; at += 3.1) hits.push({ t: at, from: f.id, to: null, style: f.style });
+    const plan = wander(i, 50 + off * 7.2, 38 - off * off * 0.18);
+    plan.rests.forEach(([a, b]) => {
+      if (b - a > 1.6 && b < PREVIEW_LOOP - 0.6 && plan.rand() < 0.6) hits.push({ t: a + 0.5 + plan.rand() * (b - a - 1.4), from: f.id, to: null, style: f.style });
+    });
+    return { id: f.id, pts: plan.pts };
   });
   hits.sort((a, b) => a.t - b.t);
   loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true });
@@ -642,7 +679,7 @@ function poseSpoop(actor, dead, turn) {
     tmp.subVectors(toWorld(after.x, after.y, tmp2), actor.pos);
     if (tmp.lengthSq() > 1e-5) actor.yaw = approachAngle(actor.yaw, Math.atan2(tmp.x, tmp.z), turn);
   } else if (preview) {
-    actor.yaw = 0;
+    actor.yaw = approachAngle(actor.yaw, 0, turn * 0.4);
   }
   actor.obj.root.rotation.y = actor.yaw;
   actor.obj.pose({
@@ -1329,6 +1366,7 @@ bossEl.addEventListener('change', () => {
 
 // /raid3d.html?live opens straight onto the live raid.
 if (new URLSearchParams(location.search).has('live')) {
+  document.body.classList.add('is-watch');
   bossEl.value = 'live';
   tierEl.disabled = true;
   fightBtn.textContent = 'Watch';
