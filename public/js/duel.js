@@ -35,22 +35,78 @@
     return (data && data.a ? data.a : 'Someone') + ' vs ' + (data && data.b ? data.b : 'someone') + ' · ' + gold + ' gold each';
   }
 
+  function americanOdds(p) {
+    if (!(p > 0) || !(p < 1)) return '';
+    if (Math.abs(p - 0.5) < 0.005) return 'Even';
+    if (p >= 0.5) return '-' + Math.round((100 * p) / (1 - p));
+    return '+' + Math.round((100 * (1 - p)) / p);
+  }
+
+  let paintedSig = '';
+
+  function paintStage(data) {
+    if (!waitEl || !data) return;
+    const sides = Array.isArray(data.sides) && data.sides.length === 2
+      ? data.sides
+      : [{ name: data.a }, { name: data.b }];
+    const winner = data.phase === 'done' ? String(data.winner || '') : '';
+    const sig = JSON.stringify([sides, winner, data.pot, data.stake]);
+    if (sig === paintedSig) return;
+    paintedSig = sig;
+    waitEl.classList.toggle('is-done', !!winner);
+    const potEl = document.getElementById('duel-pot');
+    const stakeEl = document.getElementById('duel-stake');
+    const pot = Number(data.pot) || Number(data.stake || 0) * 2;
+    if (potEl) potEl.textContent = pot.toLocaleString();
+    if (stakeEl) stakeEl.textContent = Number(data.stake || 0).toLocaleString() + ' gold each';
+    sides.forEach((side, i) => {
+      const el = waitEl.querySelector('.duel-side[data-side="' + i + '"]');
+      if (!el) return;
+      const p = Number(side.p);
+      const hasOdds = Number.isFinite(p) && p > 0;
+      el.querySelector('.duel-name').textContent = side.name || '';
+      el.querySelector('.duel-meta').textContent = side.combat
+        ? 'Cb ' + side.combat + ' · Gear ' + Math.round(Number(side.gear) || 0)
+        : '';
+      el.querySelector('.duel-pct').textContent = hasOdds ? Math.round(p * 100) + '%' : '';
+      el.querySelector('.duel-line').textContent = hasOdds ? americanOdds(p) + ' to win' : '';
+      el.classList.toggle('is-fav', hasOdds && p > 0.5);
+      el.classList.toggle('is-winner', !!winner && winner === side.name);
+      el.classList.toggle('is-loser', !!winner && winner !== side.name);
+      el.querySelector('.duel-badge').hidden = !(winner && winner === side.name);
+      const canvas = el.querySelector('.duel-art');
+      if (canvas && window.SpoopArt) {
+        window.SpoopArt.drawSpoop(canvas, { name: side.name, equipped: side.equipped || {} }, { clear: true });
+      }
+    });
+  }
+
   function showWait(data) {
     if (waitEl) waitEl.hidden = false;
     if (countdownEl) countdownEl.textContent = 'Duel';
-    if (waitWhen) waitWhen.textContent = purseLine(data);
+    paintStage(data);
+    if (waitWhen) waitWhen.textContent = data && data.starting ? 'Fighters walking out' : 'until the fight';
     const left = fightAtMs - nowMs();
-    const text = data && data.starting ? 'Walking out' : formatRemain(left);
-    if (waitClock) waitClock.textContent = text;
+    const text = data && data.starting ? 'FIGHT' : formatRemain(left);
+    if (waitClock) {
+      waitClock.textContent = text;
+      waitClock.classList.toggle('is-close', !!(data && data.starting) || left <= 60000);
+    }
     if (statusEl) statusEl.textContent = data && data.starting ? 'The duel is about to start.' : purseLine(data);
   }
 
   function showDone(data) {
     if (waitEl) waitEl.hidden = false;
     if (countdownEl) countdownEl.textContent = 'Duel';
-    if (waitClock) waitClock.textContent = data && data.winner ? data.winner : 'Finished';
-    const gold = Number(data && data.stake || 0).toLocaleString();
-    if (waitWhen) waitWhen.textContent = (data && data.winner ? data.winner + ' won. ' : '') + gold + ' gold each.';
+    paintStage(data);
+    const kicker = document.getElementById('arena-wait-kicker');
+    if (kicker) kicker.textContent = 'Duel over';
+    if (waitClock) {
+      waitClock.textContent = data && data.winner ? data.winner + ' wins' : 'Finished';
+      waitClock.classList.remove('is-close');
+      waitClock.classList.add('is-result');
+    }
+    if (waitWhen) waitWhen.textContent = data && data.winner ? 'and takes the pot' : '';
     if (statusEl) statusEl.textContent = (data && data.winner ? data.winner : 'Someone') + ' won the duel.';
   }
 
