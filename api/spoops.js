@@ -3,6 +3,7 @@ const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, e
 const { publishEvents, publishArena, publishPk, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 const { syncPk } = require('../lib/spoop/pk-settle');
+const { postDuelChallenge } = require('../lib/spoop/discord');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -221,6 +222,7 @@ async function handlePost(req) {
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
     if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    if (result.challenge) await postDuelChallenge(result.challenge);
     if (result.call && await publishEvents([result.call], state)) {
       await save(state, state.clock);
     }

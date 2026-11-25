@@ -2650,11 +2650,35 @@
     if (closer) closer.focus();
   }
 
+  let toastTimer = 0;
+
+  function showToast(text, isError) {
+    let toast = document.querySelector('[data-spoop-toast]');
+    if (!toast) {
+      toast = document.createElement('div');
+      toast.className = 'spoop-toast';
+      toast.setAttribute('data-spoop-toast', '1');
+      toast.setAttribute('role', 'status');
+      toast.setAttribute('aria-live', 'polite');
+      document.body.appendChild(toast);
+    }
+    toast.textContent = text;
+    toast.classList.toggle('is-error', !!isError);
+    toast.classList.remove('is-shown');
+    void toast.offsetWidth;
+    toast.classList.add('is-shown');
+    window.clearTimeout(toastTimer);
+    toastTimer = window.setTimeout(() => toast.classList.remove('is-shown'), 3200);
+  }
+
   async function sendDuel(name) {
     if (settingDuel) return;
     const target = document.querySelector('[data-duel-target]');
     const input = document.querySelector('[data-duel-gold]');
     if (!target || !input) return;
+    const targetName = target.selectedOptions && target.selectedOptions[0]
+      ? target.selectedOptions[0].textContent.trim()
+      : target.value;
     settingDuel = true;
     try {
       const data = await api('/api/spoops', {
@@ -2663,8 +2687,10 @@
         body: JSON.stringify({ action: 'duel', op: 'issue', name, target: target.value, gold: input.value }),
       });
       render(data);
+      const gold = Number(String(input.value).replace(/[^0-9]/g, '')) || 0;
+      showToast('Challenge sent to ' + targetName + (gold ? ' for ' + gold.toLocaleString() + ' gold' : '') + '.');
     } catch (err) {
-      window.alert(err.message);
+      showToast(err.message || 'Could not send the challenge.', true);
     } finally {
       settingDuel = false;
     }
