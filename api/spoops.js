@@ -1,7 +1,8 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, presentDuelWatch, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
+const { syncPk } = require('../lib/spoop/pk-settle');
 
 function cors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -376,10 +377,38 @@ async function handleArena(req, res) {
   }
 }
 
+async function handleDuel(req, res) {
+  if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+  res.setHeader('Cache-Control', 'private, no-store');
+  const token = String(req.query.w || '').trim().slice(0, 40);
+  if (!/^[a-z0-9]+$/i.test(token)) return res.status(404).json({ error: 'That duel is not here.' });
+  try {
+    const view = await locked(async () => {
+      let state = await load();
+      const pending = state && state.pk && state.pk.staked && state.pk.watch === token ? state.pk : null;
+      if (pending && new Date(pending.fightAt) <= new Date()) {
+        await syncPk(new Date());
+        state = await load();
+      }
+      attachReplays(state, await loadReplays());
+      const card = presentDuelWatch(state, token, new Date());
+      if (!card) return null;
+      card.serverNow = new Date().toISOString();
+      return card;
+    });
+    if (!view) return res.status(404).json({ error: 'That duel is not here.' });
+    return res.status(200).json(view);
+  } catch (err) {
+    console.error('duel watch', err && err.message ? err.message : err);
+    return res.status(500).json({ error: 'Could not load the duel' });
+  }
+}
+
 async function handler(req, res) {
   cors(res);
   if (req.method === 'OPTIONS') return res.status(204).end();
   if ((req.query.path || '') === 'arena') return handleArena(req, res);
+  if ((req.query.path || '') === 'duel') return handleDuel(req, res);
   try {
     if (req.method === 'GET' && (req.query.icon === '1' || req.query.icon === 'true')) {
       return proxySprite(req, res);

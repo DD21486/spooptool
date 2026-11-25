@@ -13,6 +13,7 @@
     { "source": "/api/character-snapshot", "destination": "/api/characters-with-snapshots" },
     { "source": "/api/ge-prices", "destination": "/api/aggregate-history?path=ge" },
     { "source": "/api/arena", "destination": "/api/spoops?path=arena" },
+    { "source": "/api/duel", "destination": "/api/spoops?path=duel" },
     { "source": "/w/:token", "destination": "/duel.html?w=:token" },
     { "source": "/api/spoopscore-history", "destination": "/api/characters?path=spoopscore-history" }
   ]
