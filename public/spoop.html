@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Spoop – SpoopTool</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' };</script>
   <link rel="stylesheet" href="/css/runescape-fonts.css" />
@@ -500,5 +508,6 @@
     <div id="spoop-root"></div>
   </div>
   <script src="/js/spoop.js?v=skill-xp"></script>
+  <script type="module" src="/js/raid3d/portrait.js"></script>
 </body>
 </html>

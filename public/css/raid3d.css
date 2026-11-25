@@ -1,0 +1,433 @@
+.r3d-back {
+  font-size: 12px;
+  color: #38bdf8;
+  text-decoration: none;
+}
+
+.r3d-back:hover { color: #7dd3fc; }
+
+.r3d-status {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+}
+
+.r3d-stage {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  background: #8fbbe0;
+}
+
+.r3d-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.r3d-page.is-pixel .r3d-canvas { image-rendering: pixelated; }
+
+.r3d-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+}
+
+/* Overhead name and health bar, OSRS style: green over red, no border radius. */
+.r3d-tag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translate(-50%, -100%);
+  will-change: transform;
+}
+
+.r3d-tag[hidden] { display: none; }
+
+.r3d-tag-name {
+  font-size: 12px;
+  line-height: 1;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #000;
+  white-space: nowrap;
+}
+
+.r3d-page.no-names .r3d-tag-name { display: none; }
+
+.r3d-tag-hp {
+  position: relative;
+  width: 30px;
+  height: 5px;
+  background: #c00000;
+}
+
+.r3d-tag-hp > b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: #00c000;
+}
+
+.r3d-tag.is-dead .r3d-tag-hp { visibility: hidden; }
+.r3d-tag.is-dead .r3d-tag-name { color: #a3a3a3; }
+
+/* Raid frames: one tile per spoop, five to a column, colored by combat style. */
+.r3d-party {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: grid;
+  grid-template-rows: repeat(5, auto);
+  grid-auto-flow: column;
+  grid-auto-columns: 112px;
+  gap: 3px;
+  pointer-events: none;
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+}
+
+.r3d-party:empty { display: none; }
+
+.r3d-unit {
+  position: relative;
+  height: 30px;
+  overflow: hidden;
+  background: #1a1a1a;
+  border: 1px solid #000;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+}
+
+.r3d-unit > b,
+.r3d-unit > i {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+
+.r3d-unit > i { background: rgba(255, 236, 170, 0.55); }
+.r3d-unit > b { background: var(--unit, #3a8a3a); }
+
+.r3d-unit.is-melee { --unit: #a8402c; }
+.r3d-unit.is-ranged { --unit: #4f9a3a; }
+.r3d-unit.is-magic { --unit: #3f6fc8; }
+
+.r3d-unit > span {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  right: 4px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 12px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.r3d-unit > em {
+  position: absolute;
+  right: 4px;
+  bottom: 2px;
+  font-style: normal;
+  font-size: 11px;
+  line-height: 1;
+  color: #f4f4f4;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.r3d-unit.is-hit { border-color: #ff3a3a; box-shadow: inset 0 0 10px rgba(255, 40, 40, 0.75); }
+.r3d-unit.is-low:not(.is-dead) { animation: r3d-low 0.8s ease-in-out infinite; }
+
+@keyframes r3d-low {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(255, 60, 60, 0.4); }
+  50% { box-shadow: inset 0 0 12px rgba(255, 30, 30, 0.9); }
+}
+
+.r3d-unit.is-dead > b,
+.r3d-unit.is-dead > i { display: none; }
+.r3d-unit.is-dead > span { color: #8a8a8a; }
+.r3d-unit.is-dead > em { color: #c04040; }
+
+@media (prefers-reduced-motion: reduce) {
+  .r3d-unit.is-low:not(.is-dead) { animation: none; box-shadow: inset 0 0 10px rgba(255, 30, 30, 0.8); }
+}
+
+/* Hitsplats: red for damage, blue for a zero. */
+.r3d-splat {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 26px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  font-family: "RuneScape Bold 12", "RuneScape", sans-serif;
+  font-size: 13px;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  will-change: transform, opacity;
+}
+
+.r3d-splat::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: #b30d0d;
+  border: 2px solid #4a0505;
+  border-radius: 46% 54% 42% 58% / 52% 44% 56% 48%;
+  box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.25), inset 2px 2px 0 rgba(255, 120, 120, 0.35);
+}
+
+.r3d-splat.is-miss::before {
+  background: #1f4fbf;
+  border-color: #0a1e52;
+  box-shadow: inset -3px -3px 0 rgba(0, 0, 0, 0.25), inset 2px 2px 0 rgba(140, 180, 255, 0.35);
+}
+
+.r3d-splat.is-max::before { background: #d0400d; border-color: #5a1a02; }
+
+.r3d-hz-label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: "RuneScape Bold 12", "RuneScape", sans-serif;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #fde68a;
+  text-shadow: 1px 1px 0 #000;
+  will-change: transform;
+}
+
+.r3d-bossbar {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: min(420px, calc(100% - 32px));
+  transform: translateX(-50%);
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  pointer-events: none;
+}
+
+.r3d-bossbar[hidden] { display: none; }
+
+.r3d-bossbar-line {
+  display: flex;
+  justify-content: space-between;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #000;
+  font-size: 13px;
+}
+
+.r3d-bossbar-track {
+  position: relative;
+  height: 12px;
+  background: #c00000;
+  border: 1px solid #000;
+}
+
+.r3d-bossbar-track > i,
+.r3d-bossbar-track > b {
+  position: absolute;
+  inset: 0 auto 0 0;
+}
+
+.r3d-bossbar-track > i { background: #fde68a; transition: width 0.6s ease-out 0.15s; }
+.r3d-bossbar-track > b { background: #00c000; }
+
+.r3d-bossbar.is-enraged .r3d-bossbar-line { color: #ff8a3d; }
+
+.r3d-banner {
+  position: absolute;
+  top: 18%;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 22px;
+  text-align: center;
+  background: rgba(15, 12, 8, 0.82);
+  border: 2px solid #5a4a2a;
+  color: #ffff00;
+  font-family: "RuneScape Bold 12", "RuneScape", sans-serif;
+  font-size: 22px;
+  text-shadow: 2px 2px 0 #000;
+  pointer-events: none;
+}
+
+.r3d-banner[hidden] { display: none; }
+
+.r3d-banner small {
+  display: block;
+  margin-top: 4px;
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  font-size: 13px;
+  color: #e2e8f0;
+}
+
+.r3d-log {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  margin: 0;
+  padding: 8px 10px;
+  width: min(520px, calc(100% - 20px));
+  min-height: 9.5rem;
+  list-style: none;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #e2e8f0;
+  pointer-events: none;
+}
+
+.r3d-log:empty { display: none; }
+
+/* Damage meter: one bar per spoop, re-sorted as the ranking changes. Rows slide to their new place. */
+.r3d-meter {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  width: min(300px, calc(100% - 20px));
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  pointer-events: none;
+}
+
+.r3d-meter[hidden] { display: none; }
+
+.r3d-meter header {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 4px 4px;
+  font-size: 12px;
+  color: #ffff00;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.r3d-meter-rows { position: relative; }
+
+.r3d-dps {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 20px;
+  background: #1a1a1a;
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+  will-change: transform;
+}
+
+.r3d-dps > b {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--unit, #a8402c);
+  opacity: 0.85;
+  transition: width 0.3s ease-out;
+}
+
+.r3d-dps.is-melee { --unit: #a8402c; }
+.r3d-dps.is-ranged { --unit: #4f9a3a; }
+.r3d-dps.is-magic { --unit: #3f6fc8; }
+.r3d-dps.is-dead > b { opacity: 0.35; }
+
+.r3d-dps > span,
+.r3d-dps > em {
+  position: absolute;
+  top: 3px;
+  font-size: 12px;
+  line-height: 1.1;
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  white-space: nowrap;
+}
+
+.r3d-dps > span { left: 5px; right: 92px; overflow: hidden; text-overflow: ellipsis; }
+.r3d-dps > em { right: 5px; font-style: normal; font-variant-numeric: tabular-nums; }
+
+@media (prefers-reduced-motion: reduce) {
+  .r3d-dps, .r3d-dps > b { transition: none; }
+}
+.r3d-log .is-hit { color: #ffb4a8; }
+.r3d-log .is-miss { color: #9cc3ff; }
+.r3d-log .is-dead { color: #ff5c5c; }
+
+.r3d-view {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 6px;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.r3d-view label { display: flex; align-items: center; gap: 4px; }
+
+.r3d-view button[hidden] { display: none; }
+
+.r3d-cams {
+  display: flex;
+  padding: 2px;
+  background: #1e293b;
+  border-radius: 999px;
+}
+
+.r3d-view .r3d-cams button { background: transparent; color: #cbd5e1; }
+
+.r3d-view .r3d-cams button[aria-pressed="true"] { background: #b45309; color: #fff7ed; }
+
+.r3d-view button,
+.r3d-transport button {
+  border: 0;
+  border-radius: 999px;
+  background: #334155;
+  color: #f1f5f9;
+  font-size: 12px;
+  padding: 3px 10px;
+}
+
+.r3d-view button:hover,
+.r3d-transport button:hover { background: #475569; }
+
+.r3d-transport {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  background: #0b1220;
+  border-top: 1px solid #1e293b;
+  flex: 0 0 auto;
+}
+
+.r3d-transport input[type="range"] { flex: 1 1 auto; min-width: 0; }
+
+.r3d-clock {
+  min-width: 4.5rem;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: #94a3b8;
+  text-align: right;
+}
+
+@media (max-width: 640px) {
+  .r3d-party { grid-auto-columns: 78px; }
+  .r3d-unit { height: 24px; }
+  .r3d-unit > span { font-size: 10px; }
+  .r3d-unit > em { font-size: 10px; }
+  .r3d-view { top: auto; bottom: 10px; right: 10px; }
+  .r3d-log { display: none; }
+  .r3d-meter { width: 170px; }
+}

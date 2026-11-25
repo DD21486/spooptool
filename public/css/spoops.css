@@ -1196,6 +1196,9 @@ body[data-page="list"] #spoop-root {
   pointer-events: none;
 }
 
+.spoop-hero .spoop-sprite-3d { cursor: grab; touch-action: pan-y; }
+.spoop-hero .spoop-sprite-3d:active { cursor: grabbing; }
+
 .spoop-hero .spoop-sprite {
   position: relative;
   z-index: 1;

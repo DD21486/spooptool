@@ -2111,6 +2111,10 @@
       '</section>';
 
     drawSpoop(document.getElementById('spoop-hero'), spoop, { clear: true });
+    // The 3D portrait (/js/raid3d/portrait.js) takes over the hero once it loads; the sprite stays as the fallback.
+    const portraitEl = root.querySelector('.spoop-portrait');
+    window.__spoopHero = { container: portraitEl, spoop };
+    if (window.SpoopPortrait) window.SpoopPortrait.show(portraitEl, spoop);
     closeGearMenu();
     root.querySelectorAll('[data-equipmode]').forEach((btn) => {
       btn.addEventListener('click', () => chooseEquipMode(

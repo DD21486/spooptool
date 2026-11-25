@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex" />
+  <title>3D Raid – SpoopTool</title>
+  <link rel="stylesheet" href="/css/runescape-fonts.css" />
+  <link rel="stylesheet" href="/css/arena.css" />
+  <link rel="stylesheet" href="/css/raid3d.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body class="arena-page r3d-page">
+  <header class="arena-bar">
+    <a href="/raid.html" class="r3d-back">2D raid</a>
+    <div id="pit-picks" class="pit-picks"></div>
+    <div class="pit-controls">
+      <label>Boss
+        <select id="r3d-boss">
+          <option value="elvarg" selected>Elvarg</option>
+          <option value="mole">Giant Mole</option>
+          <option value="brutus">Brutus</option>
+          <option value="scurrius">Scurrius</option>
+          <option value="chaos">Chaos Elemental</option>
+          <option value="leviathan">The Leviathan</option>
+          <option value="obor">Obor</option>
+          <option value="bryophyta">Bryophyta</option>
+          <option value="kbd">King Black Dragon</option>
+          <option value="vorkath">Vorkath</option>
+          <option value="kq">Kalphite Queen</option>
+        </select>
+      </label>
+      <label>Tier
+        <select id="r3d-tier">
+          <option value="trivial">Trivial</option>
+          <option value="easy" selected>Easy</option>
+          <option value="medium">Medium</option>
+          <option value="tough">Tough</option>
+          <option value="hard">Hard</option>
+          <option value="elite">Elite</option>
+          <option value="master">Master</option>
+          <option value="god">God</option>
+        </select>
+      </label>
+      <label>Seed <input id="r3d-seed" type="text" autocomplete="off" spellcheck="false" /></label>
+      <label>Speed
+        <select id="r3d-speed">
+          <option value="0.25">Slow-mo</option>
+          <option value="0.75">Slow</option>
+          <option value="1.5" selected>Normal</option>
+          <option value="3">Fast</option>
+        </select>
+      </label>
+      <button type="button" id="r3d-fight">Fight</button>
+      <button type="button" id="r3d-replay">Replay</button>
+      <p id="r3d-status" class="r3d-status">Pick the party and send them in.</p>
+    </div>
+  </header>
+  <main id="r3d-stage" class="r3d-stage" aria-label="3D raid">
+    <canvas id="r3d-canvas" class="r3d-canvas"></canvas>
+    <div id="r3d-overlay" class="r3d-overlay" aria-hidden="true"></div>
+    <div id="r3d-party" class="r3d-party" aria-label="Party health"></div>
+    <div id="r3d-bossbar" class="r3d-bossbar" hidden>
+      <div class="r3d-bossbar-line"><strong></strong><span></span></div>
+      <div class="r3d-bossbar-track"><i></i><b></b></div>
+    </div>
+    <div id="r3d-banner" class="r3d-banner" hidden></div>
+    <ol id="r3d-log" class="r3d-log"></ol>
+    <section id="r3d-meter" class="r3d-meter" aria-label="Damage meter" hidden>
+      <header><span>Damage</span><span>Total (DPS)</span></header>
+      <div class="r3d-meter-rows"></div>
+    </section>
+    <div class="r3d-view">
+      <label><input type="checkbox" id="r3d-pixel" checked> Pixel</label>
+      <label><input type="checkbox" id="r3d-names" checked> Names</label>
+      <div class="r3d-cams" role="group" aria-label="Camera">
+        <button type="button" data-cam="cinematic" aria-pressed="true">Cinematic</button>
+        <button type="button" data-cam="free" aria-pressed="false">Free cam</button>
+      </div>
+      <button type="button" id="r3d-cam" hidden>Reset</button>
+    </div>
+  </main>
+  <footer class="r3d-transport">
+    <button type="button" id="r3d-pause" aria-label="Pause">Pause</button>
+    <input type="range" id="r3d-scrub" min="0" max="100" step="0.05" value="0" aria-label="Fight timeline" />
+    <span id="r3d-clock" class="r3d-clock">0.0s</span>
+  </footer>
+  <script type="module" src="/js/raid3d/main.js"></script>
+</body>
+</html>

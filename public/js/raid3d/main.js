@@ -1,0 +1,1118 @@
+// The 3D raid test page. The server runs the fight exactly as it does for /raid.html and sends
+// back the same timeline (tracks, hits, deaths, hazards). This file only draws it, so any frame
+// is a function of fight time: pause, scrub, and orbit the camera to look at a pose.
+import * as THREE from 'three';
+import { createWorld, toWorld, K, BOSS_SCENE } from './world.js';
+import { buildSpoop, attackKind, attackDuration, projectileKind, ATTACK_IMPACT } from './character.js';
+import { buildBoss } from './boss.js';
+import { createFx } from './fx.js';
+import { createDirector } from './camera.js';
+
+// Same pacing as /js/arena.js: fight seconds advance at speed x PACE per real second.
+const PACE = 0.55;
+const SPLAT_LIFE = 0.95;
+const PREVIEW_LOOP = 12;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('r3d-canvas');
+const stage = $('r3d-stage');
+const overlay = $('r3d-overlay');
+const picks = $('pit-picks');
+const bossEl = $('r3d-boss');
+const tierEl = $('r3d-tier');
+const seedEl = $('r3d-seed');
+const speedEl = $('r3d-speed');
+const fightBtn = $('r3d-fight');
+const replayBtn = $('r3d-replay');
+const statusEl = $('r3d-status');
+const bannerEl = $('r3d-banner');
+const logEl = $('r3d-log');
+const bossBar = $('r3d-bossbar');
+const pauseBtn = $('r3d-pause');
+const scrub = $('r3d-scrub');
+const clockEl = $('r3d-clock');
+const pixelBox = $('r3d-pixel');
+const namesBox = $('r3d-names');
+const partyEl = $('r3d-party');
+const meterEl = $('r3d-meter');
+const meterRows = meterEl.querySelector('.r3d-meter-rows');
+const METER_ROW = 22;
+
+const world = createWorld(canvas);
+const fx = createFx(world.scene);
+const director = createDirector(world);
+
+let bout = null;
+let preview = false;
+let actors = new Map();
+let t = 0;
+let endAt = 0;
+let playing = false;
+let ended = false;
+let snapFacing = true;
+let dragging = false;
+let busy = false;
+let lastData = null;
+let spoopList = [];
+
+function readPref(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v == null ? fallback : v === 'on';
+  } catch (err) {
+    return fallback;
+  }
+}
+
+function writePref(key, on) {
+  try { localStorage.setItem(key, on ? 'on' : 'off'); } catch (err) { /* private mode */ }
+}
+
+function applyView() {
+  document.body.classList.toggle('is-pixel', pixelBox.checked);
+  document.body.classList.toggle('no-names', !namesBox.checked);
+  world.setPixel(pixelBox.checked);
+}
+
+pixelBox.checked = readPref('r3d-pixel', true);
+namesBox.checked = readPref('r3d-names', true);
+pixelBox.addEventListener('change', () => { writePref('r3d-pixel', pixelBox.checked); applyView(); });
+namesBox.addEventListener('change', () => { writePref('r3d-names', namesBox.checked); applyView(); });
+const camButtons = Array.from(document.querySelectorAll('[data-cam]'));
+const resetBtn = $('r3d-cam');
+function paintCam(mode) {
+  camButtons.forEach((btn) => btn.setAttribute('aria-pressed', btn.dataset.cam === mode ? 'true' : 'false'));
+  resetBtn.hidden = mode !== 'free';
+}
+camButtons.forEach((btn) => btn.addEventListener('click', () => {
+  director.setMode(btn.dataset.cam);
+  try { localStorage.setItem('r3d-cam', btn.dataset.cam); } catch (err) { /* private mode */ }
+}));
+director.onMode(paintCam);
+resetBtn.addEventListener('click', () => world.resetCamera());
+try {
+  if (localStorage.getItem('r3d-cam') === 'free') director.setMode('free');
+} catch (err) { /* private mode */ }
+paintCam(director.mode);
+new ResizeObserver(() => world.resize()).observe(stage);
+applyView();
+
+// ---- Timeline helpers (same reading of a track as /js/arena.js) ----
+
+function sampleTrack(pts, time) {
+  if (!pts.length) return { x: 50, y: 36, moving: false, target: null };
+  if (time + 0.001 < pts[0][0]) return { hidden: true, x: pts[0][1], y: pts[0][2], target: null };
+  if (time <= pts[0][0]) return { x: pts[0][1], y: pts[0][2], target: pts[0][3] || null };
+  const last = pts[pts.length - 1];
+  if (time >= last[0]) return { x: last[1], y: last[2], target: last[3] || null, i: pts.length - 1 };
+  let lo = 0;
+  let hi = pts.length - 1;
+  while (lo < hi - 1) {
+    const mid = (lo + hi) >> 1;
+    if (pts[mid][0] <= time) lo = mid;
+    else hi = mid;
+  }
+  const a = pts[lo];
+  const b = pts[hi];
+  if (b[4] === 'up') return { x: a[1], y: a[2], buried: true, target: a[3] || null, i: lo };
+  const u = (time - a[0]) / (b[0] - a[0] || 1);
+  return { x: a[1] + (b[1] - a[1]) * u, y: a[2] + (b[2] - a[2]) * u, target: a[3] || null, i: lo, u };
+}
+
+// Walked distance in world units up to a point in time, for the stride.
+function walkedAt(actor, time, pos) {
+  const pts = actor.pts;
+  if (!pts.length || pos.i == null) return 0;
+  const a = pts[pos.i];
+  const b = pts[pos.i + 1];
+  const extra = pos.u && b ? Math.hypot(b[1] - a[1], b[2] - a[2]) * pos.u * K : 0;
+  return actor.cum[pos.i] + extra + (pos.scramble || 0) * K;
+}
+
+function lastIndexAtOrBefore(list, time, key) {
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid][key || 't'] <= time) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo - 1;
+}
+
+// A boss whose first hit lands near full health shows that as its pool, as /js/arena.js does.
+function poolMaxHp(fight, fighter) {
+  const listed = Math.max(1, Number(fighter.maxHp) || 1);
+  if (Number(fighter.startHp) > 0) return listed;
+  const hit = (fight.hits || []).find((h) => h && h.to === fighter.id);
+  if (!hit) return listed;
+  const before = (Number(hit.hp) || 0) + (!hit.miss && hit.amount > 0 ? hit.amount : 0);
+  return before >= listed * 0.75 && before <= listed * 1.25 ? Math.max(1, Math.round(before)) : listed;
+}
+
+// ---- Dodging, retimed for tension ----
+// The engine decides who gets hit. It moves dodgers out early and leaves the unlucky standing
+// still, which gives the outcome away. Here the same outcome plays later and messier: a dodger
+// holds their ground and breaks out at the last moment, and someone who is going to be hit
+// scrambles for the edge and comes up short. Where everyone stands when the attack lands is unchanged.
+
+function hazardEdge(hz, x, y) {
+  // Distance from (x, y) to the edge of the warning, positive inside, and the way out.
+  const r = Number(hz.r) || 0;
+  if (hz.kind === 'lane') {
+    const ax = Number(hz.x1);
+    const ay = Number(hz.y1);
+    const dx = Number(hz.x2) - ax;
+    const dy = Number(hz.y2) - ay;
+    const len2 = dx * dx + dy * dy || 1;
+    const u = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / len2));
+    const px = x - (ax + dx * u);
+    const py = y - (ay + dy * u);
+    const d = Math.hypot(px, py);
+    const len = Math.sqrt(len2);
+    const out = d > 0.01 ? [px / d, py / d] : [-dy / len, dx / len];
+    return { inside: Number(hz.w) / 2 - d, out };
+  }
+  const dx = x - Number(hz.x);
+  const dy = y - Number(hz.y);
+  const d = Math.hypot(dx, dy);
+  const out = d > 0.01 ? [dx / d, dy / d] : [1, 0];
+  if (hz.kind === 'cone') {
+    let da = Math.atan2(dy, dx) - Number(hz.a);
+    while (da > Math.PI) da -= Math.PI * 2;
+    while (da < -Math.PI) da += Math.PI * 2;
+    const inArc = Math.abs(da) <= Number(hz.arc);
+    return { inside: inArc ? Math.min(r - d, (Number(hz.arc) - Math.abs(da)) * d) : -1, out };
+  }
+  return { inside: r - d, out };
+}
+
+function seededFor(a, b) {
+  let h = 2166136261;
+  const str = a + '|' + b;
+  for (let i = 0; i < str.length; i++) h = Math.imul(h ^ str.charCodeAt(i), 16777619);
+  return ((h >>> 0) % 10000) / 10000;
+}
+
+function planDodges(actor, hazards) {
+  actor.warps = [];
+  actor.scrambles = [];
+  actor.braces = [];
+  hazards.forEach((hz) => {
+    const span = Number(hz.t1) - Number(hz.t0);
+    if (!(span > 0.45) || hz.attack === 'rocks') return;
+    if (actor.deathT != null && actor.deathT <= hz.t1) return;
+    const end = sampleTrack(actor.pts, hz.t1);
+    if (end.hidden) return;
+    let entered = null;
+    let lastIn = null;
+    for (let tt = Number(hz.t0); tt < hz.t1; tt += 0.1) {
+      const p = sampleTrack(actor.pts, tt);
+      if (hazardEdge(hz, p.x, p.y).inside > 0) {
+        if (entered == null) entered = tt;
+        lastIn = tt;
+      }
+    }
+    const roll = seededFor(actor.f.id, hz.id || hz.t0);
+    const caught = hazardEdge(hz, end.x, end.y);
+    if (caught.inside <= 0 && entered != null) {
+      // A dodger: hold, then break for it. Some cut it finer than others.
+      const dash = Math.max(0.3, span * (0.2 + roll * 0.3));
+      const hold = Number(hz.t1) - dash;
+      if (lastIn < hold) actor.warps.push({ from: entered, hold, t1: Number(hz.t1), roll });
+      return;
+    }
+    if (caught.inside > 0) {
+      // Caught: most try to get out and don't make it. The rest brace for it.
+      if (roll < 0.72 && caught.inside > 0.8) {
+        const room = Math.min(3.2, (caught.inside - 0.6) * (0.55 + roll * 0.4));
+        const start = Number(hz.t1) - Math.min(0.65, span * 0.55);
+        actor.scrambles.push({ start, t1: Number(hz.t1), amp: room, dir: caught.out });
+      } else {
+        actor.braces.push({ start: Number(hz.t1) - Math.min(0.6, span * 0.5), t1: Number(hz.t1) });
+      }
+    }
+  });
+}
+
+function easeInOut(u) {
+  return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
+}
+
+// The track as shown: retimed through dodges, nudged by scrambles.
+function posAt(actor, time) {
+  let tt = time;
+  let shuffle = 0;
+  const warps = actor.warps || [];
+  for (let i = 0; i < warps.length; i++) {
+    const w = warps[i];
+    if (time < w.from || time > w.t1) continue;
+    if (time < w.hold) {
+      tt = w.from;
+      shuffle = Math.sin(time * (5 + w.roll * 3)) * 0.35;
+    } else {
+      tt = w.from + easeInOut((time - w.hold) / (w.t1 - w.hold)) * (w.t1 - w.from);
+    }
+    break;
+  }
+  const p = sampleTrack(actor.pts, tt);
+  if (shuffle) p.x += shuffle;
+  const scrambles = actor.scrambles || [];
+  for (let i = 0; i < scrambles.length; i++) {
+    const s = scrambles[i];
+    let k = 0;
+    if (time >= s.start && time <= s.t1) k = easeInOut((time - s.start) / (s.t1 - s.start));
+    else if (time > s.t1 && time < s.t1 + 0.7) k = 1 - (time - s.t1) / 0.7;
+    if (k <= 0) continue;
+    p.x += s.dir[0] * s.amp * k;
+    p.y += s.dir[1] * s.amp * k;
+    p.scramble = s.amp * k * (time <= s.t1 ? 1 : 0);
+  }
+  return p;
+}
+
+function braceAt(actor, time) {
+  const braces = actor.braces || [];
+  for (let i = 0; i < braces.length; i++) {
+    const b = braces[i];
+    if (time >= b.start && time <= b.t1 + 0.15) return Math.min(1, (time - b.start) / 0.25);
+  }
+  return 0;
+}
+
+// ---- Building a fight ----
+
+function clearActors() {
+  actors.forEach((actor) => {
+    actor.obj.root.removeFromParent();
+    if (actor.tag) actor.tag.remove();
+  });
+  actors = new Map();
+  overlay.innerHTML = '';
+  partyEl.innerHTML = '';
+  meterRows.innerHTML = '';
+  meterSig = '';
+  splats.clear();
+  hzLabels.clear();
+  logEl.innerHTML = '';
+  logSig = '';
+  fx.clear();
+}
+
+function makeTag(fighter, isBoss) {
+  const el = document.createElement('div');
+  el.className = 'r3d-tag';
+  el.innerHTML = (isBoss ? '' : '<span class="r3d-tag-name"></span>') + '<span class="r3d-tag-hp"><b></b></span>';
+  const name = el.querySelector('.r3d-tag-name');
+  if (name) name.textContent = fighter.name;
+  overlay.appendChild(el);
+  return { el, bar: el.querySelector('.r3d-tag-hp > b') };
+}
+
+// A raid frame: name, health bar with a trail for damage just taken, and hp %.
+function makeUnit(fighter) {
+  const el = document.createElement('div');
+  const style = (fighter.equipped && fighter.equipped.weapon && fighter.equipped.weapon.style) || fighter.style || 'melee';
+  el.className = 'r3d-unit is-' + style;
+  el.innerHTML = '<i></i><b></b><span></span><em></em>';
+  el.querySelector('span').textContent = fighter.name;
+  el.title = fighter.name;
+  partyEl.appendChild(el);
+  return { el, fill: el.querySelector('b'), trail: el.querySelector('i'), pct: el.querySelector('em'), last: '' };
+}
+
+function makeMeter(fighter) {
+  const el = document.createElement('div');
+  const style = (fighter.equipped && fighter.equipped.weapon && fighter.equipped.weapon.style) || fighter.style || 'melee';
+  el.className = 'r3d-dps is-' + style;
+  el.innerHTML = '<b></b><span></span><em></em>';
+  el.querySelector('span').textContent = fighter.name;
+  meterRows.appendChild(el);
+  return { el, bar: el.querySelector('b'), num: el.querySelector('em') };
+}
+
+function damageAt(actor, time) {
+  const list = actor.dealt;
+  let lo = 0;
+  let hi = list.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (list[mid][0] <= time) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo ? list[lo - 1][1] : 0;
+}
+
+let meterSig = '';
+// Ranked by damage so far. DPS is damage over the time they have been fighting.
+function paintMeter() {
+  if (preview) return;
+  const rows = [];
+  actors.forEach((actor) => {
+    if (!actor.meter) return;
+    const dmg = damageAt(actor, t);
+    const stop = actor.deathT != null && t > actor.deathT ? actor.deathT : t;
+    const dps = stop > 1 ? dmg / stop : 0;
+    rows.push({ actor, dmg, dps });
+  });
+  rows.sort((a, b) => b.dmg - a.dmg || a.actor.f.name.localeCompare(b.actor.f.name));
+  const top = rows.length ? Math.max(1, rows[0].dmg) : 1;
+  const sig = rows.map((r) => r.actor.f.id + ':' + r.dmg + ':' + r.dps.toFixed(1)).join('|');
+  if (sig === meterSig) return;
+  meterSig = sig;
+  rows.forEach((row, i) => {
+    const m = row.actor.meter;
+    m.el.style.transform = 'translateY(' + (i * METER_ROW) + 'px)';
+    m.bar.style.width = (row.dmg / top * 100).toFixed(1) + '%';
+    m.num.textContent = row.dmg.toLocaleString('en-US') + ' (' + row.dps.toFixed(1) + ')';
+    m.el.classList.toggle('is-dead', row.actor.deathT != null && t >= row.actor.deathT);
+  });
+}
+
+function paintUnit(actor) {
+  const u = actor.unit;
+  if (!u) return;
+  const dead = actor.deathT != null && t >= actor.deathT;
+  const now = Math.max(0, Math.min(1, hpAt(actor, t) / actor.maxHp));
+  // The trail holds where the bar was a moment ago, then drains down to it.
+  const before = Math.max(0, Math.min(1, hpAt(actor, t - 0.8) / actor.maxHp));
+  const hurt = !dead && hurtAt(actor, t) > 0;
+  const sig = (dead ? 'd' : '') + now.toFixed(3) + '|' + before.toFixed(3) + (hurt ? 'h' : '');
+  if (sig === u.last) return;
+  u.last = sig;
+  u.fill.style.width = (now * 100).toFixed(1) + '%';
+  u.trail.style.width = (Math.max(now, before) * 100).toFixed(1) + '%';
+  u.pct.textContent = dead ? 'Dead' : Math.ceil(now * 100) + '%';
+  u.el.classList.toggle('is-dead', dead);
+  u.el.classList.toggle('is-hit', hurt);
+  u.el.classList.toggle('is-low', !dead && now < 0.3);
+}
+
+function loadFight(fight, opts) {
+  clearActors();
+  bout = fight;
+  preview = !!(opts && opts.preview);
+  const tracks = {};
+  (fight.tracks || []).forEach((tr) => { tracks[tr.id] = tr.pts || []; });
+  const hits = fight.hits || [];
+  const fighters = fight.fighters || [];
+
+  fighters.forEach((f) => {
+    const pts = tracks[f.id] || [];
+    const cum = [0];
+    for (let i = 1; i < pts.length; i++) {
+      const jump = pts[i][4] === 'up';
+      cum.push(cum[i - 1] + (jump ? 0 : Math.hypot(pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]) * K));
+    }
+    const monster = !!f.monster;
+    const obj = monster ? buildBoss(f) : buildSpoop(f);
+    world.scene.add(obj.root);
+    const maxHp = poolMaxHp(fight, f);
+    const start = Number(f.startHp) > 0 ? Math.min(Number(f.startHp), maxHp) : maxHp;
+    const tag = makeTag(f, monster && !f.minion);
+    const unit = monster ? null : makeUnit(f);
+    const meter = monster || preview ? null : makeMeter(f);
+    const buried = [];
+    for (let i = 1; i < pts.length; i++) if (pts[i][4] === 'up') buried.push([pts[i - 1][0], pts[i][0]]);
+    actors.set(f.id, {
+      f, obj, pts, cum, monster, maxHp, startHp: start, buried,
+      tag: tag && tag.el, bar: tag && tag.bar, unit, meter, dealt: [],
+      yaw: monster ? 0 : Math.PI, attacks: [], winds: [], strikes: [], hitsOn: [], deathT: null,
+      anchor: new THREE.Vector3(), pos: new THREE.Vector3(),
+      appearT: pts.length && pts[0][0] > 0 ? pts[0][0] : null, frozen: [], mad: [],
+    });
+  });
+
+  const boss = bossActor();
+  hits.forEach((hit, idx) => {
+    const from = actors.get(hit.from);
+    const to = actors.get(hit.to);
+    if (to) to.hitsOn.push(idx);
+    if (!from) return;
+    if (!from.monster) {
+      const style = hit.style || from.f.style || 'melee';
+      const kind = attackKind(from.obj.look, style);
+      const dur = attackDuration(kind);
+      const flight = style === 'ranged' ? 0.3 : style === 'magic' ? 0.42 : 0;
+      const launch = hit.t - flight;
+      from.attacks.push({ start: launch - ATTACK_IMPACT[kind] * dur, dur, kind, idx, flight, launch, style });
+      return;
+    }
+    const nearHazard = (fight.hazards || []).some((hz) => Math.abs(hz.t1 - hit.t) < 0.35);
+    if (!nearHazard) from.strikes.push({ start: hit.t - 0.24, end: hit.t + 0.2, idx });
+  });
+  if (boss) {
+    (fight.hazards || []).forEach((hz) => {
+      boss.winds.push({ t0: hz.t0, t1: hz.t1, hz });
+      boss.strikes.push({ start: hz.t1 - 0.14, end: hz.t1 + 0.3, hz });
+    });
+    boss.strikes.sort((a, b) => a.start - b.start);
+  }
+  actors.forEach((actor) => actor.attacks.sort((a, b) => a.start - b.start));
+  // Running damage per spoop, for the meter: [time, total so far].
+  hits.forEach((hit) => {
+    const from = actors.get(hit.from);
+    if (!from || from.monster || hit.miss || !(hit.amount > 0)) return;
+    const prev = from.dealt.length ? from.dealt[from.dealt.length - 1][1] : 0;
+    from.dealt.push([hit.t, prev + hit.amount]);
+  });
+  meterEl.hidden = preview;
+  meterRows.style.height = (fighters.filter((f) => !f.monster).length * METER_ROW) + 'px';
+  (fight.deaths || []).forEach((d) => {
+    const a = actors.get(d.id);
+    if (a && a.deathT == null) {
+      a.deathT = d.t;
+      a.deathBy = d.by;
+    }
+  });
+  actors.forEach((actor) => { if (!actor.monster) planDodges(actor, fight.hazards || []); });
+
+  fx.setHazards(fight.hazards || []);
+  fx.setRubble(fight.rubble || []);
+  world.setScene(preview ? 'grass' : (BOSS_SCENE[boss && boss.f.monster] || 'grass'));
+  // Status effects on spoops: frozen by ice breath, or driven mad.
+  hits.forEach((hit) => {
+    const v = actors.get(hit.to);
+    if (!v || v.monster) return;
+    if (hit.effect === 'freeze') v.frozen.push([hit.t, Number(hit.until) || hit.t + 3]);
+    if (hit.effect === 'madness') v.mad.push([hit.t, Number(hit.until) || hit.t + 5]);
+  });
+  if (boss) {
+    boss.phases = (fight.phases || []).slice().sort((a, b) => a.t - b.t);
+    boss.baseMax = boss.maxHp;
+  }
+  director.plan({
+    preview,
+    duration: Number(fight.duration) || 0,
+    hazards: fight.hazards || [],
+    deaths: fight.deaths || [],
+    bossId: boss ? boss.f.id : null,
+  });
+  endAt = preview ? PREVIEW_LOOP : (Number(fight.duration) || 0) + 0.8;
+  scrub.max = String(endAt);
+  t = 0;
+  ended = false;
+  snapFacing = true;
+  bannerEl.hidden = true;
+  paintBossBar();
+}
+
+function bossActor() {
+  for (const actor of actors.values()) {
+    if (actor.monster && !actor.f.minion && actor.f.monster !== 'rat') return actor;
+  }
+  return null;
+}
+
+// The party standing in a line before a fight, each swinging on a loop, so gear and
+// animations can be checked without running the fight.
+function showPreview() {
+  const list = spoopList.slice(0, 14);
+  const n = list.length;
+  const fighters = list.map((spoop, i) => {
+    const weapon = spoop.equipped && spoop.equipped.weapon;
+    return { id: 'p' + i, name: spoop.name, equipped: spoop.equipped, style: (weapon && weapon.style) || 'melee', maxHp: 10 };
+  });
+  const tracks = fighters.map((f, i) => {
+    const off = i - (n - 1) / 2;
+    const x = 50 + off * 7.2;
+    const y = 38 - off * off * 0.18;
+    return { id: f.id, pts: [[0, x, y, ''], [1e6, x, y, '']] };
+  });
+  const hits = [];
+  fighters.forEach((f, i) => {
+    for (let at = 1.2 + i * 0.37; at < PREVIEW_LOOP - 0.6; at += 3.1) hits.push({ t: at, from: f.id, to: null, style: f.style });
+  });
+  hits.sort((a, b) => a.t - b.t);
+  loadFight({ fighters, tracks, hits, deaths: [], hazards: [], duration: PREVIEW_LOOP }, { preview: true });
+  playing = true;
+  statusEl.textContent = n ? 'The party, warming up. Pick a boss and fight.' : 'No spoops to show.';
+}
+
+// ---- Per-frame update ----
+
+const tmp = new THREE.Vector3();
+const tmp2 = new THREE.Vector3();
+const mouthAt = new THREE.Vector3();
+const proj = new THREE.Vector3();
+
+function angleTo(from, to) {
+  return Math.atan2(to.x - from.x, to.z - from.z);
+}
+
+function approachAngle(cur, want, k) {
+  let d = want - cur;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return cur + d * k;
+}
+
+function activeAt(list, time, endOf) {
+  for (let i = list.length - 1; i >= 0; i--) {
+    const w = list[i];
+    if (w.start <= time && time < endOf(w)) return w;
+    if (w.start + 5 < time) break;
+  }
+  return null;
+}
+
+function hurtAt(actor, time) {
+  const hits = bout.hits;
+  for (let i = actor.hitsOn.length - 1; i >= 0; i--) {
+    const hit = hits[actor.hitsOn[i]];
+    if (hit.t > time) continue;
+    if (time - hit.t > 0.22) return 0;
+    if (hit.miss || !(hit.amount > 0)) continue;
+    return 1 - (time - hit.t) / 0.22;
+  }
+  return 0;
+}
+
+function hpAt(actor, time) {
+  const hits = bout.hits;
+  for (let i = actor.hitsOn.length - 1; i >= 0; i--) {
+    const hit = hits[actor.hitsOn[i]];
+    if (hit.t <= time) return Math.max(0, Number(hit.hp) || 0);
+  }
+  return actor.startHp;
+}
+
+function sinkAt(actor, time) {
+  if (actor.appearT != null && time >= actor.appearT && time < actor.appearT + 0.4) return 1 - (time - actor.appearT) / 0.4;
+  for (const [s, e] of actor.buried) {
+    if (time >= s && time <= e) return Math.min(1, (time - s) / 0.35);
+    if (time > e && time < e + 0.35) return 1 - (time - e) / 0.35;
+  }
+  return 0;
+}
+
+function screenX(v) {
+  proj.copy(v).project(world.camera);
+  return proj.x;
+}
+
+function update(dt) {
+  const cam = world.camera.position;
+  const turn = snapFacing ? 1 : 1 - Math.exp(-dt * 10);
+  snapFacing = false;
+
+  // Positions first, so facing can look at where everyone is now.
+  actors.forEach((actor) => {
+    const p = actor.monster ? sampleTrack(actor.pts, t) : posAt(actor, t);
+    actor.sample = p;
+    actor.obj.root.visible = !p.hidden;
+    toWorld(p.x, p.y, actor.pos);
+    actor.obj.root.position.copy(actor.pos);
+  });
+
+  actors.forEach((actor) => {
+    if (actor.sample.hidden) return;
+    const dead = actor.deathT != null && t >= actor.deathT;
+    if (!actor.monster) poseSpoop(actor, dead, turn);
+    else poseBoss(actor, dead, cam);
+  });
+
+  world.scene.updateMatrixWorld();
+  const boss = bossActor();
+  const mouth = boss && !boss.sample.hidden && !(boss.deathT != null && t > boss.deathT) && boss.obj.mouthPoint
+    ? boss.obj.mouthPoint(mouthAt) : null;
+  fx.update(t, { mouth });
+  fx.drawProjectiles(preview ? [] : shotsAt());
+}
+
+function poseSpoop(actor, dead, turn) {
+  const p = actor.sample;
+  const before = posAt(actor, t - 0.12);
+  const after = posAt(actor, t + 0.12);
+  const speed = Math.hypot(after.x - before.x, after.y - before.y) * K / 0.24;
+  const move = dead ? 0 : Math.max(0, Math.min(1.5, (speed - 0.08) / 0.6));
+  const swing = dead ? null : activeAt(actor.attacks, t, (w) => w.start + w.dur);
+  const attack = swing ? { kind: swing.kind, u: (t - swing.start) / swing.dur } : null;
+
+  let face = null;
+  const victim = swing && actors.get(bout.hits[swing.idx].to);
+  const killer = dead && actors.get(actor.deathBy);
+  // Go down facing whoever did it, so the body is knocked back away from them.
+  if (killer) face = killer.pos;
+  else if (victim && !victim.sample.hidden) face = victim.pos;
+  else if (p.target && actors.get(p.target)) face = actors.get(p.target).pos;
+  if (face && face.distanceToSquared(actor.pos) > 0.0001) {
+    actor.yaw = approachAngle(actor.yaw, angleTo(actor.pos, face), turn);
+  } else if (move > 0.2) {
+    tmp.subVectors(toWorld(after.x, after.y, tmp2), actor.pos);
+    if (tmp.lengthSq() > 1e-5) actor.yaw = approachAngle(actor.yaw, Math.atan2(tmp.x, tmp.z), turn);
+  } else if (preview) {
+    actor.yaw = 0;
+  }
+  actor.obj.root.rotation.y = actor.yaw;
+  actor.obj.pose({
+    walk: walkedAt(actor, t, p) * (Math.PI * 2 / 1.15),
+    move,
+    attack,
+    hurt: dead ? 0 : hurtAt(actor, t),
+    deathTime: dead ? t - actor.deathT : null,
+    breathe: t + actor.f.id.length,
+    brace: dead ? 0 : braceAt(actor, t),
+    frozen: !dead && inWindow(actor.frozen, t),
+    mad: !dead && inWindow(actor.mad, t),
+  });
+}
+
+function inWindow(list, time) {
+  return list.some(([a, b]) => time >= a && time < b);
+}
+
+// A boss with another form: the art and the size of its bar follow whichever form is up.
+function applyForm(actor) {
+  if (!actor.phases || !actor.phases.length || !actor.obj.setSprite) return;
+  let form = null;
+  actor.phases.forEach((ph) => { if (ph.t <= t) form = ph; });
+  actor.obj.setSprite((form && form.sprite) || actor.f.sprite);
+  actor.maxHp = form && form.hp ? form.hp : actor.baseMax;
+}
+
+function poseBoss(actor, dead, cam) {
+  applyForm(actor);
+  const p = actor.sample;
+  const wind = actor.winds.find((w) => t >= w.t0 && t < w.t1);
+  const strike = dead ? null : activeAt(actor.strikes, t, (w) => w.end);
+  let aim = null;
+  if (strike && strike.hz) aim = hazardAim(strike.hz, tmp);
+  else if (wind) aim = hazardAim(wind.hz, tmp);
+  else if (strike && bout.hits[strike.idx] && actors.get(bout.hits[strike.idx].to)) aim = actors.get(bout.hits[strike.idx].to).pos;
+  else if (p.target && actors.get(p.target)) aim = actors.get(p.target).pos;
+  if (aim) {
+    const dx = screenX(aim) - screenX(actor.pos);
+    if (Math.abs(dx) > 0.01) actor.faceRight = dx > 0;
+  }
+  let lungeDir = null;
+  if (aim) {
+    lungeDir = tmp2.subVectors(aim, actor.pos).setY(0);
+    if (lungeDir.lengthSq() > 1e-5) lungeDir.normalize();
+    else lungeDir = null;
+  }
+  const flat = Math.hypot(cam.x - actor.pos.x, cam.z - actor.pos.z);
+  actor.obj.pose({
+    t,
+    yaw: Math.atan2(cam.x - actor.pos.x, cam.z - actor.pos.z),
+    pitch: Math.atan2(cam.y - actor.obj.height * 0.5, flat),
+    faceRight: !!actor.faceRight,
+    wind: wind && !dead ? Math.min(1, (t - wind.t0) / Math.max(0.1, wind.t1 - wind.t0)) : 0,
+    strike: strike ? (t - strike.start) / (strike.end - strike.start) : null,
+    lungeDir,
+    hurt: dead ? 0 : hurtAt(actor, t) * 0.7,
+    enraged: !!(bout.rageAt && t >= bout.rageAt) && !dead,
+    sink: sinkAt(actor, t),
+    death: dead ? (t - actor.deathT) : null,
+  });
+}
+
+const SPELL_COLOR = { magic: '#a78bfa' };
+
+// Where a boss looks for an attack: down the lane, along the cone, or at the mark.
+function hazardAim(hz, out) {
+  if (hz.kind === 'lane') return toWorld(hz.x2, hz.y2, out);
+  if (hz.kind === 'cone') return toWorld(Number(hz.x) + Math.cos(hz.a) * hz.r, Number(hz.y) + Math.sin(hz.a) * hz.r, out);
+  return toWorld(hz.x, hz.y, out);
+}
+
+function shotsAt() {
+  const shots = [];
+  actors.forEach((actor) => {
+    if (actor.monster || actor.sample.hidden) return;
+    for (let i = actor.attacks.length - 1; i >= 0; i--) {
+      const w = actor.attacks[i];
+      if (w.start + 3 < t) break;
+      if (!w.flight || t < w.launch || t > w.launch + w.flight) continue;
+      const victim = actors.get(bout.hits[w.idx].to);
+      if (!victim) continue;
+      const from = actor.obj.launchPoint(new THREE.Vector3());
+      const to = victim.pos.clone();
+      to.y += victim.monster ? victim.obj.height * 0.45 : 1.1;
+      shots.push({
+        kind: w.style === 'ranged' ? projectileKind(actor.obj.look) : 'orb',
+        from, to,
+        u: (t - w.launch) / w.flight,
+        color: actor.obj.look.spellColor || SPELL_COLOR.magic,
+      });
+    }
+  });
+  // Bouncing bolts hop from the last spoop they hit, or leave the boss's mouth.
+  const boss = bossActor();
+  const hits = bout.hits || [];
+  for (let i = lastIndexAtOrBefore(hits, t + 0.35); i >= 0; i--) {
+    const hit = hits[i];
+    if (hit.t < t - 0.05) break;
+    if (hit.attack !== 'bounce' || t > hit.t) continue;
+    const victim = actors.get(hit.to);
+    if (!victim) continue;
+    const via = hit.via && actors.get(hit.via);
+    const from = via ? via.pos.clone().setY(1.1) : boss && boss.obj.mouthPoint ? boss.obj.mouthPoint(new THREE.Vector3()) : null;
+    if (!from) continue;
+    shots.push({ kind: 'orb', from, to: victim.pos.clone().setY(1.1), u: 1 - (hit.t - t) / 0.35, color: '#c084fc' });
+  }
+  return shots;
+}
+
+// ---- Overlay: tags, hitsplats, warning labels, log, boss bar ----
+
+const splats = new Map();
+const hzLabels = new Map();
+let logSig = '';
+
+function toScreen(v, w, h) {
+  proj.copy(v).project(world.camera);
+  if (proj.z > 1 || proj.z < -1) return null;
+  return { x: (proj.x * 0.5 + 0.5) * w, y: (-proj.y * 0.5 + 0.5) * h };
+}
+
+function headOf(actor) {
+  const a = actor.anchor.copy(actor.pos);
+  if (actor.monster) a.y = (actor.obj.height || 3) * (1 - sinkAt(actor, t) * 0.85) + 0.25;
+  else a.y = actor.deathT != null && t >= actor.deathT ? 0.6 : 2.0;
+  return a;
+}
+
+function splatBias(fromId, victim) {
+  if (!victim.monster) return { x: 0, y: 0 };
+  const ids = (bout.fighters || []).map((f) => f.id);
+  const i = Math.max(0, ids.indexOf(fromId));
+  const n = Math.max(3, ids.length);
+  const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+  return { x: Math.round(Math.cos(a) * 40), y: Math.round(Math.sin(a) * 20) + 30 };
+}
+
+function drawOverlay() {
+  const w = overlay.clientWidth;
+  const h = overlay.clientHeight;
+  actors.forEach((actor) => {
+    if (!actor.tag) return;
+    const dead = actor.deathT != null && t >= actor.deathT;
+    const at = !actor.sample.hidden && toScreen(headOf(actor), w, h);
+    actor.tag.hidden = !at || (actor.monster && dead);
+    if (!at) return;
+    actor.tag.style.transform = 'translate(' + at.x.toFixed(1) + 'px,' + at.y.toFixed(1) + 'px) translate(-50%,-100%)';
+    actor.tag.classList.toggle('is-dead', dead);
+    const hp = hpAt(actor, t);
+    actor.bar.style.width = (Math.max(0, Math.min(1, hp / actor.maxHp)) * 100).toFixed(1) + '%';
+  });
+
+  actors.forEach(paintUnit);
+  paintMeter();
+
+  const hits = (bout && bout.hits) || [];
+  const live = new Set();
+  if (!preview) {
+    const lastIdx = lastIndexAtOrBefore(hits, t);
+    for (let i = lastIdx; i >= 0; i--) {
+      const hit = hits[i];
+      const age = t - hit.t;
+      if (age > SPLAT_LIFE) break;
+      const victim = actors.get(hit.to);
+      if (!victim || victim.sample.hidden) continue;
+      if (hit.effect === 'madness' && !(hit.amount > 0)) continue;
+      const anchor = tmp.copy(victim.pos);
+      anchor.y = victim.monster ? (victim.obj.height || 3) * 0.5 : 1.1;
+      const at = toScreen(anchor, w, h);
+      if (!at) continue;
+      live.add(i);
+      let el = splats.get(i);
+      if (!el) {
+        el = document.createElement('div');
+        const miss = hit.miss || !(hit.amount > 0);
+        const attacker = actors.get(hit.from);
+        const max = !miss && attacker && attacker.f.maxHit && hit.amount >= attacker.f.maxHit;
+        el.className = 'r3d-splat' + (miss ? ' is-miss' : '') + (max ? ' is-max' : '');
+        el.textContent = miss ? '0' : String(hit.amount);
+        overlay.appendChild(el);
+        splats.set(i, el);
+      }
+      const bias = splatBias(hit.from, victim);
+      const rise = age * 16;
+      el.style.transform = 'translate(' + (at.x + bias.x - 13).toFixed(1) + 'px,' + (at.y + bias.y - 12 - rise).toFixed(1) + 'px)';
+      el.style.opacity = age > SPLAT_LIFE * 0.7 ? String(Math.max(0, 1 - (age - SPLAT_LIFE * 0.7) / (SPLAT_LIFE * 0.3))) : '1';
+    }
+  }
+  splats.forEach((el, i) => {
+    if (live.has(i)) return;
+    el.remove();
+    splats.delete(i);
+  });
+
+  const words = new Set();
+  fx.labels(t).forEach((row) => {
+    const at = toScreen(row.pos, w, h);
+    if (!at) return;
+    words.add(row.key);
+    let el = hzLabels.get(row.key);
+    if (!el) {
+      el = document.createElement('span');
+      el.className = 'r3d-hz-label';
+      el.textContent = row.text;
+      overlay.appendChild(el);
+      hzLabels.set(row.key, el);
+    }
+    el.style.transform = 'translate(' + at.x.toFixed(1) + 'px,' + at.y.toFixed(1) + 'px) translate(-50%,-50%)';
+    el.style.color = row.hot ? '#ffffff' : '';
+  });
+  hzLabels.forEach((el, key) => {
+    if (words.has(key)) return;
+    el.remove();
+    hzLabels.delete(key);
+  });
+
+  if (!preview) drawLog();
+  setBossBar();
+}
+
+function nameOf(id) {
+  const a = actors.get(id);
+  return a ? a.f.name : 'Someone';
+}
+
+function drawLog() {
+  const hits = bout.hits || [];
+  const deaths = bout.deaths || [];
+  const hi = lastIndexAtOrBefore(hits, t);
+  const di = lastIndexAtOrBefore(deaths, t);
+  const sig = hi + '|' + di;
+  if (sig === logSig) return;
+  logSig = sig;
+  const rows = [];
+  for (let i = hi; i >= 0 && rows.length < 12; i--) {
+    const hit = hits[i];
+    const miss = hit.miss || !(hit.amount > 0);
+    const a = nameOf(hit.from);
+    const v = nameOf(hit.to);
+    let text;
+    if (hit.verb) text = a + ' ' + hit.verb + ' ' + v + (miss ? '. Dodged.' : ' ' + hit.amount);
+    else text = miss ? a + ' misses ' + v : a + ' hits ' + v + ' ' + hit.amount;
+    rows.push({ t: hit.t, text, kind: miss ? 'is-miss' : 'is-hit' });
+  }
+  for (let i = di; i >= 0 && i > di - 4; i--) rows.push({ t: deaths[i].t, text: nameOf(deaths[i].id) + ' is defeated', kind: 'is-dead' });
+  rows.sort((a, b) => a.t - b.t);
+  logEl.innerHTML = '';
+  rows.slice(-12).forEach((row) => {
+    const li = document.createElement('li');
+    li.className = row.kind;
+    li.textContent = row.text;
+    logEl.appendChild(li);
+  });
+}
+
+function paintBossBar() {
+  const boss = bossActor();
+  bossBar.hidden = !boss || preview;
+  if (!boss) return;
+  bossBar.querySelector('strong').textContent = boss.f.name;
+  bossBar.querySelector('span').textContent = (boss.f.tierName ? boss.f.tierName + ' · ' : '') + (boss.f.combat ? 'Level ' + boss.f.combat : '');
+}
+
+function setBossBar() {
+  const boss = bossActor();
+  if (!boss || preview) return;
+  const pct = Math.max(0, Math.min(1, hpAt(boss, t) / boss.maxHp)) * 100;
+  bossBar.querySelector('b').style.width = pct.toFixed(1) + '%';
+  bossBar.querySelector('i').style.width = pct.toFixed(1) + '%';
+  bossBar.classList.toggle('is-enraged', !!(bout.rageAt && t >= bout.rageAt));
+}
+
+function showEnd() {
+  if (preview || !bout) return;
+  const boss = bossActor();
+  const bossName = (boss && boss.f.name) || bout.bossName || 'The boss';
+  const party = (bout.party || []);
+  const alive = party.filter((row) => row.alive);
+  const wiped = !!(bout.loot && bout.loot.wiped);
+  const dealt = new Map();
+  (bout.hits || []).forEach((hit) => {
+    const from = actors.get(hit.from);
+    if (!from || from.monster || !(hit.amount > 0)) return;
+    dealt.set(hit.from, (dealt.get(hit.from) || 0) + hit.amount);
+  });
+  let topId = null;
+  dealt.forEach((amount, id) => { if (!topId || amount > dealt.get(topId)) topId = id; });
+  const head = wiped
+    ? (alive.length ? bossName + ' wins' : 'The party fell')
+    : bossName + ' is down';
+  const sub = (wiped && alive.length && bout.called ? 'Time called. ' : '') +
+    (topId ? 'Most damage: ' + nameOf(topId) + ' (' + dealt.get(topId).toLocaleString('en-US') + ')' : '');
+  bannerEl.textContent = head;
+  if (sub) {
+    const small = document.createElement('small');
+    small.textContent = sub;
+    bannerEl.appendChild(small);
+  }
+  bannerEl.hidden = false;
+  statusEl.textContent = head + '.';
+}
+
+// ---- Transport ----
+
+function setPlaying(on) {
+  playing = on;
+  pauseBtn.textContent = on ? 'Pause' : 'Play';
+  pauseBtn.setAttribute('aria-label', on ? 'Pause' : 'Play');
+}
+
+pauseBtn.addEventListener('click', () => {
+  if (!bout) return;
+  if (!playing && ended) {
+    t = 0;
+    ended = false;
+    bannerEl.hidden = true;
+    snapFacing = true;
+  }
+  setPlaying(!playing);
+});
+
+scrub.addEventListener('pointerdown', () => { dragging = true; });
+scrub.addEventListener('pointerup', () => { dragging = false; });
+scrub.addEventListener('input', () => {
+  if (!bout) return;
+  t = Number(scrub.value) || 0;
+  snapFacing = true;
+  if (t < endAt) {
+    ended = false;
+    bannerEl.hidden = true;
+  }
+});
+
+window.addEventListener('keydown', (ev) => {
+  if (ev.target && /input|select|textarea/i.test(ev.target.tagName) && ev.target.type !== 'range') return;
+  if (ev.code === 'Space') {
+    ev.preventDefault();
+    pauseBtn.click();
+  }
+});
+
+let lastNow = performance.now();
+function frame(now) {
+  const dt = Math.min(0.1, (now - lastNow) / 1000);
+  lastNow = now;
+  if (bout) {
+    if (playing && !dragging) t += dt * Number(speedEl.value || 1.5) * PACE;
+    if (preview) {
+      if (t >= endAt) t -= endAt;
+    } else if (t >= endAt) {
+      t = endAt;
+      if (!ended) {
+        ended = true;
+        setPlaying(false);
+        showEnd();
+      }
+    }
+    update(dt);
+    world.update(dt);
+    director.update({ t, actors, boss: bossActor() });
+    drawOverlay();
+    if (!dragging) scrub.value = String(t);
+    clockEl.textContent = t.toFixed(1) + 's';
+  } else {
+    director.update({ t, actors, boss: null });
+  }
+  world.renderer.render(world.scene, world.camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Console handle for poking at the scene: raid3d.camera.position, raid3d.actors, raid3d.seek(12).
+window.raid3d = {
+  world,
+  camera: world.camera,
+  get actors() { return actors; },
+  get bout() { return bout; },
+  seek(time) {
+    t = Number(time) || 0;
+    snapFacing = true;
+  },
+  pause() { setPlaying(false); },
+  director,
+  look(x, y, z, tx, ty, tz) {
+    director.setMode('free');
+    world.camera.position.set(x, y, z);
+    world.controls.target.set(tx || 0, ty || 0, tz || 0);
+    world.controls.update();
+  },
+};
+
+// ---- Data ----
+
+function renderPicks(spoops) {
+  picks.innerHTML = '';
+  spoops.forEach((spoop) => {
+    const label = document.createElement('label');
+    const weapon = spoop.equipped && spoop.equipped.weapon;
+    const hp = ((spoop.skills || []).find((skill) => skill.id === 'hitpoints') || {}).level;
+    label.title = 'Cb ' + spoop.combat + ' · ' + ((weapon && weapon.style) || 'melee') + ' · hp ' + hp;
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = true;
+    box.value = spoop.name;
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(spoop.name));
+    picks.appendChild(label);
+  });
+}
+
+function selected() {
+  return Array.from(picks.querySelectorAll('input:checked')).map((box) => box.value);
+}
+
+function play(data) {
+  lastData = data;
+  loadFight(data.bout, { preview: false });
+  const boss = data.boss || {};
+  statusEl.textContent = (boss.name || 'Boss') + ' · ' + (boss.tierName || '') + ' · ' + (boss.hp || 0) + ' hp · hits ' + (boss.maxHit || 0);
+  setPlaying(true);
+}
+
+async function fight() {
+  if (busy) return;
+  const names = selected();
+  if (!names.length) {
+    statusEl.textContent = 'Pick at least one spoop.';
+    return;
+  }
+  if (!seedEl.value.trim()) seedEl.value = String(Date.now());
+  busy = true;
+  fightBtn.disabled = true;
+  statusEl.textContent = 'Walking in…';
+  try {
+    const res = await fetch('/api/spoops', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'raid-test', names, seed: seedEl.value.trim(), boss: bossEl.value, tier: tierEl.value }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.bout) throw new Error(data.error || 'Could not run the fight');
+    if (data.seed) seedEl.value = data.seed;
+    play(data);
+  } catch (err) {
+    statusEl.textContent = err.message;
+  } finally {
+    busy = false;
+    fightBtn.disabled = false;
+  }
+}
+
+// Each boss's usual tier, same as /js/raid.js.
+const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard' };
+bossEl.addEventListener('change', () => {
+  if (HOME_TIER[bossEl.value]) tierEl.value = HOME_TIER[bossEl.value];
+});
+fightBtn.addEventListener('click', () => fight());
+replayBtn.addEventListener('click', () => {
+  if (lastData) play(lastData);
+});
+
+fetch('/api/spoops')
+  .then((res) => res.json())
+  .then((data) => {
+    spoopList = data.spoops || [];
+    renderPicks(spoopList);
+    if (!bout || preview) showPreview();
+  })
+  .catch(() => {
+    statusEl.textContent = 'Could not load spoops.';
+  });
