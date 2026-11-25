@@ -52,8 +52,18 @@ Object.values(state.spoops).forEach((spoop, i) => {
   spoop.build = (w && w.style) || 'melee';
 });
 const TYPES = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css', '.png': 'image/png', '.jpg': 'image/jpeg', '.svg': 'image/svg+xml', '.webp': 'image/webp', '.ttf': 'font/ttf', '.woff': 'font/woff', '.woff2': 'font/woff2', '.json': 'application/json' };
+let devRaid = null;
 http.createServer((req, res) => {
   const url = new URL(req.url, 'http://x');
+  // A stand-in for the arena card: the whole roster runs a 4-boss raid that starts when first asked for.
+  if (url.pathname === '/api/arena') {
+    if (!devRaid) {
+      const night = e.testRaidNight(state, [], 'dev-' + Date.now());
+      devRaid = { kind: 'raid', hasReplay: true, at: new Date().toISOString(), revealAt: new Date(Date.now() + 1000).toISOString(), showMs: 1000, raid: night };
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    return res.end(JSON.stringify({ last: devRaid, special: null, serverNow: new Date().toISOString() }));
+  }
   if (url.pathname === '/api/spoops') {
     if (req.method === 'GET') {
       if (url.searchParams.get('icon')) { res.writeHead(404); return res.end(); }

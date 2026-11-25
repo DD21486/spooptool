@@ -956,6 +956,12 @@ function setPlaying(on) {
 }
 
 pauseBtn.addEventListener('click', () => {
+  if (live && live.segs) {
+    live.playing = !live.playing;
+    if (live.playing && live.clock >= live.total) live.clock = 0;
+    setPlaying(live.playing);
+    return;
+  }
   if (!bout) return;
   if (!playing && ended) {
     t = 0;
@@ -969,6 +975,11 @@ pauseBtn.addEventListener('click', () => {
 scrub.addEventListener('pointerdown', () => { dragging = true; });
 scrub.addEventListener('pointerup', () => { dragging = false; });
 scrub.addEventListener('input', () => {
+  if (live && live.segs) {
+    live.clock = (Number(scrub.value) || 0) * 1000;
+    snapFacing = true;
+    return;
+  }
   if (!bout) return;
   t = Number(scrub.value) || 0;
   snapFacing = true;
@@ -990,9 +1001,13 @@ let lastNow = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - lastNow) / 1000);
   lastNow = now;
+  const liveOn = !!(live && live.segs);
+  if (liveOn) tickLive(dt);
   if (bout) {
-    if (playing && !dragging) t += dt * Number(speedEl.value || 1.5) * PACE;
-    if (preview) {
+    if (playing && !dragging && !liveOn) t += dt * Number(speedEl.value || 1.5) * PACE;
+    if (liveOn) {
+      // The live raid sets t itself.
+    } else if (preview) {
       if (t >= endAt) t -= endAt;
     } else if (t >= endAt) {
       t = endAt;
@@ -1006,8 +1021,10 @@ function frame(now) {
     world.update(dt);
     director.update({ t, actors, boss: bossActor() });
     drawOverlay();
-    if (!dragging) scrub.value = String(t);
-    clockEl.textContent = t.toFixed(1) + 's';
+    if (!liveOn) {
+      if (!dragging) scrub.value = String(t);
+      clockEl.textContent = t.toFixed(1) + 's';
+    }
   } else {
     director.update({ t, actors, boss: null });
   }
@@ -1022,6 +1039,7 @@ window.raid3d = {
   camera: world.camera,
   get actors() { return actors; },
   get bout() { return bout; },
+  get live() { return live; },
   seek(time) {
     t = Number(time) || 0;
     snapFacing = true;
@@ -1035,6 +1053,209 @@ window.raid3d = {
     world.controls.update();
   },
 };
+
+// ---- Live raid ----
+// The night's rooms in order, on the same clock the engine uses for the show (RAID_SHOW and
+// fightPlaybackMs in lib/spoop/engine.js), so this stays in step with the 2D page and Discord.
+const SHOW = { open: 3400, card: 3200, loot: 19000, split: 11000, travel: 5000, fork: 3600, camp: 7000, chest: 8000 };
+const LIVE_SPEED = 1.5;
+const cardEl = $('r3d-card');
+let live = null;
+let livePoll = 0;
+
+function esc(text) {
+  return String(text == null ? '' : text).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+}
+
+function nodeLabel(node) {
+  if (!node) return '';
+  return node.name + (node.tierName && node.kind !== 'rest' && node.kind !== 'treasure' ? ' · ' + node.tierName : '');
+}
+
+function planRaid(last) {
+  const raid = last.raid || {};
+  const rooms = raid.rooms || [];
+  const route = raid.route || [];
+  const choices = raid.choices || [];
+  const nodes = new Map(((raid.map && raid.map.nodes) || []).map((n) => [n.id, n]));
+  const segs = [];
+  let at = 0;
+  const push = (kind, ms, extra) => {
+    segs.push(Object.assign({ kind, start: at, end: at + ms }, extra));
+    at += ms;
+  };
+  if (route.length) push('open', SHOW.open);
+  let fights = 0;
+  route.forEach((nodeId, step) => {
+    rooms.filter((room) => room.node === nodeId).forEach((room) => {
+      const index = rooms.indexOf(room);
+      const more = index < rooms.length - 1;
+      if (room.kind === 'rest') return push('camp', SHOW.camp, { room });
+      if (room.kind === 'treasure') return push('chest', SHOW.chest, { room });
+      fights += 1;
+      push('card', SHOW.card, { room, index, n: fights });
+      const dur = Number(room.duration || (room.bout && room.bout.duration)) || 0;
+      push('fight', Math.round((dur / (LIVE_SPEED * PACE)) * 1000), { room, index, dur });
+      if (more) {
+        const loot = room.bout && room.bout.loot;
+        push('loot', loot && loot.drop ? SHOW.loot : SHOW.split, { room, index, dur });
+      }
+    });
+    if (step < route.length - 1) {
+      const choice = choices.find((row) => row.at === nodeId);
+      if (choice) push('fork', SHOW.fork, { choice });
+      push('travel', SHOW.travel, { next: nodes.get(route[step + 1]) });
+    }
+  });
+  const total = at;
+  push('recap', 3600 * 1000);
+  const startAt = new Date(last.revealAt).getTime() - (Number(last.showMs) || total);
+  return { segs, total, startAt, raid, nodes, clock: 0, playing: true, room: -1, seg: null };
+}
+
+function showCard(kicker, title, body) {
+  cardEl.querySelector('.r3d-card-kicker').textContent = kicker || '';
+  cardEl.querySelector('.r3d-card-title').textContent = title || '';
+  cardEl.querySelector('.r3d-card-body').innerHTML = body || '';
+  cardEl.hidden = false;
+}
+
+function lootBody(room) {
+  const bout = room.bout || {};
+  const loot = bout.loot || {};
+  const party = bout.party || [];
+  const alive = party.filter((row) => row.alive);
+  const bossName = (room.boss && room.boss.name) || bout.bossName || 'The boss';
+  if (loot.wiped) {
+    return { title: alive.length ? bossName + ' wins' : 'The party fell', body: '<p class="is-dim">No kill, so no loot.</p>' };
+  }
+  let body = '';
+  if (loot.drop && loot.spooply) {
+    body += '<p class="' + (loot.drop.rare ? 'is-rare' : 'is-pick') + '">' + esc(loot.spooply.name) + ' takes the ' + esc(loot.drop.name) + (loot.drop.jackpot ? ' · Jackpot!' : loot.drop.rare ? ' · Rare!' : '') + '</p>';
+  }
+  body += '<p>' + Number(loot.gold || 0).toLocaleString('en-US') + ' gold, split by the living</p>';
+  const down = party.filter((row) => !row.alive).map((row) => row.name);
+  if (down.length) body += '<p class="is-dim">' + esc(down.join(', ')) + (down.length === 1 ? ' stays down.' : ' stay down.') + '</p>';
+  return { title: bossName + ' is down', body };
+}
+
+function recapBody(raid) {
+  const gold = new Map();
+  const drops = [];
+  (raid.rooms || []).forEach((room) => {
+    const shares = room.kind === 'treasure' ? room.shares : room.bout && room.bout.loot && !room.bout.loot.wiped ? room.bout.loot.shares : null;
+    (shares || []).forEach((row) => { if (row) gold.set(row.name, (gold.get(row.name) || 0) + (Number(row.gold) || 0)); });
+    const loot = room.bout && room.bout.loot;
+    if (loot && !loot.wiped && loot.drop && loot.spooply) drops.push({ who: loot.spooply.name, drop: loot.drop, from: room.boss && room.boss.name });
+  });
+  let body = '<p>' + (raid.cleared ? 'The party cleared the raid.' : 'The raid is over.') + '</p>';
+  if (drops.length) {
+    body += drops.map((row) => '<p class="' + (row.drop.rare ? 'is-rare' : 'is-pick') + '">' + esc(row.who) + ': ' + esc(row.drop.name) + (row.from ? ' <span class="is-dim">from ' + esc(row.from) + '</span>' : '') + '</p>').join('');
+  }
+  const rows = Array.from(gold.entries()).sort((a, b) => b[1] - a[1]);
+  if (rows.length) body += '<ul>' + rows.map(([name, g]) => '<li><span>' + esc(name) + '</span><span>' + g.toLocaleString('en-US') + ' gp</span></li>').join('') + '</ul>';
+  return body;
+}
+
+function paintSeg(seg) {
+  const raid = live.raid;
+  if (seg.kind === 'fight') {
+    cardEl.hidden = true;
+    return;
+  }
+  if (seg.kind === 'open') return showCard('Raid', raid.name || 'The raid', '<p>' + ((raid.map && raid.map.layers) || '') + ' rooms deep. The path stays hidden until you get there.</p>');
+  if (seg.kind === 'card') {
+    const boss = seg.room.boss || {};
+    return showCard('Raid fight ' + seg.n, boss.name || 'Boss', '<p>' + esc(boss.tierName || '') + (boss.level ? ' · level ' + boss.level : '') + '</p>');
+  }
+  if (seg.kind === 'loot') {
+    const out = lootBody(seg.room);
+    return showCard('Loot', out.title, out.body);
+  }
+  if (seg.kind === 'fork') {
+    const opts = seg.choice.options.map((id) => {
+      const label = nodeLabel(live.nodes.get(id));
+      return '<p class="' + (id === seg.choice.pick ? 'is-pick' : 'is-dim') + '">' + esc(label) + (id === seg.choice.pick ? ' ←' : '') + '</p>';
+    }).join('');
+    return showCard('The road splits', 'Which way?', opts);
+  }
+  if (seg.kind === 'travel') return showCard('Onward', 'Next: ' + nodeLabel(seg.next), '');
+  if (seg.kind === 'camp') {
+    const healed = (seg.room.healed || []).map((row) => (seg.room.party || []).find((p) => p.id === row.id)).filter(Boolean).map((row) => row.name);
+    return showCard('Camp', 'A short rest', '<p>' + (healed.length ? esc(healed.join(', ')) + (healed.length === 1 ? ' gets' : ' get') + ' patched up.' : 'Nobody needed patching up.') + '</p>');
+  }
+  if (seg.kind === 'chest') {
+    const chest = seg.room.chest || {};
+    return showCard('Treasure', chest.name || 'A chest', '<p>' + Number(chest.gold || 0).toLocaleString('en-US') + ' gold, split by the living</p>');
+  }
+  if (seg.kind === 'recap') return showCard('Raid over', raid.name || 'The raid', recapBody(raid));
+}
+
+function tickLive(dt) {
+  if (!live || !live.segs) return;
+  if (live.playing && !dragging) live.clock += dt * 1000;
+  const clock = live.clock;
+  const seg = live.segs.find((row) => clock >= row.start && clock < row.end) || live.segs[live.segs.length - 1];
+  if (seg.index != null && seg.room && seg.room.bout && seg.index !== live.room) {
+    live.room = seg.index;
+    loadFight(seg.room.bout, { preview: false });
+    bannerEl.hidden = true;
+    snapFacing = true;
+  }
+  if (seg.kind === 'card') t = 0;
+  else if (seg.kind === 'fight') t = ((clock - seg.start) / 1000) * LIVE_SPEED * PACE;
+  else if (seg.kind === 'loot') t = endAt;
+  if (seg !== live.seg) {
+    live.seg = seg;
+    paintSeg(seg);
+  }
+  const shown = Math.min(clock, live.total);
+  if (!dragging) scrub.value = String(shown / 1000);
+  const mm = Math.floor(shown / 60000);
+  const ss = Math.floor((shown % 60000) / 1000);
+  clockEl.textContent = mm + ':' + String(ss).padStart(2, '0') + ' / ' + Math.floor(live.total / 60000) + ':' + String(Math.floor((live.total % 60000) / 1000)).padStart(2, '0');
+}
+
+function startLivePlayback(last) {
+  live = planRaid(last);
+  live.clock = Math.max(0, Date.now() - live.startAt);
+  if (live.clock > live.total) live.clock = live.total;
+  scrub.max = String(live.total / 1000);
+  setPlaying(true);
+  statusEl.textContent = (live.raid.name || 'Raid') + (Date.now() < live.startAt + live.total ? ' · live' : ' · replay');
+}
+
+// Wait for the raid, then play it. Joining late jumps to where everyone else is.
+async function watchLive() {
+  window.clearTimeout(livePoll);
+  live = live && live.segs ? live : { waiting: true };
+  try {
+    const card = await (await fetch('/api/arena')).json();
+    const special = card.special;
+    const last = card.last;
+    const lastIsRaid = last && last.kind === 'raid' && last.hasReplay;
+    const due = special ? Date.parse(special.at) : 0;
+    if (special && (!lastIsRaid || Date.parse(last.at) < due)) {
+      const left = Math.max(0, due - Date.now());
+      const mm = Math.floor(left / 60000);
+      const ss = Math.floor((left % 60000) / 1000);
+      showCard('Raid', 'Starts ' + special.label.replace(/^.*?, .*?, /, ''), '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p><p class="is-dim">The party warms up while you wait.</p>');
+      if (!bout) showPreview();
+      livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : 4000);
+      return;
+    }
+    if (!lastIsRaid) {
+      showCard('Raid', 'No raid to watch', '<p class="is-dim">The next one shows up here when it starts.</p>');
+      return;
+    }
+    const full = await (await fetch('/api/arena?replay=1')).json();
+    if (!full.last || !full.last.raid) throw new Error('no raid');
+    startLivePlayback(full.last);
+  } catch (err) {
+    showCard('Raid', 'Could not load the raid', '<p class="is-dim">Trying again shortly.</p>');
+    livePoll = window.setTimeout(watchLive, 10000);
+  }
+}
 
 // ---- Data ----
 
@@ -1100,9 +1321,40 @@ async function fight() {
 const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard' };
 bossEl.addEventListener('change', () => {
   if (HOME_TIER[bossEl.value]) tierEl.value = HOME_TIER[bossEl.value];
+  tierEl.disabled = bossEl.value === 'live';
+  fightBtn.textContent = bossEl.value === 'live' ? 'Watch' : 'Fight';
+  if (bossEl.value === 'live') watchLive();
+  else leaveLive();
 });
-fightBtn.addEventListener('click', () => fight());
+
+// /raid3d.html?live opens straight onto the live raid.
+if (new URLSearchParams(location.search).has('live')) {
+  bossEl.value = 'live';
+  tierEl.disabled = true;
+  fightBtn.textContent = 'Watch';
+  watchLive();
+}
+function leaveLive() {
+  window.clearTimeout(livePoll);
+  live = null;
+  cardEl.hidden = true;
+}
+
+fightBtn.addEventListener('click', () => {
+  if (bossEl.value === 'live') {
+    watchLive();
+    return;
+  }
+  leaveLive();
+  fight();
+});
 replayBtn.addEventListener('click', () => {
+  if (live && live.segs) {
+    live.clock = 0;
+    live.playing = true;
+    setPlaying(true);
+    return;
+  }
   if (lastData) play(lastData);
 });
 

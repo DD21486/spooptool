@@ -78,6 +78,36 @@
 .r3d-tag.is-dead .r3d-tag-hp { visibility: hidden; }
 .r3d-tag.is-dead .r3d-tag-name { color: #a3a3a3; }
 
+/* Between rooms of a live raid: the fork, travel, camp, chest, loot and recap. */
+.r3d-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(460px, calc(100% - 32px));
+  max-height: calc(100% - 120px);
+  overflow: auto;
+  padding: 14px 18px;
+  text-align: center;
+  background: rgba(20, 16, 10, 0.88);
+  border: 2px solid #6a5530;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+  font-family: "RuneScape Plain 12", "RuneScape", sans-serif;
+  color: #e8e0cc;
+  pointer-events: none;
+}
+
+.r3d-card[hidden] { display: none; }
+.r3d-card-kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #c8a050; }
+.r3d-card-title { margin: 2px 0 8px; font-family: "RuneScape Bold 12", "RuneScape", sans-serif; font-size: 22px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
+.r3d-card-body { font-size: 13px; line-height: 1.5; }
+.r3d-card-body p { margin: 4px 0; }
+.r3d-card-body .is-rare { color: #ffb84a; }
+.r3d-card-body .is-pick { color: #ffff00; }
+.r3d-card-body .is-dim { color: #9a9280; }
+.r3d-card-body ul { margin: 6px 0 0; padding: 0; list-style: none; text-align: left; columns: 2; column-gap: 16px; }
+.r3d-card-body li { break-inside: avoid; display: flex; justify-content: space-between; gap: 8px; }
+
 /* Raid frames: one tile per spoop, five to a column, colored by combat style. */
 .r3d-party {
   position: absolute;

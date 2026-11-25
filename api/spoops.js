@@ -347,6 +347,9 @@ function cardNeedsSync(card) {
     const lastAt = card.last && Date.parse(card.last.at);
     if (!(Number.isFinite(lastAt) && Math.abs(lastAt - nextAt) < 120000)) return true;
   }
+  // A special raid due now needs the world advanced so it runs on time.
+  const specialAt = card.special && Date.parse(card.special.at || '');
+  if (Number.isFinite(specialAt) && specialAt <= Date.now() + 20000) return true;
   const pkAt = card.pk && Date.parse(card.pk.fightAt || '');
   if (Number.isFinite(pkAt) && pkAt <= Date.now() + 20000) return true;
   return false;

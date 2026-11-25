@@ -24,6 +24,7 @@
     <div class="pit-controls">
       <label>Boss
         <select id="r3d-boss">
+          <option value="live">Live raid</option>
           <option value="elvarg" selected>Elvarg</option>
           <option value="mole">Giant Mole</option>
           <option value="brutus">Brutus</option>
@@ -72,6 +73,11 @@
       <div class="r3d-bossbar-track"><i></i><b></b></div>
     </div>
     <div id="r3d-banner" class="r3d-banner" hidden></div>
+    <div id="r3d-card" class="r3d-card" hidden>
+      <p class="r3d-card-kicker"></p>
+      <p class="r3d-card-title"></p>
+      <div class="r3d-card-body"></div>
+    </div>
     <ol id="r3d-log" class="r3d-log"></ol>
     <section id="r3d-meter" class="r3d-meter" aria-label="Damage meter" hidden>
       <header><span>Damage</span><span>Total (DPS)</span></header>
