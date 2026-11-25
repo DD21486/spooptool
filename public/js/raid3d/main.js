@@ -9,6 +9,7 @@ import { createFx } from './fx.js';
 import { createDirector } from './camera.js';
 import { createSound } from './sound.js';
 import { planTournament, planField, planPk } from './show.js';
+import { hideBracket, syncBracket } from './bracket.js';
 import { paintOdds } from './odds.js';
 
 // Same pacing as /js/arena.js: fight seconds advance at speed x PACE per real second.
@@ -1789,40 +1790,20 @@ function placeList(results) {
 }
 
 function drawMeet(seg, ms) {
-  if (live.view.phase === seg.kind && seg.kind === 'entrance') {
-    const shown = Math.floor(ms / 2000);
-    live.view.chips.forEach((el, i) => el.classList.toggle('is-in', i <= shown));
+  if (seg.kind === 'entrance' || seg.kind === 'bye' || seg.kind === 'bracket' || seg.kind === 'advance') {
+    raidEl.hidden = true;
+    cardEl.hidden = true;
+    const played = seg.kind === 'advance' ? seg.matchIndex : seg.played;
+    syncBracket(stage, seg.tourney, seg.kind === 'bracket' ? 'hold' : seg.kind, ms, played || 0);
     return;
   }
+  hideBracket();
   if (live.view.phase) return;
   live.view.phase = seg.kind;
   const cast = seg.cast || (seg.tourney && seg.tourney.cast);
   if (seg.kind === 'title') {
     showRaid('Tonight', 'Tournament', 'is-intro');
     raidStage.innerHTML = '<p class="raid-map-line">One on one, up the bracket. The final is best of 3.</p>';
-    return;
-  }
-  if (seg.kind === 'entrance') {
-    showRaid('Tournament', 'The field', 'is-intro');
-    raidStage.innerHTML = '<div class="raid-who r3d-roster">' + (seg.cast || []).map((row) =>
-      '<div class="raid-chip">' + esc(row.name) + '<small>Cb ' + esc(row.combat) + '</small></div>'
-    ).join('') + '</div>';
-    live.view.chips = Array.from(raidStage.querySelectorAll('.raid-chip'));
-    return;
-  }
-  if (seg.kind === 'bye') {
-    const names = (seg.byes || []).map((bye) => personName(cast, bye.playerId)).filter(Boolean);
-    showRaid('Tournament', 'Byes', 'is-intro');
-    raidStage.innerHTML = '<p class="raid-map-line">' + esc(joinNames(names) + (names.length === 1 ? ' moves on.' : ' move on.')) + '</p>';
-    return;
-  }
-  if (seg.kind === 'bracket') {
-    const matches = (seg.tourney && seg.tourney.matches) || [];
-    showRaid('Tournament', seg.played ? 'The bracket' : 'The draw', 'is-intro');
-    raidStage.innerHTML = '<div class="raid-who">' + matches.map((match, i) =>
-      '<div class="raid-chip' + (i < seg.played ? ' is-in' : '') + '">' + esc(personName(cast, match.aId) + ' vs ' + personName(cast, match.bId)) +
-      '<small>' + esc(match.roundName || '') + (i < seg.played ? ' · ' + personName(cast, match.winnerId) : '') + '</small></div>'
-    ).join('') + '</div>';
     return;
   }
   if (seg.kind === 'versus') {
@@ -1853,10 +1834,11 @@ function drawMeet(seg, ms) {
     raidStage.innerHTML = versusHtml(seg.a || personName(cast, match.aId), seg.b || personName(cast, match.bId));
     return;
   }
-  if (seg.kind === 'advance') {
+  if (seg.kind === 'win') {
     const match = seg.match || {};
-    showRaid(match.roundName || 'Match', personName(cast, match.winnerId) + ' wins', 'is-intro');
-    raidStage.innerHTML = '<p class="raid-map-line">' + esc(personName(cast, match.winnerId) + ' moves on.') + '</p>';
+    const name = personName(cast, match.winnerId) || 'Winner';
+    showRaid(match.roundName || 'Match', name + ' wins', 'is-title');
+    raidStage.innerHTML = '<p class="r3d-title-line">' + esc(name + ' moves on.') + '</p>';
     return;
   }
   if (seg.kind === 'crown') {
@@ -1889,6 +1871,7 @@ function drawSeg(seg, ms) {
   if (live.view.seg !== seg) live.view = { seg };
   const v = live.view;
   if (seg.kind === 'fight') {
+    hideBracket();
     raidEl.hidden = true;
     cardEl.hidden = true;
     return;

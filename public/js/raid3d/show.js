@@ -4,8 +4,8 @@
 const PACE = 0.55;
 const TOURNEY = {
   titleIn: 550, titleHold: 5000, titleOut: 700, entrance: 2000, bye: 900, hold: 15000,
-  versus: 2900, intro: 2000, call: 720, win: 700, advance: 900, after: 400,
-  bestFlash: 1400, score: 3000, bracketHold: 3000, crown: 20000,
+  versus: 2900, intro: 2000, call: 720, win: 1800, advance: 2000, after: 400,
+  bestFlash: 1400, score: 3000, bracketHold: 3000, crown: 20000, ko: 3500,
 };
 const FIELD = { open: 6000, results: 14000 };
 const DUEL = { versus: 2900, intro: 2000, slack: 1500 };
@@ -42,8 +42,8 @@ export function planTournament(last) {
     at += ms;
   };
   push('title', TOURNEY.titleIn + TOURNEY.titleHold + TOURNEY.titleOut);
-  push('entrance', Math.max(1, (tourney.cast || []).length) * TOURNEY.entrance, { cast: tourney.cast || [] });
-  if ((tourney.byes || []).length) push('bye', TOURNEY.bye, { byes: tourney.byes, cast });
+  push('entrance', Math.max(1, (tourney.cast || []).length) * TOURNEY.entrance, { cast: tourney.cast || [], tourney });
+  if ((tourney.byes || []).length) push('bye', TOURNEY.bye, { byes: tourney.byes, cast, tourney });
   push('bracket', TOURNEY.hold, { tourney, played: 0 });
   const matches = tourney.matches || [];
   matches.forEach((match, index) => {
@@ -54,9 +54,10 @@ export function planTournament(last) {
       if (gameIndex) push('score', TOURNEY.score, { match, cast, games: games.slice(0, gameIndex) });
       const bout = game.bout || match.bout;
       push('intro', TOURNEY.intro * 2 + TOURNEY.call, { match, cast, bout, gameIndex, games: games.length });
-      push('fight', playbackMs(bout && bout.duration, 3), { match, cast, bout, speed: 3, gameIndex, games: games.length });
+      push('fight', playbackMs(bout && bout.duration, 3) + TOURNEY.ko, { match, cast, bout, speed: 3, gameIndex, games: games.length });
     });
-    push('advance', TOURNEY.win + TOURNEY.advance, { match, cast });
+    push('win', TOURNEY.win, { match, cast });
+    push('advance', TOURNEY.advance, { match, cast, tourney, matchIndex: index });
     if (index === matches.length - 1) {
       push('bracket', TOURNEY.bracketHold, { tourney, played: matches.length });
       push('crown', TOURNEY.crown, { tourney, cast, results: last.results || [], pot: last.pot });

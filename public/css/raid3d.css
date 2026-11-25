@@ -204,6 +204,14 @@
 .r3d-roster small { font-size: 11px; color: #c8b896; }
 
 /* Boss entrance: a title along the bottom so the camera can show the boss. */
+.r3d-page.is-bracket .r3d-overlay,
+.r3d-page.is-bracket .r3d-party,
+.r3d-page.is-bracket .r3d-meter,
+.r3d-page.is-bracket .r3d-log,
+.r3d-page.is-bracket .r3d-bossbar,
+.r3d-page.is-bracket .r3d-view { visibility: hidden; }
+.r3d-page.is-bracket .tourney-scrim { z-index: 36; background: rgba(0, 0, 0, 0.84); }
+
 .is-entrance .r3d-party,
 .is-entrance .r3d-bossbar,
 .is-entrance .r3d-meter,

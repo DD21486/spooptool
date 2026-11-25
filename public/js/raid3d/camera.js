@@ -56,7 +56,7 @@ export function createDirector(world) {
     // Deaths come first: every one gets its moment.
     (info.deaths || []).forEach((d) => {
       if (d.id === info.bossId) key.push({ type: 'finale', start: d.t - 0.6, end: d.t + 3.2, id: d.id });
-      else key.push({ type: 'fall', start: d.t - 0.7, end: d.t + 1.5, id: d.id });
+      else key.push({ type: 'fall', start: d.t - 0.7, end: d.t + 6.2, id: d.id });
     });
     // Big attacks next, spaced out so it never cuts every two seconds.
     let lastBig = -10;
