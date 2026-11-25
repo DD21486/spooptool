@@ -36,6 +36,7 @@ const namesBox = $('r3d-names');
 const partyEl = $('r3d-party');
 const meterEl = $('r3d-meter');
 const meterRows = meterEl.querySelector('.r3d-meter-rows');
+const calloutEl = $('r3d-callout');
 const METER_ROW = 22;
 
 const world = createWorld(canvas);
@@ -54,6 +55,8 @@ let dragging = false;
 let busy = false;
 let lastData = null;
 let spoopList = [];
+let callouts = [];
+let shownCallout = null;
 
 function readPref(key, fallback) {
   try {
@@ -302,11 +305,30 @@ function clearActors() {
 function makeTag(fighter, isBoss) {
   const el = document.createElement('div');
   el.className = 'r3d-tag';
-  el.innerHTML = (isBoss ? '' : '<span class="r3d-tag-name"></span>') + '<span class="r3d-tag-hp"><b></b></span>';
+  el.innerHTML = (isBoss ? '' : '<span class="r3d-say" hidden></span><span class="r3d-tag-name"></span>') + '<span class="r3d-tag-hp"><b></b></span>';
   const name = el.querySelector('.r3d-tag-name');
   if (name) name.textContent = fighter.name;
   overlay.appendChild(el);
-  return { el, bar: el.querySelector('.r3d-tag-hp > b') };
+  return { el, bar: el.querySelector('.r3d-tag-hp > b'), say: el.querySelector('.r3d-say') };
+}
+
+const SAY_LIFE = 2.8;
+const CALLOUT_LIFE = 1.9;
+const CALLOUT_TIPS = { circle: 'Get out of the circle!', lane: 'Dodge the charge!', cone: 'Get out of the cone!', pool: "Don't stand in the acid!", mark: 'Spread out!' };
+
+// The first time a boss uses each attack in a fight, and when it enrages.
+function planCallouts(fight, bossName) {
+  const seen = new Set();
+  const list = [];
+  (fight.hazards || []).slice().sort((a, b) => a.t0 - b.t0).forEach((hz) => {
+    const key = hz.label || hz.attack;
+    if (!key || hz.attack === 'rocks' || seen.has(key)) return;
+    seen.add(key);
+    list.push({ t: hz.t0, title: bossName + ': ' + String(hz.label || hz.attack).toUpperCase(), tip: CALLOUT_TIPS[hz.kind] || 'Watch out!' });
+  });
+  const rage = Number(fight.rageAt) || 0;
+  if (rage > 0 && rage < (Number(fight.duration) || 0)) list.push({ t: rage, title: bossName + ' is enraged!', tip: 'It only gets faster from here.', rage: true });
+  return list.sort((a, b) => a.t - b.t);
 }
 
 // A raid frame: name, health bar with a trail for damage just taken, and hp %.
@@ -416,7 +438,8 @@ function loadFight(fight, opts) {
     for (let i = 1; i < pts.length; i++) if (pts[i][4] === 'up') buried.push([pts[i - 1][0], pts[i][0]]);
     actors.set(f.id, {
       f, obj, pts, cum, monster, maxHp, startHp: start, buried,
-      tag: tag && tag.el, bar: tag && tag.bar, unit, meter, dealt: [],
+      tag: tag && tag.el, bar: tag && tag.bar, say: tag && tag.say, sayText: '', unit, meter, dealt: [],
+      lines: preview ? [] : (fight.banter || []).filter((line) => line.id === f.id),
       yaw: monster ? 0 : Math.PI, attacks: [], winds: [], strikes: [], hitsOn: [], deathT: null,
       anchor: new THREE.Vector3(), pos: new THREE.Vector3(),
       appearT: pts.length && pts[0][0] > 0 ? pts[0][0] : null, frozen: [], mad: [],
@@ -481,6 +504,8 @@ function loadFight(fight, opts) {
     boss.phases = (fight.phases || []).slice().sort((a, b) => a.t - b.t);
     boss.baseMax = boss.maxHp;
   }
+  callouts = preview || !boss ? [] : planCallouts(fight, boss.f.name);
+  calloutEl.hidden = true;
   director.plan({
     preview,
     duration: Number(fight.duration) || 0,
@@ -832,7 +857,25 @@ function drawOverlay() {
     actor.tag.classList.toggle('is-dead', dead);
     const hp = hpAt(actor, t);
     actor.bar.style.width = (Math.max(0, Math.min(1, hp / actor.maxHp)) * 100).toFixed(1) + '%';
+    if (actor.say) {
+      const line = actor.lines.find((row) => t >= row.t && t < row.t + SAY_LIFE);
+      const text = line && !dead ? line.text : '';
+      if (text !== actor.sayText) {
+        actor.sayText = text;
+        actor.say.textContent = text;
+        actor.say.hidden = !text;
+      }
+    }
   });
+  const call = callouts.find((row) => t >= row.t && t < row.t + CALLOUT_LIFE);
+  if (call !== shownCallout) {
+    shownCallout = call || null;
+    calloutEl.hidden = !call;
+    if (call) {
+      calloutEl.className = 'r3d-callout' + (call.rage ? ' is-rage' : '');
+      calloutEl.innerHTML = '<b>' + esc(call.title) + '</b><small>' + esc(call.tip) + '</small>';
+    }
+  }
 
   actors.forEach(paintUnit);
   paintMeter();
@@ -1035,8 +1078,18 @@ window.addEventListener('keydown', (ev) => {
   }
 });
 
+// How far through a live boss's entrance card we are, or null outside one.
+function introAt() {
+  const seg = live && live.segs && live.seg;
+  const on = !!seg && seg.kind === 'card';
+  document.body.classList.toggle('is-entrance', on);
+  if (!on) return null;
+  return Math.max(0, Math.min(1, (live.clock - seg.start) / (seg.end - seg.start)));
+}
+
 let lastNow = performance.now();
 function frame(now) {
+  requestAnimationFrame(frame);
   const dt = Math.min(0.1, (now - lastNow) / 1000);
   lastNow = now;
   const liveOn = !!(live && live.segs);
@@ -1057,7 +1110,7 @@ function frame(now) {
     }
     update(dt);
     world.update(dt);
-    director.update({ t, actors, boss: bossActor() });
+    director.update({ t, actors, boss: bossActor(), intro: introAt() });
     drawOverlay();
     if (!liveOn) {
       if (!dragging) scrub.value = String(t);
@@ -1067,7 +1120,6 @@ function frame(now) {
     director.update({ t, actors, boss: null });
   }
   world.renderer.render(world.scene, world.camera);
-  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
 
@@ -1300,6 +1352,15 @@ function ease(u) {
   return u < 0.5 ? 2 * u * u : 1 - Math.pow(-2 * u + 2, 2) / 2;
 }
 
+function twistHtml(twist) {
+  if (!twist) return '';
+  return '<div><p class="r3d-twist is-' + esc(twist.id) + '">Twist: <b>' + esc(twist.name) + '</b> · ' + esc(twist.detail) + '</p></div>';
+}
+
+function quoteHtml(quote) {
+  return quote && quote.name ? '<p class="r3d-quote"><b>' + esc(quote.name) + ':</b> <q>' + esc(quote.text) + '</q></p>' : '';
+}
+
 // ---- Live raid screens ----
 // Each screen is drawn from how far into its segment the clock is, so a late join, a scrub,
 // and the first viewer all see the same thing. `v` holds what the segment has built so far.
@@ -1324,6 +1385,7 @@ function drawOpen(ms, v) {
     view.token = v.start;
     raidStage.innerHTML = (map.nodes.length ? mapHtml(map, view) : '') +
       '<p class="raid-map-line">' + esc((map.layers || '') + ' rooms deep. Forks are picked on the way, so the rest of the path stays hidden.') + '</p>' +
+      twistHtml(raid.twist) +
       '<div class="raid-who r3d-roster">' + chips + '</div>';
     v.chips = Array.from(raidStage.querySelectorAll('.r3d-roster .raid-chip'));
   }
@@ -1344,17 +1406,15 @@ function drawOpen(ms, v) {
   }
 }
 
+// The boss's entrance: the camera circles it (see introAt) under a title along the bottom.
 function drawCard(seg, v) {
   if (v.phase) return;
   v.phase = 'card';
   const boss = seg.room.boss || {};
   const tier = boss.tierName || 'Medium';
-  showRaid('Raid fight ' + seg.n, boss.name || 'Boss', 'is-intro is-light');
-  raidStage.innerHTML = '<div class="raid-intro">' +
-    (boss.sprite ? '<img class="raid-boss-art" alt="" src="' + esc(boss.sprite) + '">' : '') +
-    '<p class="raid-diff-label">Difficulty</p>' +
-    '<p class="raid-diff is-' + tierSlug(tier) + '">' + esc(tier) + '</p>' +
-  '</div>';
+  showRaid('Raid fight ' + seg.n, boss.name || 'Boss', 'is-title');
+  raidStage.innerHTML = '<p class="raid-diff is-' + tierSlug(tier) + '">' + esc(tier) + '</p>' +
+    '<p class="r3d-title-line">' + esc((boss.level ? 'Level ' + boss.level : '') + (boss.maxHit ? ' · hits up to ' + boss.maxHit : '')) + '</p>';
 }
 
 function drawFork(seg, ms, v) {
@@ -1406,7 +1466,9 @@ function drawCamp(seg, ms, v) {
     v.phase = 'camp';
     showRaid('Camp', 'A short rest', 'is-intro');
     const names = (room.party || []).filter((row) => healed.has(row.id)).map((row) => row.name);
-    const line = names.length ? joinNames(names) + (names.length === 1 ? ' gets' : ' get') + ' patched up.' : 'Nobody needed patching up.';
+    const famine = live.raid.twist && live.raid.twist.id === 'famine';
+    const line = famine ? 'The camp has no supplies. Nobody gets patched up.'
+      : names.length ? joinNames(names) + (names.length === 1 ? ' gets' : ' get') + ' patched up.' : 'Nobody needed patching up.';
     const node = live.nodes.get(room.node);
     const rows = (room.party || []).map((row) => {
       const heal = healed.get(row.id);
@@ -1417,7 +1479,7 @@ function drawCamp(seg, ms, v) {
       '</div>';
     }).join('');
     raidStage.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 385, 56) +
-      '<p class="raid-chosen">' + esc(line) + '</p><div class="raid-shares">' + rows + '</div></div>';
+      '<p class="raid-chosen">' + esc(line) + '</p><div class="raid-shares">' + rows + '</div>' + quoteHtml(room.quote) + '</div>';
   }
   if (ms >= 1400 && v.phase === 'camp') {
     v.phase = 'healed';
@@ -1517,7 +1579,7 @@ function drawLoot(room, ms, span, v, closing) {
   else if (rolls && ms < ROLL.spin + ROLL.up) phase = 'up';
   else if (rolls && ms < ROLL.spin + ROLL.up + ROLL.reel) phase = 'reel';
   else if (rolls && ms < ROLL_MS) phase = 'land';
-  const living = alive.length ? alive : [loot.spooply];
+  const living = alive.length ? alive : loot.spooply ? [loot.spooply] : [];
   const who = Math.max(0, living.findIndex((row) => row.id === (loot.spooply && loot.spooply.id)));
   const fresh = v.phase !== phase;
   if (fresh) {
@@ -1556,12 +1618,19 @@ function drawLoot(room, ms, span, v, closing) {
     if (phase === 'land' && fresh) {
       if (v.win) v.win.classList.add('is-win');
       raidStage.querySelector('.raid-land').textContent = drop.name || '';
+      if (drop.rare) {
+        raidEl.classList.add('is-rare-land');
+        raidEl.classList.toggle('is-jackpot-land', !!drop.jackpot);
+        raidStage.insertAdjacentHTML('beforeend', '<p class="r3d-rare-banner' + (drop.jackpot ? ' is-jackpot' : '') + '">' +
+          (drop.jackpot ? 'JACKPOT!' : 'RARE DROP!') +
+          (drop.lucky ? '<small>Lucky Night reroll</small>' : drop.jackpot ? '<small>500,000 gp</small>' : '') + '</p>');
+      }
     }
     return;
   }
   if (fresh) {
     v.strip = null;
-    raidStage.innerHTML = summaryHtml(room) + '<p class="raid-next"></p>';
+    raidStage.innerHTML = summaryHtml(room) + (loot.quotes || []).map(quoteHtml).join('') + '<p class="raid-next"></p>';
     v.next = raidStage.querySelector('.raid-next');
   }
   const cleared = !loot.wiped && alive.length > 0;
@@ -1624,12 +1693,23 @@ function drawRecap(v) {
     : '<li class="raid-recap-empty">Nobody took a drop.</li>';
   showRaid('Raid over', raid.name || 'The raid', 'is-recap');
   raidStage.innerHTML = '<p class="raid-recap-fell' + (raid.cleared ? ' is-clear' : '') + '">' + esc(headline) + '</p>' +
-    '<p class="raid-recap-path">' + esc(path) + '</p>' + awards +
+    '<p class="raid-recap-path">' + esc(path) + '</p>' + awards + recordsHtml(raid.records) +
     '<div class="raid-recap-cols">' +
       '<section><h3>Damage</h3><ol class="raid-recap-list">' + list(rows.slice().sort((a, b) => b.damage - a.damage || a.name.localeCompare(b.name)), 'damage', '') + '</ol></section>' +
       '<section><h3>Gold</h3><ol class="raid-recap-list">' + list(rows.slice().sort((a, b) => b.gold - a.gold || a.name.localeCompare(b.name)), 'gold', ' gp') + '</ol></section>' +
       '<section><h3>Drops</h3><ol class="raid-recap-list">' + dropHtml + '</ol></section>' +
     '</div>';
+}
+
+function recordsHtml(records) {
+  const board = (records && records.board) || [];
+  if (!board.length) return '';
+  const beat = new Map(((records && records.broken) || []).filter((row) => row.prev != null).map((row) => [row.id, row]));
+  return '<section class="r3d-records"><h3>Records</h3><ul>' + board.map((row) => {
+    const was = beat.get(row.id);
+    return '<li' + (was ? ' class="is-new"' : '') + '><span>' + esc(row.label) + '</span><strong>' + esc(row.who) + '</strong> <em>' + esc(row.text) + '</em>' +
+      (was ? '<small>Was ' + esc(row.id.startsWith('kill-') ? Number(was.prev).toFixed(1) + 's' : Number(was.prev).toLocaleString('en-US')) + (was.prevWho ? ' by ' + esc(was.prevWho) : '') + '</small>' : '') + '</li>';
+  }).join('') + '</ul></section>';
 }
 
 function drawSeg(seg, ms) {

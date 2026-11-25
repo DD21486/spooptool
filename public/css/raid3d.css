@@ -68,6 +68,58 @@
 
 .r3d-page.no-names .r3d-tag-name { display: none; }
 
+/* What a spoop says, over its head. */
+.r3d-say {
+  position: relative;
+  margin-bottom: 6px;
+  max-width: 180px;
+  padding: 3px 8px;
+  border-radius: 8px;
+  background: #fff8dc;
+  color: #1a1206;
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  white-space: normal;
+  width: max-content;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+  animation: r3d-say-in 0.18s ease-out;
+}
+.r3d-say::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: -5px;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-bottom: 0;
+  border-top-color: #fff8dc;
+}
+.r3d-say[hidden] { display: none; }
+@keyframes r3d-say-in { from { transform: translateY(4px) scale(0.9); opacity: 0; } }
+
+/* A boss mechanic the first time it comes out. */
+.r3d-callout {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 20;
+  padding: 6px 18px 7px;
+  text-align: center;
+  pointer-events: none;
+  background: rgba(40, 8, 4, 0.82);
+  border: 1px solid #b4412a;
+  border-radius: 6px;
+  animation: r3d-callout-in 0.22s ease-out;
+}
+.r3d-callout[hidden] { display: none; }
+.r3d-callout b { display: block; font-family: "RuneScape Bold 12", "RuneScape", sans-serif; font-size: 18px; color: #ff9b6b; text-shadow: 1px 1px 0 #000; letter-spacing: 0.04em; }
+.r3d-callout small { display: block; font-size: 12px; color: #fde2d0; }
+.r3d-callout.is-rage { border-color: #ef4444; background: rgba(70, 0, 0, 0.88); }
+.r3d-callout.is-rage b { color: #ff4b4b; }
+@keyframes r3d-callout-in { from { transform: translate(-50%, -8px); opacity: 0; } }
+
 .r3d-tag-hp {
   position: relative;
   width: 30px;
@@ -124,6 +176,94 @@
 }
 .r3d-roster .raid-chip.is-in { opacity: 1; transform: none; }
 .r3d-roster small { font-size: 11px; color: #c8b896; }
+
+/* Boss entrance: a title along the bottom so the camera can show the boss. */
+.is-entrance .r3d-party,
+.is-entrance .r3d-bossbar,
+.is-entrance .r3d-meter,
+.is-entrance .r3d-log,
+.is-entrance .r3d-overlay { visibility: hidden; }
+.r3d-raid.is-title {
+  align-items: flex-end;
+  padding-bottom: 7%;
+  background: linear-gradient(to bottom, transparent 55%, rgba(0, 0, 0, 0.7));
+}
+.r3d-raid.is-title .raid-card { background: transparent; border: 0; box-shadow: none; overflow: visible; }
+.r3d-raid.is-title .raid-phase { font-size: 46px; text-shadow: 3px 3px 0 #000; animation: r3d-title-in 0.6s ease-out; }
+.r3d-raid.is-title .raid-kicker { text-shadow: 1px 1px 0 #000; }
+.r3d-raid.is-title .raid-diff { font-size: 26px; text-shadow: 2px 2px 0 #000; }
+.r3d-raid.is-title .r3d-title-line { margin: 4px 0 0; color: #f4efe4; font-size: 14px; text-shadow: 1px 1px 0 #000; }
+@keyframes r3d-title-in { from { letter-spacing: 0.4em; opacity: 0; } }
+
+.r3d-twist {
+  display: inline-block;
+  margin: 8px auto 0;
+  padding: 5px 14px;
+  border: 1px solid #b4412a;
+  border-radius: 8px;
+  background: rgba(60, 14, 6, 0.6);
+  font-size: 14px;
+  color: #fde2d0;
+}
+.r3d-twist b { color: #ff9b6b; font-weight: normal; letter-spacing: 0.06em; text-transform: uppercase; }
+.r3d-twist.is-bloodmoon { border-color: #ef4444; }
+.r3d-twist.is-goldrush, .r3d-twist.is-lucky { border-color: #eab308; background: rgba(60, 46, 6, 0.6); }
+.r3d-twist.is-goldrush b, .r3d-twist.is-lucky b { color: #fde047; }
+.r3d-twist.is-medic { border-color: #22c55e; background: rgba(6, 50, 20, 0.6); }
+.r3d-twist.is-medic b { color: #86efac; }
+
+.r3d-quote { margin: 8px 0 0; font-size: 14px; color: #e7d7b1; }
+.r3d-quote b { color: #fff6c8; font-weight: normal; }
+.r3d-quote q { color: #ffe58a; }
+
+/* A rare or jackpot drop lands: a beam behind the card, a flash, and a banner. */
+.r3d-raid.is-rare-land::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse 30% 70% at 50% 50%, rgba(232, 121, 249, 0.55), transparent 70%);
+  animation: r3d-beam 1.6s ease-in-out infinite alternate;
+}
+.r3d-raid.is-jackpot-land::before { background: radial-gradient(ellipse 34% 75% at 50% 50%, rgba(250, 204, 21, 0.6), transparent 70%); }
+.r3d-raid.is-rare-land::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: #fff;
+  animation: r3d-flash 0.7s ease-out forwards;
+}
+.r3d-raid .raid-card { position: relative; }
+.r3d-rare-banner {
+  margin: 10px 0 0;
+  font-family: "RuneScape Bold 12", "RuneScape", sans-serif;
+  font-size: 34px;
+  letter-spacing: 0.12em;
+  color: #f5d0fe;
+  text-shadow: 0 0 12px #d946ef, 2px 2px 0 #000;
+  animation: r3d-rare-pop 0.5s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+.r3d-rare-banner.is-jackpot { color: #fef08a; text-shadow: 0 0 14px #eab308, 2px 2px 0 #000; }
+.r3d-rare-banner small { display: block; font-size: 13px; letter-spacing: 0.05em; color: #fde68a; text-shadow: none; }
+@keyframes r3d-beam { from { opacity: 0.55; } to { opacity: 1; } }
+@keyframes r3d-flash { from { opacity: 0.85; } to { opacity: 0; } }
+@keyframes r3d-rare-pop { from { transform: scale(2.2); opacity: 0; } }
+
+.r3d-records { margin-top: 14px; }
+.r3d-records h3 { margin: 0 0 6px; text-align: center; font-size: 12px; letter-spacing: 0.16em; text-transform: uppercase; color: #f0d878; }
+.r3d-records ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 6px; margin: 0; padding: 0; list-style: none; }
+.r3d-records li { padding: 6px 10px; border: 1px solid #3f2e1c; border-radius: 8px; background: #1c140c; font-size: 13px; }
+.r3d-records li span { display: block; font-size: 11px; color: #c8b896; letter-spacing: 0.04em; }
+.r3d-records li strong { color: #fff6c8; font-weight: normal; }
+.r3d-records li em { color: #ffe58a; font-style: normal; }
+.r3d-records li.is-new { border-color: #facc15; box-shadow: 0 0 0 1px rgba(250, 204, 21, 0.5), 0 0 14px rgba(250, 204, 21, 0.25); }
+.r3d-records li.is-new span::after { content: ' · NEW RECORD'; color: #facc15; }
+.r3d-records li small { display: block; font-size: 11px; color: #9a9280; }
+
+@media (prefers-reduced-motion: reduce) {
+  .r3d-raid.is-rare-land::before, .r3d-raid.is-rare-land::after, .r3d-rare-banner, .r3d-say, .r3d-callout { animation: none; }
+}
 .r3d-card-kicker { margin: 0; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #c8a050; }
 .r3d-card-title { margin: 2px 0 8px; font-family: "RuneScape Bold 12", "RuneScape", sans-serif; font-size: 22px; color: #ffff00; text-shadow: 2px 2px 0 #000; }
 .r3d-card-body { font-size: 13px; line-height: 1.5; }

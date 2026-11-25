@@ -263,7 +263,27 @@ export function createDirector(world) {
     pos.set(target.x, 12, target.z + 14);
   }
 
+  // A boss's entrance before the fight: low and close, sweeping round and pulling up and back.
+  function intro(ctx) {
+    const boss = ctx.boss;
+    const k = ease(ctx.intro);
+    const h = boss.obj.height || 3;
+    const a = 0.95 - k * 1.5;
+    const rad = h * 1.1 + 3 + k * (h * 0.9 + 4);
+    pos.set(boss.pos.x + Math.sin(a) * rad, 0.7 + k * (h * 0.7 + 2), boss.pos.z + Math.cos(a) * rad);
+    target.copy(boss.pos);
+    target.y = h * (0.62 - k * 0.15);
+    drift(ctx.intro * 10, 0.04);
+  }
+
   function update(ctx) {
+    if (mode === 'cinematic' && ctx.intro != null && ctx.boss) {
+      intro(ctx);
+      camera.position.copy(pos);
+      camera.lookAt(target);
+      lastTarget.copy(target);
+      return;
+    }
     if (mode !== 'cinematic' || !shots.length) {
       controls.update();
       return;

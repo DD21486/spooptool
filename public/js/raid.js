@@ -567,7 +567,8 @@
       const first = map.nodes[0];
       const view = mapView(map, -1);
       view.token = { x: Math.max(2.5, first.x - 6), y: first.y };
-      view.caption = map.layers + ' rooms deep. The path stays hidden until you get there.';
+      view.caption = map.layers + ' rooms deep. The path stays hidden until you get there.' +
+        (data.twist ? ' Twist: ' + data.twist.name + '. ' + data.twist.detail : '');
       drawMap(map, view);
       window.setTimeout(() => resolve(token === rollToken), SHOW.open);
     });
