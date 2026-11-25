@@ -2559,22 +2559,29 @@
     btn.addEventListener('click', () => openDuelModal(lastState));
   }
 
-  function duelRowHtml(row, booked) {
+  function duelRowHtml(row, booked, focusKey) {
     const gold = Number(row.gold || 0).toLocaleString();
     const short = Number(row.toGold || 0) < Number(row.gold || 0);
-    const accept = booked
-      ? ''
-      : '<button type="button" data-duel-act="accept" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Accept</button>';
+    const incoming = focusKey && focusKey === row.toKey;
+    const outgoing = focusKey && focusKey === row.fromKey;
+    const accept = incoming && !booked
+      ? '<button type="button" data-duel-act="accept" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Accept</button>'
+      : '';
+    const decline = incoming
+      ? '<button type="button" data-duel-act="decline" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Decline</button>'
+      : '';
+    const cancel = outgoing
+      ? '<button type="button" data-duel-act="cancel" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.fromKey) + '">Take back</button>'
+      : '';
+    const actions = accept || decline || cancel
+      ? '<div class="duel-actions">' + accept + decline + cancel + '</div>'
+      : '';
     return '<li class="duel-row">' +
       '<p><a href="/spoop.html?name=' + encodeURIComponent(row.fromKey) + '">' + escapeHtml(row.from) + '</a> challenged ' +
         '<a href="/spoop.html?name=' + encodeURIComponent(row.toKey) + '">' + escapeHtml(row.to) + '</a> for <strong>' + gold + '</strong> gold.' +
         (short ? ' <span class="is-short">' + escapeHtml(row.to) + ' is short.</span>' : '') +
       '</p>' +
-      '<div class="duel-actions">' +
-        accept +
-        '<button type="button" data-duel-act="decline" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.toKey) + '">Decline</button>' +
-        '<button type="button" data-duel-act="cancel" data-duel-id="' + escapeHtml(row.id) + '" data-duel-name="' + escapeHtml(row.fromKey) + '">Take back</button>' +
-      '</div>' +
+      actions +
     '</li>';
   }
 
@@ -2609,7 +2616,7 @@
     const rest = focusKey ? duels.filter((row) => row.fromKey !== focusKey && row.toKey !== focusKey) : [];
     const booked = !!(state && state.pk);
     const section = (title, rows) => rows.length
-      ? '<section><h3>' + escapeHtml(title) + '</h3><ul>' + rows.map((row) => duelRowHtml(row, booked)).join('') + '</ul></section>'
+      ? '<section><h3>' + escapeHtml(title) + '</h3><ul>' + rows.map((row) => duelRowHtml(row, booked, focusKey)).join('') + '</ul></section>'
       : '';
     const overlay = document.createElement('div');
     overlay.className = 'roll-overlay duel-overlay';
