@@ -121,6 +121,12 @@ const THEMES = {
     sky: '#1a1206', fog: ['#3a2a10', 18, 50], hemi: ['#ffe0a0', '#3a2a10', 0.75], sun: ['#ffe8b8', 1.1],
     props: ['eggs', 'hive', 'cave-rocks', 'torches'], particles: 'dust',
   },
+  shrine: {
+    shape: 'island', floor: ['#3d5a3a', '#456242', '#385434', '#4a6844'], worn: '#5a7048', wall: ['#1a2a18'],
+    liquid: { color: '#0c3a28', emissive: '#021810', y: -0.48, opacity: 0.9, water: true },
+    sky: '#0c1810', fog: ['#14281c', 20, 56], hemi: ['#c8e0a8', '#061208', 0.7], sun: ['#d8f0c0', 0.95],
+    props: ['pillars', 'dead-trees', 'rocks'], particles: 'spores',
+  },
   // The spoop-vs-spoop pit: packed sand, a wooden lip, corner posts, and stands around it.
   pit: {
     shape: 'pit', floor: ['#e4c98a', '#d7b56e', '#c9a45a', '#edd6a0'], worn: '#b48a42', wall: ['#3a322c', '#2e2824', '#463c34'],
@@ -133,7 +139,8 @@ const THEMES = {
 export const BOSS_SCENE = {
   brutus: 'pasture', cow: 'pasture', mole: 'lair', scurrius: 'sewer', rat: 'sewer', elvarg: 'crandor',
   chaos: 'wild', spider: 'wild', leviathan: 'pool', obor: 'hillcave', bryophyta: 'mossy', kbd: 'kbdlair',
-  vorkath: 'ungael', kq: 'kqlair', sarachnis: 'mossy', dusk: 'hillcave', dawn: 'hillcave', skotizo: 'wild',
+  vorkath: 'ungael', kq: 'kqlair', sarachnis: 'mossy', dusk: 'hillcave', dawn: 'hillcave', skotizo: 'wild', crazy: 'wild',
+  zulrah: 'shrine',
 };
 
 function heightFor(theme, x, z) {
@@ -668,16 +675,84 @@ export function createWorld(canvas) {
   controls.update();
 
   let pixel = false;
+  let ps1 = false;
+  const ps1Target = new THREE.WebGLRenderTarget(320, 180, {
+    depthBuffer: true,
+    magFilter: THREE.NearestFilter,
+    minFilter: THREE.NearestFilter,
+    generateMipmaps: false,
+  });
+  ps1Target.texture.colorSpace = THREE.SRGBColorSpace;
+  ps1Target.texture.generateMipmaps = false;
+  const ps1Texel = new THREE.Vector2(1 / 320, 1 / 180);
+  const ps1Material = new THREE.ShaderMaterial({
+    glslVersion: THREE.GLSL3,
+    uniforms: { tDiffuse: { value: ps1Target.texture }, texel: { value: ps1Texel } },
+    vertexShader: `
+      out vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = vec4(position.xy, 0.0, 1.0);
+      }
+    `,
+    fragmentShader: `
+      precision highp float;
+      uniform sampler2D tDiffuse;
+      uniform vec2 texel;
+      in vec2 vUv;
+      out vec4 fragColor;
+      float bayer4(vec2 p) {
+        int x = int(mod(p.x, 4.0));
+        int y = int(mod(p.y, 4.0));
+        const int bayer[16] = int[16](0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5);
+        return float(bayer[x + y * 4]) / 16.0;
+      }
+      void main() {
+        vec2 cell = floor(vUv / texel);
+        vec3 linear = texture(tDiffuse, (cell + 0.5) * texel).rgb;
+        vec3 color = pow(max(linear, vec3(0.0)), vec3(1.0 / 2.2));
+        color += (bayer4(cell) - 0.5) / 32.0;
+        color = floor(clamp(color, 0.0, 1.0) * 31.0 + 0.5) / 31.0;
+        fragColor = vec4(pow(color, vec3(2.2)), 1.0);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false,
+    toneMapped: false,
+  });
+  const ps1Scene = new THREE.Scene();
+  ps1Scene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), ps1Material));
+  const ps1Camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
   function resize() {
     const w = canvas.clientWidth || 1;
     const h = canvas.clientHeight || 1;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(pixel ? Math.max(0.34, dpr / 3) : dpr);
+    // The PS1 pass draws the chunks itself. Pixel mode shrinks the canvas instead.
+    renderer.setPixelRatio((ps1 || !pixel) ? dpr : Math.max(0.34, dpr / 3));
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
     // A tall phone screen gets a wider lens, so the fight still fits side to side.
     camera.fov = camera.aspect < 1 ? 38 + (1 - camera.aspect) * 34 : 38;
     camera.updateProjectionMatrix();
+    if (ps1) {
+      const iw = Math.max(320, Math.round(w * 0.5));
+      const ih = Math.max(180, Math.round(iw * (h / Math.max(1, w))));
+      if (ps1Target.width !== iw || ps1Target.height !== ih) ps1Target.setSize(iw, ih);
+      ps1Texel.set(1 / iw, 1 / ih);
+    }
+  }
+
+  function render() {
+    if (!ps1) {
+      renderer.setRenderTarget(null);
+      renderer.render(scene, camera);
+      return;
+    }
+    renderer.setRenderTarget(ps1Target);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+    renderer.render(ps1Scene, ps1Camera);
   }
 
   return {
@@ -686,11 +761,16 @@ export function createWorld(canvas) {
     camera,
     controls,
     resize,
+    render,
     setScene,
     update,
     get sceneId() { return currentId; },
     setPixel(on) {
       pixel = !!on;
+      resize();
+    },
+    setPs1(on) {
+      ps1 = !!on;
       resize();
     },
     resetCamera() {

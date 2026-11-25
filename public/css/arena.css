@@ -3072,6 +3072,20 @@
 .actor.is-kq.is-molting .boss-sprite { animation: kq-molt 0.45s ease-in-out infinite; }
 .actor.is-kq.is-dead .boss-sprite { animation: none; }
 
+.actor.is-zulrah .sprite-wrap { width: 200px; height: 140px; }
+.actor.is-zulrah .hud { width: 160px; }
+.actor.is-zulrah.is-burrowed .boss-sprite { opacity: 0; animation: none; }
+
+.pit.is-shrine { box-shadow: inset 0 0 0 6px #1a3a28; }
+.pit.is-shrine .colosseum,
+.pit.is-shrine .pit-post { display: none; }
+.pit.is-shrine .pit-stage {
+  background-color: #06140e;
+  background-image:
+    radial-gradient(ellipse 70% 62% at 50% 48%, #3d6a48 0%, #1a3a28 46%, #06140e 82%);
+  background-size: 100% 100%;
+}
+
 .pit.is-kqlair { box-shadow: inset 0 0 0 6px #5a4320; }
 .pit.is-kqlair .colosseum,
 .pit.is-kqlair .pit-post { display: none; }
@@ -3731,6 +3745,9 @@
 .raid-map .map-stop .map-node { transition: stroke 0.12s ease, fill 0.12s ease; }
 .raid-map .map-stop.is-rest .map-node { stroke: #86efac; }
 .raid-map .map-stop.is-treasure .map-node { stroke: #fbbf24; }
+.raid-map .map-stop.is-altar .map-node { stroke: #c4b5fd; }
+.raid-map .map-stop.is-grave .map-node { stroke: #d6d3d1; }
+.raid-map .map-stop.is-gear .map-node { stroke: #67e8f9; }
 .raid-map .map-stop.is-swarm .map-node { stroke: #93c5fd; }
 .raid-map .map-stop.is-past .map-node { fill: #2c1f12; }
 .raid-map .map-stop.is-skipped { opacity: 0.38; }
@@ -3815,6 +3832,8 @@
 .raid-chest.is-open .raid-chest-box { animation: chest-pop 0.45s ease-out; }
 .raid-chest.is-big.is-open .raid-chest-box { border-color: #f0d878; box-shadow: 0 0 22px rgba(240, 216, 120, 0.45); }
 .raid-chest.is-huge.is-open .raid-chest-box { border-color: #d946ef; box-shadow: 0 0 28px rgba(217, 70, 239, 0.55); }
+.raid-chest.is-rune.is-open .raid-chest-box { border-color: #38bdf8; box-shadow: 0 0 22px rgba(56, 189, 248, 0.45); }
+.raid-chest.is-dragon.is-open .raid-chest-box { border-color: #f97316; box-shadow: 0 0 26px rgba(249, 115, 22, 0.5); }
 .raid-chest.is-huge .raid-chest-gold { color: #f5d0fe; }
 .raid-chest-gold { margin-top: 10px; font-variant-numeric: tabular-nums; }
 

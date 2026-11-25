@@ -297,9 +297,22 @@
       return row;
     }
     (raid.rooms || []).forEach((room) => {
-      if (room.kind === 'treasure') {
+      if (room.kind === 'treasure' || room.kind === 'altar' || room.kind === 'grave') {
         (room.shares || []).forEach((share) => {
           if (share) person(share.id, share.name).gold += Number(share.gold) || 0;
+        });
+        if (room.raised) person(room.raised.id, room.raised.name).fell = '';
+        return;
+      }
+      if (room.kind === 'gear') {
+        (room.gifts || []).forEach((gift) => {
+          if (!gift) return;
+          person(gift.id, gift.name).drops.push({
+            name: gift.item,
+            osrsId: gift.osrsId,
+            rare: !!(room.chest && room.chest.id === 'dragon'),
+            from: (room.chest && room.chest.name) || 'a chest',
+          });
         });
         return;
       }
@@ -342,7 +355,7 @@
     const killed = rooms
       .filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name && !room.boss.skirmish)
       .map((room) => room.boss.name);
-    const chests = rooms.filter((room) => room.kind === 'treasure' && room.chest).map((room) => room.chest.name);
+    const chests = rooms.filter((room) => (room.kind === 'treasure' || room.kind === 'gear') && room.chest).map((room) => room.chest.name);
     const map = raid.map && !Array.isArray(raid.map) ? raid.map : null;
     const depth = map && map.layers
       ? 'Reached ' + (raid.route || []).length + ' of ' + map.layers + ' rooms.'
@@ -447,7 +460,7 @@
   }
 
   // Same waits as RAID_SHOW in lib/spoop/engine.js.
-  const SHOW = { open: 10000, fork: 3600, travel: 5000, camp: 7000, chest: 8000 };
+  const SHOW = { open: 10000, fork: 3600, travel: 5000, camp: 7000, chest: 8000, altar: 7000, grave: 7500, gear: 9000 };
 
   // Raids from before the branching map stored a plain list of points, one per room.
   function raidMap(data) {
@@ -485,7 +498,7 @@
 
   function nodeLabel(node) {
     if (!node) return '';
-    if (node.kind === 'rest' || node.kind === 'treasure') return node.name;
+    if (node.kind === 'rest' || node.kind === 'treasure' || node.kind === 'altar' || node.kind === 'grave' || node.kind === 'gear') return node.name;
     return node.name + (node.tierName ? ' · ' + node.tierName : '');
   }
 
@@ -725,6 +738,113 @@
     });
   }
 
+  function showAltar(room, node, token) {
+    return new Promise((resolve) => {
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      const healed = new Map((room.healed || []).map((row) => [row.id, row]));
+      const title = room.gift === 'greed' ? 'Gold, and a curse' : room.gift === 'bless' ? 'A blessing' : 'The altar mends';
+      if (kickerEl) kickerEl.textContent = 'Altar';
+      if (phaseEl) phaseEl.textContent = title;
+      let line = 'The altar blesses the party. They hit harder in the next fight.';
+      if (room.gift === 'mend') {
+        const names = (room.party || []).filter((row) => healed.has(row.id)).map((row) => row.name);
+        line = names.length ? joinNames(names) + (names.length === 1 ? ' is' : ' are') + ' made whole.' : 'Nobody needed mending.';
+      } else if (room.gift === 'greed') {
+        const gold = (room.shares || []).reduce((sum, row) => sum + (Number(row.gold) || 0), 0);
+        line = 'The altar pays ' + gold.toLocaleString('en-US') + ' gold. The next fight is cursed.';
+      }
+      const rows = room.gift === 'mend'
+        ? (room.party || []).map((row) => {
+          const heal = healed.get(row.id);
+          const before = heal ? { hp: heal.from, maxHp: heal.maxHp } : row;
+          return '<div class="raid-share raid-camp-row' + (heal ? ' is-healed' : '') + '" data-id="' + escapeHtml(row.id) + '">' +
+            '<strong>' + escapeHtml(row.name) + '</strong>' + hpLine(before) +
+            (heal ? '<em class="raid-camp-gain">+' + (heal.to - heal.from) + '</em>' : '') +
+          '</div>';
+        }).join('')
+        : (room.shares || []).map((share) =>
+          '<div class="raid-share"><strong>' + escapeHtml(share.name) + '</strong><span>' +
+            Number(share.gold || 0).toLocaleString('en-US') + ' gp</span></div>'
+        ).join('');
+      stageEl.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 1718, 56) +
+        '<p class="raid-chosen">' + escapeHtml(line) + '</p><div class="raid-shares">' + rows + '</div></div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => resolve(token === rollToken), SHOW.altar);
+    });
+  }
+
+  function showGrave(room, node, token) {
+    return new Promise((resolve) => {
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      let line = 'Nobody is buried here. A few coins in the dust.';
+      let title = 'Quiet';
+      if (room.act === 'raise' && room.raised) {
+        title = 'Raised';
+        line = room.raised.name + ' stands back up at ' + room.raised.to + ' of ' + room.raised.maxHp + ' hitpoints. The living pay for it.';
+      } else if (room.act === 'loot') {
+        title = 'Robbed';
+        const left = (room.left || []).filter(Boolean);
+        line = left.length ? 'They leave ' + joinNames(left) + ' and take the coins.' : 'They take the coins and leave the dead.';
+      }
+      if (kickerEl) kickerEl.textContent = 'Gravestone';
+      if (phaseEl) phaseEl.textContent = title;
+      const shares = (room.shares || []).map((share) => {
+        const gold = Number(share.gold) || 0;
+        const text = (gold < 0 ? '−' : '') + Math.abs(gold).toLocaleString('en-US') + ' gp';
+        return '<div class="raid-share"><strong>' + escapeHtml(share.name) + '</strong><span>' + text + '</span></div>';
+      }).join('');
+      stageEl.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 526, 56) +
+        '<p class="raid-chosen">' + escapeHtml(line) + '</p><div class="raid-shares">' + shares + '</div></div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => resolve(token === rollToken), SHOW.grave);
+    });
+  }
+
+  function showGear(room, token) {
+    return new Promise((resolve) => {
+      const chest = room.chest || {};
+      if (!lootEl || !stageEl) {
+        resolve(token === rollToken);
+        return;
+      }
+      if (kickerEl) kickerEl.textContent = chest.id === 'dragon' ? 'Dragon chest' : 'Rune chest';
+      if (phaseEl) phaseEl.textContent = chest.name || 'A chest';
+      stageEl.innerHTML = '<div class="raid-chest is-' + escapeHtml(chest.id || 'rune') + ' is-shut">' +
+        '<div class="raid-chest-box">' + iconHtml(chest.osrsId, 72) + '</div>' +
+        '<p class="raid-gold raid-chest-gold">' + (chest.rolls || 0) + ' rolls</p>' +
+        '<div class="raid-shares"></div></div>';
+      lootEl.classList.add('is-intro');
+      lootEl.hidden = false;
+      if (banner) banner.hidden = true;
+      window.setTimeout(() => {
+        if (token !== rollToken) return;
+        const box = stageEl.querySelector('.raid-chest');
+        if (box) {
+          box.classList.remove('is-shut');
+          box.classList.add('is-open');
+        }
+        const shares = stageEl.querySelector('.raid-chest .raid-shares');
+        if (shares) {
+          shares.innerHTML = (room.gifts || []).map((gift) =>
+            '<div class="raid-share"><strong>' + escapeHtml(gift.name) + '</strong>' +
+              iconHtml(gift.osrsId, 28) + '<span>' + escapeHtml(gift.item) + '</span></div>'
+          ).join('');
+        }
+      }, 1800);
+      window.setTimeout(() => resolve(token === rollToken), SHOW.gear);
+    });
+  }
+
   // After the last card the full recap takes over, unless a wipe already put it up.
   async function closeOut(data, token) {
     if (!lootEl || lootEl.classList.contains('is-recap')) return;
@@ -779,7 +899,7 @@
     const total = map.layers || map.route.length;
     const byId = new Map(map.nodes.map((node) => [node.id, node]));
     if (statusEl) statusEl.textContent = data.name || 'Tonight';
-    if (notesEl) notesEl.textContent = total + ' rooms deep. Damage carries from room to room, and the camp after the second boss patches up three. Anyone who dies stays down.';
+    if (notesEl) notesEl.textContent = total + ' rooms deep. Damage carries from room to room. An altar, a gravestone, or a chest can sit between the bosses. Anyone left in the ground stays down unless a stone raises them.';
     const opened = await showOpening(map, data, token);
     if (!opened || token !== rollToken) return;
     clearLoot();
@@ -793,8 +913,12 @@
         const more = rooms.indexOf(room) < rooms.length - 1;
         if (statusEl) statusEl.textContent = (step + 1) + ' / ' + total + ' · ' + (data.name || 'Tonight');
         if (notesEl) notesEl.textContent = 'Room ' + (step + 1) + ' of ' + total;
-        if (room.kind === 'rest' || room.kind === 'treasure') {
-          const shown = room.kind === 'rest' ? await showCamp(room, node, token) : await showChest(room, token);
+        if (room.kind === 'rest' || room.kind === 'treasure' || room.kind === 'altar' || room.kind === 'grave' || room.kind === 'gear') {
+          const shown = room.kind === 'rest' ? await showCamp(room, node, token)
+            : room.kind === 'treasure' ? await showChest(room, token)
+            : room.kind === 'altar' ? await showAltar(room, node, token)
+            : room.kind === 'grave' ? await showGrave(room, node, token)
+            : await showGear(room, token);
           if (!shown || token !== rollToken) return;
           clearLoot();
           continue;
@@ -829,9 +953,10 @@
   function paintScene(boss) {
     const pit = document.getElementById('arena-pit');
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair', 'is-shrine');
     const known = {
       kq: 'is-kqlair',
+      zulrah: 'is-shrine',
       bryophyta: 'is-mossy',
       kbd: 'is-kbdlair',
       obor: 'is-hillcave',
@@ -916,7 +1041,7 @@
     const tonight = bossEl.value === 'raid';
     tierEl.disabled = tonight;
     tierEl.title = tonight ? 'Tonight rolls a tier for each boss' : '';
-    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough' }[bossEl.value];
+    const home = { elvarg: 'easy', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', cerberus: 'tough', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough', crazy: 'easy', zulrah: 'tough' }[bossEl.value];
     if (!tonight && home && bossEl.dataset.home !== bossEl.value) tierEl.value = home;
     bossEl.dataset.home = bossEl.value;
   }

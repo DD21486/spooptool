@@ -19,9 +19,11 @@ const BOSS = {
   dusk: { h: 4.4, mouth: [-0.2, 0.55] },
   dawn: { h: 3.2, mouth: [-0.15, 0.62] },
   skotizo: { h: 4.2, mouth: [-0.18, 0.5] },
+  crazy: { h: 2.7, mouth: [-0.2, 0.72] },
+  zulrah: { h: 3.6, mouth: [-0.2, 0.78] },
 };
 // Minions are sized by their art, since a growthling fights under the rat's name.
-const MINION = { 'Giant_rat.png': 0.9, 'Growthling.png': 1.15, 'Cow.png': 1.4, 'Venenatis_spiderling.png': 0.8 };
+const MINION = { 'Giant_rat.png': 0.9, 'Growthling.png': 1.15, 'Cow.png': 1.4, 'Venenatis_spiderling.png': 0.8, 'Greater_demon.png': 1.7 };
 const loader = new THREE.TextureLoader();
 
 export function buildBoss(fighter) {

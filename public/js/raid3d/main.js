@@ -36,6 +36,7 @@ const pauseBtn = $('r3d-pause');
 const scrub = $('r3d-scrub');
 const clockEl = $('r3d-clock');
 const pixelBox = $('r3d-pixel');
+const ps1Box = $('r3d-ps1');
 const namesBox = $('r3d-names');
 const partyEl = $('r3d-party');
 const meterEl = $('r3d-meter');
@@ -78,14 +79,17 @@ function writePref(key, on) {
 }
 
 function applyView() {
-  document.body.classList.toggle('is-pixel', pixelBox.checked);
+  document.body.classList.toggle('is-pixel', pixelBox.checked && !(ps1Box && ps1Box.checked));
   document.body.classList.toggle('no-names', !namesBox.checked);
   world.setPixel(pixelBox.checked);
+  if (ps1Box) world.setPs1(ps1Box.checked);
 }
 
 pixelBox.checked = readPref('r3d-pixel', true);
+if (ps1Box) ps1Box.checked = readPref('r3d-ps1', true);
 namesBox.checked = readPref('r3d-names', true);
 pixelBox.addEventListener('change', () => { writePref('r3d-pixel', pixelBox.checked); applyView(); });
+if (ps1Box) ps1Box.addEventListener('change', () => { writePref('r3d-ps1', ps1Box.checked); applyView(); });
 namesBox.addEventListener('change', () => { writePref('r3d-names', namesBox.checked); applyView(); });
 const camButtons = Array.from(document.querySelectorAll('[data-cam]'));
 const resetBtn = $('r3d-cam');
@@ -123,7 +127,7 @@ function sampleTrack(pts, time) {
   }
   const a = pts[lo];
   const b = pts[hi];
-  if (b[4] === 'up') return { x: a[1], y: a[2], buried: true, target: a[3] || null, i: lo };
+  if (a[4] === 'down' || b[4] === 'down' || b[4] === 'up') return { x: a[1], y: a[2], buried: true, target: a[3] || null, i: lo };
   const u = (time - a[0]) / (b[0] - a[0] || 1);
   return { x: a[1] + (b[1] - a[1]) * u, y: a[2] + (b[2] - a[2]) * u, target: a[3] || null, i: lo, u };
 }
@@ -332,6 +336,9 @@ function planCallouts(fight, bossName) {
     seen.add(key);
     list.push({ t: hz.t0, title: bossName + ': ' + String(hz.label || hz.attack).toUpperCase(), tip: CALLOUT_TIPS[hz.kind] || 'Watch out!' });
   });
+  (fight.banners || []).forEach((row) => {
+    list.push({ t: row.t, title: row.title, tip: row.tip || 'Watch out!' });
+  });
   const rage = Number(fight.rageAt) || 0;
   if (rage > 0 && rage < (Number(fight.duration) || 0)) list.push({ t: rage, title: bossName + ' is enraged!', tip: 'It only gets faster from here.', rage: true });
   return list.sort((a, b) => a.t - b.t);
@@ -429,7 +436,7 @@ function loadFight(fight, opts) {
     const pts = tracks[f.id] || [];
     const cum = [0];
     for (let i = 1; i < pts.length; i++) {
-      const jump = pts[i][4] === 'up';
+      const jump = pts[i][4] === 'up' || pts[i][4] === 'down';
       cum.push(cum[i - 1] + (jump ? 0 : Math.hypot(pts[i][1] - pts[i - 1][1], pts[i][2] - pts[i - 1][2]) * K));
     }
     const monster = !!f.monster;
@@ -442,6 +449,14 @@ function loadFight(fight, opts) {
     const unit = monster ? null : makeUnit(f);
     const meter = monster || preview ? null : makeMeter(f);
     const buried = [];
+    for (let i = 0; i < pts.length; i++) {
+      if (pts[i][4] !== 'down') continue;
+      const start = pts[Math.max(0, i - 1)][0];
+      let j = i;
+      while (j + 1 < pts.length && pts[j + 1][4] === 'down') j += 1;
+      buried.push([start, pts[Math.min(pts.length - 1, j + 1)][0]]);
+      i = j;
+    }
     for (let i = 1; i < pts.length; i++) if (pts[i][4] === 'up') buried.push([pts[i - 1][0], pts[i][0]]);
     actors.set(f.id, {
       f, obj, pts, cum, monster, maxHp, startHp: start, buried,
@@ -499,6 +514,7 @@ function loadFight(fight, opts) {
 
   fx.setHazards(fight.hazards || []);
   fx.setRubble(fight.rubble || []);
+  fx.setAltars(fight.altars || []);
   const pvp = !!(live && live.segs && !live.raid);
   const scene = (opts && opts.scene) || (preview ? 'grass' : pvp ? 'pit' : (BOSS_SCENE[boss && boss.f.monster] || 'grass'));
   world.setScene(scene);
@@ -967,7 +983,9 @@ function drawOverlay() {
 
 function nameOf(id) {
   const a = actors.get(id);
-  return a ? a.f.name : 'Someone';
+  if (a) return a.f.name;
+  if (String(id).indexOf('altar') === 0) return 'an altar';
+  return 'Someone';
 }
 
 function drawLog() {
@@ -1180,7 +1198,7 @@ function frame(now) {
     director.update({ t, actors, boss: null });
     syncSound();
   }
-  world.renderer.render(world.scene, world.camera);
+  world.render();
 }
 requestAnimationFrame(frame);
 
@@ -1209,7 +1227,7 @@ window.raid3d = {
 // ---- Live raid ----
 // The night's rooms in order, on the same clock the engine uses for the show (RAID_SHOW and
 // fightPlaybackMs in lib/spoop/engine.js), so this stays in step with the 2D page and Discord.
-const SHOW = { open: 10000, card: 3200, loot: 22000, split: 12000, travel: 5000, fork: 3600, camp: 7000, chest: 8000 };
+const SHOW = { open: 10000, card: 3200, loot: 22000, split: 12000, travel: 5000, fork: 3600, camp: 7000, chest: 8000, altar: 7000, grave: 7500, gear: 9000 };
 // Inside a loot card: who loots, then the drop reel, then the split for the rest of the card.
 const ROLL = { spin: 3000, up: 1500, reel: 5100, land: 900 };
 const ROLL_MS = ROLL.spin + ROLL.up + ROLL.reel + ROLL.land;
@@ -1230,7 +1248,7 @@ function esc(text) {
 
 function nodeLabel(node) {
   if (!node) return '';
-  return node.name + (node.tierName && node.kind !== 'rest' && node.kind !== 'treasure' ? ' · ' + node.tierName : '');
+  return node.name + (node.tierName && node.kind !== 'rest' && node.kind !== 'treasure' && node.kind !== 'altar' && node.kind !== 'grave' && node.kind !== 'gear' ? ' · ' + node.tierName : '');
 }
 
 function planRaid(last) {
@@ -1253,6 +1271,9 @@ function planRaid(last) {
       const more = index < rooms.length - 1;
       if (room.kind === 'rest') return push('camp', SHOW.camp, { room });
       if (room.kind === 'treasure') return push('chest', SHOW.chest, { room });
+      if (room.kind === 'altar') return push('altar', SHOW.altar, { room });
+      if (room.kind === 'grave') return push('grave', SHOW.grave, { room });
+      if (room.kind === 'gear') return push('gear', SHOW.gear, { room });
       fights += 1;
       push('card', SHOW.card, { room, index, n: fights });
       const dur = Number(room.duration || (room.bout && room.bout.duration)) || 0;
@@ -1479,7 +1500,8 @@ function drawCard(seg, v) {
   const tier = boss.tierName || 'Medium';
   showRaid('Raid fight ' + seg.n, boss.name || 'Boss', 'is-title');
   raidStage.innerHTML = '<p class="raid-diff is-' + tierSlug(tier) + '">' + esc(tier) + '</p>' +
-    '<p class="r3d-title-line">' + esc((boss.level ? 'Level ' + boss.level : '') + (boss.maxHit ? ' · hits up to ' + boss.maxHit : '')) + '</p>';
+    '<p class="r3d-title-line">' + esc((boss.level ? 'Level ' + boss.level : '') + (boss.maxHit ? ' · hits up to ' + boss.maxHit : '') +
+      (seg.room.omen === 'bless' ? ' · blessed' : seg.room.omen === 'curse' ? ' · cursed' : '')) + '</p>';
 }
 
 function drawFork(seg, ms, v) {
@@ -1590,6 +1612,104 @@ function drawChest(seg, ms, v) {
     v.phase = 'split';
     raidStage.querySelector('.raid-chest .raid-shares').innerHTML = (room.shares || []).map((share) =>
       '<div class="raid-share"><strong>' + esc(share.name) + '</strong><span>' + Number(share.gold || 0).toLocaleString('en-US') + ' gp</span></div>'
+    ).join('');
+  }
+}
+
+function drawAltar(seg, ms, v) {
+  const room = seg.room;
+  const healed = new Map((room.healed || []).map((row) => [row.id, row]));
+  if (!v.phase) {
+    v.phase = 'altar';
+    const title = room.gift === 'greed' ? 'Gold, and a curse' : room.gift === 'bless' ? 'A blessing' : 'The altar mends';
+    showRaid('Altar', title, 'is-intro');
+    let line = 'The altar blesses the party. They hit harder in the next fight.';
+    if (room.gift === 'mend') {
+      const names = (room.party || []).filter((row) => healed.has(row.id)).map((row) => row.name);
+      line = names.length ? joinNames(names) + (names.length === 1 ? ' is' : ' are') + ' made whole.' : 'Nobody needed mending.';
+    } else if (room.gift === 'greed') {
+      line = 'The altar pays ' + Number((room.shares || []).reduce((sum, row) => sum + (Number(row.gold) || 0), 0)).toLocaleString('en-US') + ' gold. The next fight is cursed.';
+    }
+    const rows = room.gift === 'mend'
+      ? (room.party || []).map((row) => {
+        const heal = healed.get(row.id);
+        const before = heal ? { hp: heal.from, maxHp: heal.maxHp } : row;
+        return '<div class="raid-share raid-camp-row' + (heal ? ' is-healed' : '') + '" data-id="' + esc(row.id) + '">' +
+          '<strong>' + esc(row.name) + '</strong>' + hpLine(before) +
+          (heal ? '<em class="raid-camp-gain">+' + (heal.to - heal.from) + '</em>' : '') +
+        '</div>';
+      }).join('')
+      : (room.shares || []).map((share) =>
+        '<div class="raid-share"><strong>' + esc(share.name) + '</strong><span>' + Number(share.gold || 0).toLocaleString('en-US') + ' gp</span></div>'
+      ).join('');
+    const node = live.nodes.get(room.node);
+    raidStage.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 1718, 56) +
+      '<p class="raid-chosen">' + esc(line) + '</p><div class="raid-shares">' + rows + '</div></div>';
+  }
+  if (ms >= 1400 && v.phase === 'altar' && room.gift === 'mend') {
+    v.phase = 'healed';
+    healed.forEach((heal, id) => {
+      const el = raidStage.querySelector('.raid-camp-row[data-id="' + id + '"]');
+      if (!el) return;
+      el.classList.add('is-full');
+      const bar = el.querySelector('.raid-hp b');
+      const text = el.querySelector('.raid-hp small');
+      if (bar) {
+        bar.style.width = '100%';
+        bar.style.background = hpColor(1);
+      }
+      if (text) text.textContent = heal.to + '/' + heal.maxHp;
+    });
+  }
+}
+
+function drawGrave(seg, ms, v) {
+  if (v.phase) return;
+  v.phase = 'grave';
+  const room = seg.room;
+  const node = live.nodes.get(room.node);
+  let line = 'Nobody is buried here. A few coins in the dust.';
+  if (room.act === 'raise' && room.raised) {
+    line = room.raised.name + ' stands back up at ' + room.raised.to + ' of ' + room.raised.maxHp + ' hitpoints. The living pay for it.';
+  } else if (room.act === 'loot') {
+    const left = (room.left || []).filter(Boolean);
+    line = (left.length ? 'They leave ' + joinNames(left) + ' and take the coins.' : 'They take the coins and leave the dead.');
+  }
+  const shares = (room.shares || []).map((share) => {
+    const gold = Number(share.gold) || 0;
+    const text = (gold < 0 ? '−' : '') + Math.abs(gold).toLocaleString('en-US') + ' gp';
+    return '<div class="raid-share"><strong>' + esc(share.name) + '</strong><span>' + text + '</span></div>';
+  }).join('');
+  showRaid('Gravestone', room.act === 'raise' ? 'Raised' : room.act === 'loot' ? 'Robbed' : 'Quiet', 'is-intro');
+  raidStage.innerHTML = '<div class="raid-camp">' + iconHtml((node && node.icon) || 526, 56) +
+    '<p class="raid-chosen">' + esc(line) + '</p><div class="raid-shares">' + shares + '</div></div>';
+}
+
+function drawGear(seg, ms, v) {
+  const room = seg.room;
+  const chest = room.chest || {};
+  if (!v.phase) {
+    v.phase = 'shut';
+    showRaid(chest.id === 'dragon' ? 'Dragon chest' : 'Rune chest', chest.name || 'A chest', 'is-intro');
+    raidStage.innerHTML = '<div class="raid-chest is-' + esc(chest.id || 'rune') + ' is-shut">' +
+      '<div class="raid-chest-box">' + iconHtml(chest.osrsId, 72) + '</div>' +
+      '<p class="raid-gold raid-chest-gold">' + (chest.rolls || 0) + ' rolls</p><div class="raid-shares"></div></div>';
+  }
+  if (ms < 1800) return;
+  const box = raidStage.querySelector('.raid-chest');
+  if (v.phase === 'shut' && box) {
+    v.phase = 'open';
+    box.classList.remove('is-shut');
+    box.classList.add('is-open');
+    const shown = Math.max(1, Math.floor(((ms - 1800) / 1600) * ((room.gifts || []).length || 1)));
+    raidStage.querySelector('.raid-chest .raid-shares').innerHTML = (room.gifts || []).slice(0, shown).map((gift) =>
+      '<div class="raid-share"><strong>' + esc(gift.name) + '</strong>' + iconHtml(gift.osrsId, 28) + '<span>' + esc(gift.item) + '</span></div>'
+    ).join('');
+  }
+  if (v.phase === 'open' && ms >= 3400) {
+    v.phase = 'dealt';
+    raidStage.querySelector('.raid-chest .raid-shares').innerHTML = (room.gifts || []).map((gift) =>
+      '<div class="raid-share"><strong>' + esc(gift.name) + '</strong>' + iconHtml(gift.osrsId, 28) + '<span>' + esc(gift.item) + '</span></div>'
     ).join('');
   }
 }
@@ -1711,7 +1831,17 @@ function raidTallies(raid) {
     return row;
   };
   (raid.rooms || []).forEach((room) => {
-    if (room.kind === 'treasure') return (room.shares || []).forEach((s) => { if (s) person(s.id, s.name).gold += Number(s.gold) || 0; });
+    if (room.kind === 'treasure' || room.kind === 'altar' || room.kind === 'grave') {
+      (room.shares || []).forEach((s) => { if (s) person(s.id, s.name).gold += Number(s.gold) || 0; });
+      if (room.raised) person(room.raised.id, room.raised.name).fell = '';
+      return;
+    }
+    if (room.kind === 'gear') {
+      (room.gifts || []).forEach((gift) => {
+        if (gift) person(gift.id, gift.name).drops.push({ name: gift.item, osrsId: gift.osrsId, rare: room.chest && room.chest.id === 'dragon', from: (room.chest && room.chest.name) || 'a chest' });
+      });
+      return;
+    }
     if (room.kind === 'rest') return;
     const bout = room.bout || {};
     const bossName = (room.boss && room.boss.name) || 'the room';
@@ -1735,7 +1865,7 @@ function drawRecap(v) {
   const rooms = raid.rooms || [];
   const lastRoom = rooms[rooms.length - 1];
   const killed = rooms.filter((room) => room.bout && room.bout.loot && !room.bout.loot.wiped && room.boss && room.boss.name && !room.boss.skirmish).map((room) => room.boss.name);
-  const chests = rooms.filter((room) => room.kind === 'treasure' && room.chest).map((room) => room.chest.name);
+  const chests = rooms.filter((room) => (room.kind === 'treasure' || room.kind === 'gear') && room.chest).map((room) => room.chest.name);
   const depth = live.map.layers ? ' Reached ' + live.map.route.length + ' of ' + live.map.layers + ' rooms.' : '';
   const headline = raid.cleared ? 'The party cleared the raid.' : 'The party fell to ' + ((lastRoom && lastRoom.boss && lastRoom.boss.name) || 'the raid') + '.';
   const path = (killed.length ? 'Killed ' + joinNames(killed) + '.' : 'No boss went down.') + (chests.length ? ' Opened a ' + joinNames(chests) + '.' : '') + depth;
@@ -1892,6 +2022,9 @@ function drawSeg(seg, ms) {
   if (seg.kind === 'travel') return drawTravel(seg, ms, v);
   if (seg.kind === 'camp') return drawCamp(seg, ms, v);
   if (seg.kind === 'chest') return drawChest(seg, ms, v);
+  if (seg.kind === 'altar') return drawAltar(seg, ms, v);
+  if (seg.kind === 'grave') return drawGrave(seg, ms, v);
+  if (seg.kind === 'gear') return drawGear(seg, ms, v);
   if (seg.kind === 'recap') return drawRecap(v);
   return drawMeet(seg, ms);
 }
@@ -2086,7 +2219,7 @@ async function fight() {
 }
 
 // Each boss's usual tier, same as /js/raid.js.
-const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough' };
+const HOME_TIER = { elvarg: 'easy', mole: 'medium', brutus: 'medium', scurrius: 'medium', chaos: 'hard', leviathan: 'master', obor: 'easy', vorkath: 'hard', bryophyta: 'easy', kbd: 'medium', kq: 'hard', sarachnis: 'easy', grotesque: 'medium', skotizo: 'tough', crazy: 'easy', zulrah: 'tough' };
 const testBench = document.body.classList.contains('is-test');
 bossEl.addEventListener('change', () => {
   if (HOME_TIER[bossEl.value]) tierEl.value = HOME_TIER[bossEl.value];

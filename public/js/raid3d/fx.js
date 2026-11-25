@@ -111,6 +111,46 @@ export function createFx(scene) {
     rubble.forEach((rock, i) => { rubbleMeshes[i].visible = t >= rock.t; });
   }
 
+  let altarList = [];
+  const altarMeshes = [];
+  function setAltars(list) {
+    altarMeshes.forEach((mesh) => mesh.removeFromParent());
+    altarMeshes.length = 0;
+    altarList = list || [];
+    altarList.forEach(() => {
+      const group = new THREE.Group();
+      const stone = new THREE.Mesh(
+        new THREE.BoxGeometry(0.7, 3.6, 0.7),
+        new THREE.MeshLambertMaterial({ color: '#b388ff', emissive: '#6d28d9', emissiveIntensity: 0.65, flatShading: true })
+      );
+      stone.position.y = 1.8;
+      stone.castShadow = true;
+      const cap = new THREE.Mesh(
+        new THREE.OctahedronGeometry(0.5, 0),
+        new THREE.MeshLambertMaterial({ color: '#f0e4ff', emissive: '#c084fc', emissiveIntensity: 1.2, flatShading: true })
+      );
+      cap.position.y = 3.85;
+      group.add(stone, cap);
+      group.visible = false;
+      airGroup.add(group);
+      altarMeshes.push(group);
+    });
+  }
+  function updateAltars(time) {
+    altarList.forEach((altar, i) => {
+      const mesh = altarMeshes[i];
+      if (time < altar.t) {
+        mesh.visible = false;
+        return;
+      }
+      let h = Math.min(1, (time - altar.t) / 0.55);
+      if (altar.died && time >= altar.died) h *= Math.max(0, 1 - (time - altar.died) / 0.45);
+      mesh.visible = h > 0.02;
+      mesh.scale.y = Math.max(0.02, h);
+      mesh.position.copy(toWorld(altar.x, altar.y));
+    });
+  }
+
   function setHazards(list) {
     clear();
     hazards = list || [];
@@ -252,6 +292,7 @@ export function createFx(scene) {
     ctxMouth = ctx && ctx.mouth;
     updateSpray(t, ctxMouth);
     updateRubble(t);
+    updateAltars(t);
     hazards.forEach((hz, i) => {
       const live = t >= hz.t0 && t <= hz.t1 + 0.6;
       let entry = made.get(i);
@@ -613,5 +654,5 @@ export function createFx(scene) {
     return out;
   }
 
-  return { setHazards, setRubble, update, drawProjectiles, labels, clear };
+  return { setHazards, setRubble, setAltars, update, drawProjectiles, labels, clear };
 }

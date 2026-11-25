@@ -729,7 +729,7 @@
     }
     const a = pts[lo];
     const b = pts[hi];
-    if (b[4] === 'up') {
+    if (a[4] === 'down' || b[4] === 'down' || b[4] === 'up') {
       return { x: a[1], y: a[2], moving: false, buried: true, target: aimOf(a) };
     }
     const span = b[0] - a[0] || 1;
@@ -1633,12 +1633,12 @@
 
   function paintRaidScene(fight) {
     if (!pit) return;
-    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair', 'is-raid-wait');
+    pit.classList.remove('is-lair', 'is-pasture', 'is-sewer', 'is-crandor', 'is-wild', 'is-pool', 'is-hillcave', 'is-ungael', 'is-kennel', 'is-mossy', 'is-kbdlair', 'is-kqlair', 'is-shrine', 'is-raid-wait');
     if (!fight || fight.formation !== 'raid') return;
     const boss = (fight.fighters || []).find((f) => f.monster && !f.minion && f.monster !== 'rat');
     const scene = fight.scene || {
       mole: 'is-lair', brutus: 'is-pasture', scurrius: 'is-sewer', elvarg: 'is-crandor', chaos: 'is-wild', leviathan: 'is-pool',
-      obor: 'is-hillcave', vorkath: 'is-ungael', cerberus: 'is-kennel', bryophyta: 'is-mossy', kbd: 'is-kbdlair', kq: 'is-kqlair',
+      obor: 'is-hillcave', vorkath: 'is-ungael', cerberus: 'is-kennel', bryophyta: 'is-mossy', kbd: 'is-kbdlair', kq: 'is-kqlair', zulrah: 'is-shrine',
     }[boss && boss.monster];
     if (scene) pit.classList.add(scene);
   }
