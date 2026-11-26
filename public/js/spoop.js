@@ -1953,6 +1953,17 @@
           '</div></div>' +
         '</div>'
       : '';
+    const heldCells = (spoop.heldCrates || []).map((held) => {
+      const tint = held.tint || TIER_COLORS[held.tier] || '#94a3b8';
+      return '<div class="spoop-slot is-held-crate" data-held="' + escapeHtml(held.id) + '" role="button" tabindex="0" aria-haspopup="menu" aria-label="' + escapeHtml(held.name + ', ' + held.count) + '" style="--crate-tint:' + tint + '">' +
+        crateIcon(tint) +
+        (held.count > 1 ? '<span class="mega-count">' + held.count + '</span>' : '') +
+        '<div class="spoop-tips"><div class="spoop-tip" role="tooltip">' +
+          '<p class="spoop-tip-mega">' + escapeHtml(held.name) + (held.count > 1 ? ' × ' + held.count : '') + '</p>' +
+          '<p class="text-slate-300 mt-1">A Thanksgiving gift. Click to open.</p>' +
+        '</div></div>' +
+      '</div>';
+    }).join('');
     const lampCells = (spoop.lamps || []).map((lamp) =>
       '<div class="spoop-slot is-lamp" data-lamp="' + escapeHtml(lamp.id) + '" role="button" tabindex="0" aria-haspopup="menu" aria-label="' + escapeHtml(lamp.name + ', ' + lamp.count) + '">' +
         (lamp.osrsId ? itemIcon(lamp) : '') +
@@ -1973,7 +1984,7 @@
         '</div></div>' +
       '</div>'
     ).join('');
-    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + jackpotCells + lampCells + bankCells.join('') + '</div>';
+    const bank = '<div class="flex flex-wrap gap-1">' + chestCell + heldCells + jackpotCells + lampCells + bankCells.join('') + '</div>';
     const log = activityLog(spoop);
     const fight = spoop.fights[0];
     const fightHtml = fight
@@ -2155,6 +2166,18 @@
         ev.preventDefault();
         const crate = (state.crates || []).find((row) => row.id === crateId);
         if (crate) openCrateMenu(ev, crate, build);
+      });
+    });
+    root.querySelectorAll('[data-held]').forEach((slot) => {
+      const held = (spoop.heldCrates || []).find((row) => row.id === slot.getAttribute('data-held'));
+      const open = (ev) => {
+        ev.preventDefault();
+        if (held) openHeldCrateMenu(slot, spoopKey(spoop), held, build);
+      };
+      slot.addEventListener('click', open);
+      slot.addEventListener('contextmenu', open);
+      slot.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Enter' || ev.key === ' ') open(ev);
       });
     });
     root.querySelectorAll('[data-lamp]').forEach((slot) => {
@@ -2916,6 +2939,38 @@
     menu.querySelector('[data-view]').focus();
   }
 
+  function openHeldCrateMenu(slot, name, held, build) {
+    closeCrateMenu();
+    const crate = (lastState && lastState.crates || []).find((row) => row.id === held.id);
+    const menu = document.createElement('div');
+    menu.className = 'spoop-menu';
+    menu.setAttribute('role', 'menu');
+    menu.innerHTML =
+      '<button type="button" role="menuitem" data-open>Open</button>' +
+      '<button type="button" role="menuitem" data-view>View contents</button>';
+    document.body.appendChild(menu);
+    const slotRect = slot.getBoundingClientRect();
+    const rect = menu.getBoundingClientRect();
+    let left = slotRect.left;
+    let top = slotRect.bottom + 4;
+    if (left + rect.width > window.innerWidth - 8) left = window.innerWidth - rect.width - 8;
+    if (top + rect.height > window.innerHeight - 8) top = Math.max(8, slotRect.top - rect.height - 4);
+    menu.style.left = Math.max(8, left) + 'px';
+    menu.style.top = top + 'px';
+    menu.querySelector('[data-open]').addEventListener('click', () => {
+      closeCrateMenu();
+      openHeldCrate(name, held);
+    });
+    menu.querySelector('[data-view]').addEventListener('click', () => {
+      closeCrateMenu();
+      if (crate) showCrateLoot(crate, build);
+    });
+    crateMenu = menu;
+    document.addEventListener('mousedown', onCrateMenuAway, true);
+    document.addEventListener('keydown', onCrateMenuKey);
+    menu.querySelector('[data-open]').focus();
+  }
+
   function openChestMenu(slot, name, table) {
     closeCrateMenu();
     const menu = document.createElement('div');
@@ -3089,6 +3144,37 @@
   }
 
   let openingChest = false;
+
+  async function openHeldCrate(name, held) {
+    if (openingChest || buyingCrate || askingCrate) return;
+    askingCrate = true;
+    let yes = false;
+    try {
+      yes = await askConfirm({
+        title: 'Open ' + held.name + '?',
+        detail: 'It rolls one piece, the same as buying one. This uses up the crate.',
+        yes: 'Open',
+      });
+    } finally {
+      askingCrate = false;
+    }
+    if (!yes) return;
+    buyingCrate = true;
+    try {
+      const data = await api('/api/spoops', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'open-held', name, crate: held.id }),
+      });
+      if (data.roll) await playRoll(data.roll);
+      const fresh = await api('/api/spoops');
+      render(fresh);
+    } catch (err) {
+      window.alert(err.message);
+    } finally {
+      buyingCrate = false;
+    }
+  }
 
   async function openMegaChest(name, table) {
     if (openingChest || buyingCrate || askingCrate) return;
