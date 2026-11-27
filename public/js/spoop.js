@@ -540,6 +540,8 @@
     put(13, 14, handDk);
     const ring = eq.ring;
     if (ring) put(13, 13, shiftColor(TIER_COLORS[ring.tier] || '#f0d878', 28));
+    const ring2 = eq.ring2;
+    if (ring2 && pose === 'idle') put(2, 13, shiftColor(TIER_COLORS[ring2.tier] || '#f0d878', 28));
     const ammo = eq.ammo;
     if (ammo) {
       const shaft = shiftColor(TIER_COLORS[ammo.tier] || '#cbb98a', -8);
@@ -579,6 +581,13 @@
       put(8, 12, '#fff6c8');
     }
     if (bodyQ === 0 && tierHex) put(5, 13, '#3a2a1c');
+    const belt = eq.belt;
+    if (belt) {
+      const strap = shiftColor(TIER_COLORS[belt.tier] || '#c4a46a', -16);
+      fill(4, 14, 8, 1, strap);
+      put(7, 14, shiftColor(strap, 36));
+      put(8, 14, '#f0d878');
+    }
 
     if (pose === 'windup') {
       put(3, 11, hand);
@@ -1533,7 +1542,7 @@
             : '') +
           '<dl class="spoop-stats">' +
             '<div><dt>Combat</dt><dd>' + spoop.combat + '</dd></div>' +
-            '<div><dt title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1.">Gear</dt><dd>' + (spoop.gearRating || 0) + '</dd></div>' +
+            '<div><dt title="Average of the 14 worn slots. Empty counts as 0. A full set of crude bronze is 1.">Gear</dt><dd>' + (spoop.gearRating || 0) + '</dd></div>' +
             '<div><dt>Arena</dt><dd>' + spoop.arenaWins + '–' + spoop.arenaLosses + '</dd></div>' +
             '<div><dt>Duels</dt><dd>' + (spoop.duelWins || 0) + '–' + (spoop.duelLosses || 0) + '</dd></div>' +
             '<div class="is-wide"><dt>Gold</dt><dd>' + Number(spoop.gold || 0).toLocaleString() + '</dd></div>' +
@@ -1603,7 +1612,24 @@
     return '<div class="spoop-bar flex-1"><span style="width:' + w + '%"></span></div>';
   }
 
+  const BELT_GEM = { melee: '#e24b4b', ranged: '#3dba5a', magic: '#5b8def', prayer: '#f0d060', defence: '#d5d8e0' };
+
+  function beltIcon(item) {
+    const strap = TIER_COLORS[item && item.tier] || '#c4a46a';
+    const gem = BELT_GEM[item && item.lean] || BELT_GEM.defence;
+    return '<svg class="belt-icon" viewBox="0 0 32 32" aria-hidden="true">' +
+      '<rect x="1" y="13" width="30" height="6" fill="' + strap + '" stroke="#1a120c" stroke-width="1"/>' +
+      '<rect x="12" y="10" width="8" height="12" fill="#3a2a1c" stroke="#1a120c" stroke-width="1"/>' +
+      '<rect x="14" y="14" width="4" height="4" fill="' + gem + '"/>' +
+      '<rect x="4" y="15" width="2" height="2" fill="#1a120c"/>' +
+      '<rect x="7" y="15" width="2" height="2" fill="#1a120c"/>' +
+      '<rect x="23" y="15" width="2" height="2" fill="#1a120c"/>' +
+      '<rect x="26" y="15" width="2" height="2" fill="#1a120c"/>' +
+    '</svg>';
+  }
+
   function itemIcon(item) {
+    if (item && item.slot === 'belt') return beltIcon(item);
     if (!item || !item.osrsId) return '';
     return '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="36" height="36" loading="lazy">';
   }
@@ -1620,15 +1646,17 @@
 
   const SLOT_LABEL = {
     weapon: 'Weapon', shield: 'Shield', head: 'Head', body: 'Body', legs: 'Legs',
-    boots: 'Boots', gloves: 'Hands', cape: 'Cape', neck: 'Neck', ring: 'Ring', ammo: 'Ammo',
+    boots: 'Boots', gloves: 'Hands', cape: 'Cape', neck: 'Neck', ring: 'Ring', ring2: 'Ring 2', ammo: 'Ammo',
+    belt: 'Belt', companion: 'Companion',
   };
 
   const EQUIP_GRID = [
     [null, 'head', null],
     ['cape', 'neck', 'ammo'],
     ['weapon', 'body', 'shield'],
-    [null, 'legs', null],
+    ['belt', 'legs', null],
     ['gloves', 'boots', 'ring'],
+    ['companion', null, 'ring2'],
   ];
 
   const QUALITY_COLOR = {
@@ -1678,10 +1706,18 @@
     const mega = item.mega
       ? '<p class="spoop-tip-mega">Megarare' + (item.job ? ' · ' + escapeHtml(item.job) : '') + '</p>'
       : '';
+    const job = !item.mega && item.job
+      ? '<p class="text-slate-400">' + escapeHtml(item.job) + '</p>'
+      : '';
+    const manner = item.demeanorLine
+      ? '<p class="text-slate-400">' + escapeHtml(item.demeanorLine) + '</p>'
+      : '';
     return '<div class="spoop-tip" role="tooltip">' +
       kicker +
       mega +
       '<p class="text-xs" style="color:' + (QUALITY_COLOR[item.quality] || '#fde68a') + '">' + escapeHtml(item.name) + '</p>' +
+      job +
+      manner +
       value +
       rating +
       reqHtml +
@@ -1691,9 +1727,20 @@
     '</div>';
   }
 
+  function wornRival(spoop, item) {
+    const equipped = spoop && spoop.equipped;
+    if (!equipped || !item) return null;
+    if (item.slot === 'ring') {
+      const rings = [equipped.ring, equipped.ring2].filter(Boolean);
+      if (rings.length < 2) return null;
+      return rings.slice().sort((a, b) => (Number(a.score) || 0) - (Number(b.score) || 0))[0];
+    }
+    return equipped[item.slot] || null;
+  }
+
   function slotTips(item, spoop, gear) {
     if (!item) return '';
-    const worn = gear === 'bank' && spoop && spoop.equipped && item.slot ? spoop.equipped[item.slot] : null;
+    const worn = gear === 'bank' ? wornRival(spoop, item) : null;
     if (worn && String(worn.id) !== String(item.id)) {
       return '<div class="spoop-tips">' + itemTip(worn, spoop, 'Wearing') + itemTip(item, spoop, 'In bank') + '</div>';
     }
@@ -1848,14 +1895,14 @@
       const saved = window.localStorage.getItem(DETAIL_TAB_KEY);
       if (DETAIL_TABS.indexOf(saved) >= 0) return saved;
     } catch (err) {}
-    return 'bosses';
+    return 'crates';
   }
 
   function showDetailTab(root, id) {
     const tabs = root.querySelector('[data-detail-tabs]');
     if (!tabs) return;
-    let tab = DETAIL_TABS.indexOf(id) >= 0 ? id : 'bosses';
-    if (tab === 'activity' && !detailNarrow()) tab = 'bosses';
+    let tab = DETAIL_TABS.indexOf(id) >= 0 ? id : 'crates';
+    if (tab === 'activity' && !detailNarrow()) tab = 'crates';
     tabs.querySelectorAll('[data-tab]').forEach((btn) => {
       const on = btn.getAttribute('data-tab') === tab;
       btn.classList.toggle('is-on', on);
@@ -1865,6 +1912,12 @@
     tabs.querySelectorAll('[data-panel]').forEach((panel) => {
       panel.hidden = panel.getAttribute('data-panel') !== tab;
     });
+    const current = tabs.querySelector('[data-tab="' + tab + '"]');
+    const list = tabs.querySelector('.spoop-tablist');
+    if (current && list && list.scrollWidth > list.clientWidth + 2) {
+      const left = current.offsetLeft - (list.clientWidth - current.offsetWidth) / 2;
+      list.scrollLeft = Math.max(0, left);
+    }
   }
 
   function rememberDetailTab(id) {
@@ -2056,12 +2109,16 @@
         '</span>' +
       '</button>';
     };
-    const metalCrates = (state.crates || []).filter((crate) => !crate.style && !crate.lamps).map(crateButton).join('');
+    const metalCrates = (state.crates || []).filter((crate) => !crate.style && !crate.lamps && !crate.companions).map(crateButton).join('');
     const styleCrates = (state.crates || []).filter((crate) => crate.style).map(crateButton).join('');
+    const companionCrates = (state.crates || []).filter((crate) => crate.companions).map(crateButton).join('');
     const lampCrates = (state.crates || []).filter((crate) => crate.lamps).map(crateButton).join('');
     const crates = metalCrates +
       (styleCrates
         ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">Ranging and mage</h3>' + styleCrates
+        : '') +
+      (companionCrates
+        ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">Companions</h3>' + companionCrates
         : '') +
       (lampCrates
         ? '<h3 class="text-sm text-slate-300 col-span-2 sm:col-span-4 mt-2">XP lamps</h3>' + lampCrates
@@ -2098,8 +2155,11 @@
     const bossKills = (spoop.bosses || []).reduce((sum, boss) => sum + (Number(boss.kc) || 0), 0);
     const raidCount = spoop.raids ? Number(spoop.raids.raids) || 0 : 0;
     const crateBody =
-      '<div class="flex items-center gap-2 mb-1">' + bar(goal.progress) + '</div>' +
-      '<p class="text-[11px] text-slate-500 mb-3">' + spoop.gold.toLocaleString() + ' gold · saving for ' + escapeHtml(goal.name) + ' (' + priceLabel(goal.cost) + ')</p>' +
+      '<div class="spoop-crate-head">' +
+        '<p class="spoop-crate-gold"><span>Gold</span><strong>' + Number(spoop.gold || 0).toLocaleString() + '</strong></p>' +
+        '<p class="spoop-panel-lead">Saving for ' + escapeHtml(goal.name) + ' (' + priceLabel(goal.cost) + ')</p>' +
+      '</div>' +
+      '<div class="flex items-center gap-2 mb-3">' + bar(goal.progress) + '</div>' +
       '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' + crates + '</div>';
 
     root.innerHTML =
@@ -2152,12 +2212,14 @@
         '<section class="spoop-wear rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-3">' +
             '<h3 class="text-sm text-slate-300">Wearing</h3>' +
-            '<p class="text-sm text-amber-200 tabular-nums" title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1. Each quality step adds 1, and each metal adds 10.">Gear ' + (spoop.gearRating || 0) + '</p>' +
+            '<p class="text-sm text-amber-200 tabular-nums" title="Average of the 14 worn slots. Empty counts as 0. A full set of crude bronze is 1. Each quality step adds 1, and each metal adds 10.">Gear ' + (spoop.gearRating || 0) + '</p>' +
           '</div>' +
           '<div class="spoop-grid equip-grid">' + grid + '</div>' +
-          statsHtml +
         '</section>' +
       '</div>' +
+      '<section class="spoop-bonuses mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+        statsHtml +
+      '</section>' +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<div class="flex items-baseline justify-between gap-3 mb-2">' +
           '<h3 class="text-sm text-slate-300">Bank</h3>' +
@@ -3288,9 +3350,11 @@
     let perBuild = false;
     const groups = (loot.groups || []).map((group) => {
       const cards = (group.items || []).map((item) => {
-        const icon = item.osrsId
-          ? '<img src="/api/spoops?icon=1&id=' + Number(item.osrsId) + '" alt="" width="32" height="32">'
-          : '';
+        const icon = item.slot === 'belt'
+          ? beltIcon(item)
+          : item.osrsId
+            ? '<img src="/api/spoops?icon=1&id=' + Number(item.osrsId) + '" alt="" width="32" height="32">'
+            : '';
         const rare = item.rare ? '<span class="rare">Rare</span>' : '';
         const job = item.job ? '<span class="job">' + escapeHtml(item.job) + '</span>' : '';
         const chance = itemChance(item, build);
@@ -3539,8 +3603,7 @@
         statLine('magic', 'Magic', values.magic) +
         statLine('range', 'Range', values.range) +
       '</div>';
-    return '<div class="spoop-bonuses">' +
-      '<h3 class="text-sm text-slate-300 mb-3">Stats</h3>' +
+    return '<h3 class="text-sm text-slate-300 mb-3">Stats</h3>' +
       '<div class="spoop-sheet">' +
         column('Attack bonus', attack) +
         column('Defence bonus', defence) +
@@ -3557,8 +3620,7 @@
             '</div>' +
           '</div>' +
         '</div>' +
-      '</div>' +
-    '</div>';
+      '</div>';
   }
 
   function priceLabel(n) {
@@ -3577,9 +3639,11 @@
       const overlay = document.createElement('div');
       overlay.className = 'roll-overlay';
       const cards = (roll.reel || []).map((item, i) => {
-        const icon = item && item.osrsId
-          ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="36" height="36">'
-          : '';
+        const icon = item && item.slot === 'belt'
+          ? beltIcon(item)
+          : item && item.osrsId
+            ? '<img src="/api/spoops?icon=1&id=' + item.osrsId + '" alt="" width="36" height="36">'
+            : '';
         const quality = item && QUALITY_COLOR[item.quality] ? ' q-' + item.quality : '';
         const mega = item && item.mega ? ' is-mega' : '';
         const lamp = item && item.lamp ? ' is-lamp' : '';

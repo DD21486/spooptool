@@ -495,8 +495,9 @@
     [null, 'head', null],
     ['cape', 'neck', 'ammo'],
     ['weapon', 'body', 'shield'],
-    [null, 'legs', null],
+    ['belt', 'legs', null],
     ['gloves', 'boots', 'ring'],
+    ['companion', null, 'ring2'],
   ];
 
   const QUALITY_COLOR = {
@@ -630,12 +631,32 @@
   let holdPk = '';
   let holdNight = '';
 
+  const BELT_COLORS = {
+    bronze: '#c47a3a', iron: '#b8b8b8', steel: '#d5d8e0', black: '#4a4a4a', mithril: '#6a8ec8',
+    adamant: '#3d9a55', rune: '#3aa0d8', dragon: '#d04532', barrows: '#7a4ea8', raid: '#e6c15a',
+  };
+  const BELT_GEM = { melee: '#e24b4b', ranged: '#3dba5a', magic: '#5b8def', prayer: '#f0d060', defence: '#d5d8e0' };
+
+  function beltIcon(item) {
+    const strap = BELT_COLORS[item && item.tier] || '#c4a46a';
+    const gem = BELT_GEM[item && item.lean] || BELT_GEM.defence;
+    return '<svg class="belt-icon" viewBox="0 0 32 32" aria-hidden="true">' +
+      '<rect x="1" y="13" width="30" height="6" fill="' + strap + '" stroke="#1a120c" stroke-width="1"/>' +
+      '<rect x="12" y="10" width="8" height="12" fill="#3a2a1c" stroke="#1a120c" stroke-width="1"/>' +
+      '<rect x="14" y="14" width="4" height="4" fill="' + gem + '"/>' +
+      '<rect x="4" y="15" width="2" height="2" fill="#1a120c"/>' +
+      '<rect x="7" y="15" width="2" height="2" fill="#1a120c"/>' +
+    '</svg>';
+  }
+
   function gearPiece(fighter, slot) {
     const loadout = fighter && fighter.loadout;
     if (loadout && Object.prototype.hasOwnProperty.call(loadout, slot)) return loadout[slot];
     const item = fighter && fighter.equipped && fighter.equipped[slot];
-    if (!item || !item.osrsId) return null;
-    return { osrsId: item.osrsId, quality: item.quality || null };
+    if (!item) return null;
+    if (item.slot === 'belt' || slot === 'belt') return item;
+    if (!item.osrsId) return null;
+    return { osrsId: item.osrsId, quality: item.quality || null, rating: item.rating };
   }
 
   function gearCells(fighter) {
@@ -645,9 +666,11 @@
       const id = item ? parseInt(item.osrsId, 10) : 0;
       const color = item && QUALITY_COLOR[item.quality];
       const style = color ? ' style="border-color:' + color + '"' : '';
-      const icon = id > 0
-        ? '<img src="/api/spoops?icon=1&id=' + id + '" alt="" width="36" height="36">'
-        : '';
+      const icon = item && (item.slot === 'belt' || slot === 'belt')
+        ? beltIcon(item)
+        : id > 0
+          ? '<img src="/api/spoops?icon=1&id=' + id + '" alt="" width="36" height="36">'
+          : '';
       const rate = item && item.rating != null ? '<span class="spoop-rate">' + item.rating + '</span>' : '';
       return '<div class="spoop-slot"' + style + '>' + icon + rate + '</div>';
     }).join('')).join('');

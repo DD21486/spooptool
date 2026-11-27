@@ -278,7 +278,8 @@
   justify-content: center;
 }
 
-.arena-loadout .spoop-slot img {
+.arena-loadout .spoop-slot img,
+.arena-loadout .belt-icon {
   width: 36px;
   height: 36px;
   object-fit: contain;
