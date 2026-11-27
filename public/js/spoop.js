@@ -1724,7 +1724,6 @@
 
   function bossGrid(spoop) {
     const bosses = spoop.bosses || [];
-    if (!bosses.length) return '';
     const total = bosses.reduce((sum, boss) => sum + (Number(boss.kc) || 0), 0);
     const cells = bosses.map((boss) => {
       const kc = Number(boss.kc) || 0;
@@ -1735,13 +1734,9 @@
         count +
       '</span>';
     }).join('');
-    return '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
-      '<div class="flex items-baseline justify-between gap-3 mb-2">' +
-        '<h3 class="text-sm text-slate-300">Bosses</h3>' +
-        '<p class="text-xs text-slate-500 tabular-nums">' + total.toLocaleString() + ' kills</p>' +
-      '</div>' +
-      '<div class="boss-kc-grid">' + cells + '</div>' +
-    '</section>';
+    if (!bosses.length) return '<p class="text-slate-600 text-sm">No bosses yet.</p>';
+    return '<p class="text-xs text-slate-500 tabular-nums mb-2">' + total.toLocaleString() + ' kills</p>' +
+      '<div class="boss-kc-grid">' + cells + '</div>';
   }
 
   function spoopLink(key, name) {
@@ -1771,26 +1766,6 @@
     '</li>';
   }
 
-  const RELATIONS_OPEN_KEY = 'spoop-relations-open';
-
-  function relationsOpen() {
-    try {
-      return window.localStorage.getItem(RELATIONS_OPEN_KEY) !== '0';
-    } catch (err) {
-      return true;
-    }
-  }
-
-  function bindRelationsToggle(root) {
-    const panel = root.querySelector('[data-relations]');
-    if (!panel) return;
-    panel.addEventListener('toggle', () => {
-      try {
-        window.localStorage.setItem(RELATIONS_OPEN_KEY, panel.open ? '1' : '0');
-      } catch (err) {}
-    });
-  }
-
   function relationsSection(spoop) {
     const social = spoop.social || { sees: [], seenBy: [] };
     const column = (title, rows, empty) =>
@@ -1800,33 +1775,19 @@
           ? '<ul class="spoop-rel-list">' + rows.map(relationRow).join('') + '</ul>'
           : '<p class="text-slate-600 text-sm">' + escapeHtml(empty) + '</p>') +
       '</div>';
-    return '<details class="spoop-relations mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4" data-relations' + (relationsOpen() ? ' open' : '') + '>' +
-      '<summary><h3 class="text-sm text-slate-300">Relationships</h3></summary>' +
-      '<div class="grid gap-4 md:grid-cols-2 mt-3">' +
-        column('How ' + spoop.name + ' sees others', social.sees || [], 'No strong feelings about anyone yet.') +
-        column('How others see ' + spoop.name, social.seenBy || [], 'Nobody has made up their mind yet.') +
-      '</div>' +
-    '</details>';
+    return '<div class="grid gap-4 md:grid-cols-2">' +
+      column('How ' + spoop.name + ' sees others', social.sees || [], 'No strong feelings about anyone yet.') +
+      column('How others see ' + spoop.name, social.seenBy || [], 'Nobody has made up their mind yet.') +
+    '</div>';
   }
 
-  const RAIDS_OPEN_KEY = 'spoop-raids-open';
-
-  function raidsOpen() {
-    try {
-      return window.localStorage.getItem(RAIDS_OPEN_KEY) === '1';
-    } catch (err) {
-      return false;
-    }
-  }
-
-  function bindRaidsToggle(root) {
-    const panel = root.querySelector('[data-raids]');
-    if (!panel) return;
-    panel.addEventListener('toggle', () => {
-      try {
-        window.localStorage.setItem(RAIDS_OPEN_KEY, panel.open ? '1' : '0');
-      } catch (err) {}
+  function peopleBonds(spoop) {
+    const social = spoop.social || {};
+    const keys = {};
+    (social.sees || []).concat(social.seenBy || []).forEach((row) => {
+      if (row && row.label && row.key) keys[row.key] = 1;
     });
+    return Object.keys(keys).length;
   }
 
   function raidsSection(spoop) {
@@ -1870,10 +1831,103 @@
         '<ul class="spoop-raid-awards">' + awards + '</ul>' +
         lastLine;
     }
-    return '<details class="spoop-raids mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4" data-raids' + (raidsOpen() ? ' open' : '') + '>' +
-      '<summary><h3 class="text-sm text-slate-300">Raids</h3><p class="text-xs text-slate-500 tabular-nums">' + escapeHtml(head) + '</p></summary>' +
+    return '<p class="spoop-panel-lead">' + escapeHtml(head) + '</p>' + body;
+  }
+
+  const DETAIL_TABS = ['bosses', 'raids', 'crates', 'arena', 'people', 'activity'];
+  const DETAIL_TAB_KEY = 'spoop-detail-tab';
+
+  function detailNarrow() {
+    return window.matchMedia('(max-width: 1099px)').matches;
+  }
+
+  function readDetailTab() {
+    const hash = String(window.location.hash || '').replace(/^#/, '');
+    if (DETAIL_TABS.indexOf(hash) >= 0) return hash;
+    try {
+      const saved = window.localStorage.getItem(DETAIL_TAB_KEY);
+      if (DETAIL_TABS.indexOf(saved) >= 0) return saved;
+    } catch (err) {}
+    return 'bosses';
+  }
+
+  function showDetailTab(root, id) {
+    const tabs = root.querySelector('[data-detail-tabs]');
+    if (!tabs) return;
+    let tab = DETAIL_TABS.indexOf(id) >= 0 ? id : 'bosses';
+    if (tab === 'activity' && !detailNarrow()) tab = 'bosses';
+    tabs.querySelectorAll('[data-tab]').forEach((btn) => {
+      const on = btn.getAttribute('data-tab') === tab;
+      btn.classList.toggle('is-on', on);
+      btn.setAttribute('aria-selected', on ? 'true' : 'false');
+      btn.tabIndex = on ? 0 : -1;
+    });
+    tabs.querySelectorAll('[data-panel]').forEach((panel) => {
+      panel.hidden = panel.getAttribute('data-panel') !== tab;
+    });
+  }
+
+  function rememberDetailTab(id) {
+    try { window.localStorage.setItem(DETAIL_TAB_KEY, id); } catch (err) {}
+    const next = '#' + id;
+    if (window.location.hash !== next) history.replaceState(null, '', next);
+  }
+
+  function bindDetailTabs(root) {
+    const tabs = root.querySelector('[data-detail-tabs]');
+    if (!tabs) return;
+    showDetailTab(root, readDetailTab());
+    tabs.addEventListener('click', (ev) => {
+      const btn = ev.target.closest('[data-tab]');
+      if (!btn || !tabs.contains(btn)) return;
+      const id = btn.getAttribute('data-tab');
+      rememberDetailTab(id);
+      showDetailTab(root, id);
+    });
+    const list = tabs.querySelector('[role="tablist"]');
+    if (!list) return;
+    list.addEventListener('keydown', (ev) => {
+      if (['ArrowRight', 'ArrowLeft', 'Home', 'End'].indexOf(ev.key) < 0) return;
+      const buttons = Array.prototype.filter.call(list.querySelectorAll('[data-tab]'), (btn) => btn.offsetParent !== null);
+      if (!buttons.length) return;
+      let index = buttons.indexOf(document.activeElement);
+      if (index < 0) index = buttons.findIndex((btn) => btn.getAttribute('aria-selected') === 'true');
+      if (ev.key === 'Home') index = 0;
+      else if (ev.key === 'End') index = buttons.length - 1;
+      else if (ev.key === 'ArrowRight') index = (Math.max(index, 0) + 1) % buttons.length;
+      else index = (Math.max(index, 0) - 1 + buttons.length) % buttons.length;
+      ev.preventDefault();
+      const next = buttons[index];
+      next.focus();
+      const id = next.getAttribute('data-tab');
+      rememberDetailTab(id);
+      showDetailTab(root, id);
+    });
+  }
+
+  if (!window.__spoopDetailTabWatch) {
+    window.__spoopDetailTabWatch = true;
+    const refreshDetailTab = () => {
+      const root = document.getElementById('spoop-root');
+      if (root && root.querySelector('[data-detail-tabs]')) showDetailTab(root, readDetailTab());
+    };
+    window.addEventListener('hashchange', refreshDetailTab);
+    window.addEventListener('resize', refreshDetailTab);
+  }
+
+  function detailTabButton(id, label, count, extraClass) {
+    const badge = count == null
+      ? ''
+      : '<span class="spoop-tab-count">' + Number(count || 0).toLocaleString() + '</span>';
+    return '<button type="button" class="spoop-tab' + (extraClass ? ' ' + extraClass : '') + '" role="tab" id="spoop-tab-' + id + '" data-tab="' + id + '" aria-controls="spoop-panel-' + id + '" aria-selected="false" tabindex="-1">' +
+      label + badge +
+    '</button>';
+  }
+
+  function detailPanel(id, body) {
+    return '<div class="spoop-tabpanel rounded-xl border border-slate-700 bg-slate-800/60 p-4" role="tabpanel" id="spoop-panel-' + id + '" data-panel="' + id + '" aria-labelledby="spoop-tab-' + id + '" hidden>' +
       body +
-    '</details>';
+    '</div>';
   }
 
   const FEUD_VERBS = {
@@ -2030,9 +2084,17 @@
         ? escapeHtml('Duel vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a) + ' · ' + Number(state.pk.stake || 0).toLocaleString() + ' gold')
         : '<a href="/raid3d.html?live">' + escapeHtml('PK vs ' + (state.pk.a === spoop.name ? state.pk.b : state.pk.a)) + '</a>') + '</p>'
       : '';
+    const bossKills = (spoop.bosses || []).reduce((sum, boss) => sum + (Number(boss.kc) || 0), 0);
+    const raidCount = spoop.raids ? Number(spoop.raids.raids) || 0 : 0;
+    const crateBody =
+      '<div class="flex items-center gap-2 mb-1">' + bar(goal.progress) + '</div>' +
+      '<p class="text-[11px] text-slate-500 mb-3">' + spoop.gold.toLocaleString() + ' gold · saving for ' + escapeHtml(goal.name) + ' (' + priceLabel(goal.cost) + ')</p>' +
+      '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' + crates + '</div>';
 
     root.innerHTML =
       duelBarHtml(state, spoop) +
+      '<div class="spoop-detail-layout">' +
+      '<div class="spoop-detail-main">' +
       '<header class="spoop-hero">' +
         '<div class="spoop-hero-bar">' +
           '<a class="spoop-back" href="/spoops.html"><svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M7.2 2.4 1.6 8l5.6 5.6 1.1-1.1L4.6 8.8H14.4V7.2H4.6l3.7-3.7z"/></svg>Back To Spoops</a>' +
@@ -2066,7 +2128,7 @@
           '</section>' +
         '</div>' +
       '</header>' +
-      '<div class="mt-6 grid gap-4 md:grid-cols-2">' +
+      '<div class="spoop-kit">' +
         '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-2">' +
             '<h3 class="text-sm text-slate-300">Skills</h3>' +
@@ -2076,28 +2138,15 @@
           '<p class="text-[11px] text-slate-500 mb-2">' + escapeHtml(gateLabel) + ' · ' + quests.done + '/' + quests.total + ' quests</p>' +
           skills +
         '</section>' +
-        '<section class="rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+        '<section class="spoop-wear rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
           '<div class="flex items-baseline justify-between gap-3 mb-3">' +
             '<h3 class="text-sm text-slate-300">Wearing</h3>' +
             '<p class="text-sm text-amber-200 tabular-nums" title="Average of the 11 worn slots. Empty counts as 0. A full set of crude bronze is 1. Each quality step adds 1, and each metal adds 10.">Gear ' + (spoop.gearRating || 0) + '</p>' +
           '</div>' +
           '<div class="spoop-grid equip-grid">' + grid + '</div>' +
+          statsHtml +
         '</section>' +
       '</div>' +
-      relationsSection(spoop) +
-      statsHtml +
-      spoopControlsHtml(spoop, build, buildTabs, state) +
-      bossGrid(spoop) +
-      raidsSection(spoop) +
-      '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
-        '<h3 class="text-sm text-slate-300 mb-2">Crates</h3>' +
-        '<div class="flex items-center gap-2 mb-1">' + bar(goal.progress) + '</div>' +
-        '<p class="text-[11px] text-slate-500 mb-3">' + spoop.gold.toLocaleString() + ' gold · saving for ' + escapeHtml(goal.name) + ' (' + priceLabel(goal.cost) + ')</p>' +
-        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-2">' + crates + '</div>' +
-      '</section>' +
-      '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
-        '<h3 class="text-sm text-slate-300 mb-2">Last arena</h3>' + fightHtml +
-      '</section>' +
       '<section class="mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<div class="flex items-baseline justify-between gap-3 mb-2">' +
           '<h3 class="text-sm text-slate-300">Bank</h3>' +
@@ -2105,10 +2154,29 @@
         '</div>' +
         bank +
       '</section>' +
-      '<section class="spoop-log mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+      spoopControlsHtml(spoop, build, buildTabs, state) +
+      '<div class="spoop-detail-tabs" data-detail-tabs>' +
+        '<div class="spoop-tablist" role="tablist" aria-label="Spoop records">' +
+          detailTabButton('bosses', 'Bosses', bossKills) +
+          detailTabButton('raids', 'Raids', raidCount) +
+          detailTabButton('crates', 'Crates') +
+          detailTabButton('arena', 'Arena') +
+          detailTabButton('people', 'People', peopleBonds(spoop)) +
+          detailTabButton('activity', 'Activity', null, 'spoop-tab-activity') +
+        '</div>' +
+        detailPanel('bosses', bossGrid(spoop)) +
+        detailPanel('raids', raidsSection(spoop)) +
+        detailPanel('crates', crateBody) +
+        detailPanel('arena', fightHtml) +
+        detailPanel('people', relationsSection(spoop)) +
+        detailPanel('activity', log) +
+      '</div>' +
+      '</div>' +
+      '<aside class="spoop-log spoop-detail-log rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
         '<h3>Activity</h3>' +
-        log +
-      '</section>';
+        '<div class="spoop-detail-log-body">' + log + '</div>' +
+      '</aside>' +
+      '</div>';
 
     drawSpoop(document.getElementById('spoop-hero'), spoop, { clear: true });
     // The 3D portrait (/js/raid3d/portrait.js) takes over the hero once it loads; the sprite stays as the fallback.
@@ -2206,8 +2274,7 @@
     });
     bindEquipTips(root);
     bindBankTips(root);
-    bindRelationsToggle(root);
-    bindRaidsToggle(root);
+    bindDetailTabs(root);
   }
 
   function placeBankTips(slot) {
@@ -3386,7 +3453,7 @@
         statLine('magic', 'Magic', values.magic) +
         statLine('range', 'Range', values.range) +
       '</div>';
-    return '<section class="spoop-sheet-card mt-4 rounded-xl border border-slate-700 bg-slate-800/60 p-4">' +
+    return '<div class="spoop-bonuses">' +
       '<h3 class="text-sm text-slate-300 mb-3">Stats</h3>' +
       '<div class="spoop-sheet">' +
         column('Attack bonus', attack) +
@@ -3405,7 +3472,7 @@
           '</div>' +
         '</div>' +
       '</div>' +
-    '</section>';
+    '</div>';
   }
 
   function priceLabel(n) {
