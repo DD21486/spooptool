@@ -1,5 +1,5 @@
 const { load, save, keepReminderMarks, peekArenaCard, loadReplays, attachReplays } = require('../lib/spoop/store');
-const { advance, openCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, presentDuelWatch, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
+const { advance, openCrate, openHeldCrate, openMegaChest, useLamp, sellBankItem, sellJackpot, equipBankItem, unequipItem, applyWearRules, setCombatBuild, setTrainingFocus, setAutoSell, setEquipMode, issueDuel, cancelDuel, declineDuel, acceptDuel, presentWorld, presentDuelWatch, nextEventAfter, STARTER_NAME, createWorld, hashString, mulberry32, arenaSnapshot, noteOddsHour, testArena, testRaid, testRaidNight } = require('../lib/spoop/engine');
 const { publishEvents, publishArena, publishPk, takeDiscordQueue, deliverDiscord } = require('../lib/spoop/publish');
 const { sendDueArenaReminders } = require('../lib/spoop/arena-reminders');
 const { syncPk } = require('../lib/spoop/pk-settle');
@@ -127,6 +127,29 @@ async function handlePost(req) {
     if (!result.ok) return { status: 400, payload: { error: result.error } };
     const saved = await save(state, state.clock);
     if (saved && await publishEvents([{
+      name: spoop.name,
+      text: result.text,
+      discord: result.discord,
+      kind: 'crate',
+      icon: result.icon,
+      stats: result.stats,
+    }], state)) {
+      await save(state, state.clock);
+    }
+    const payload = presentWorld(state, debug, [result.text]);
+    payload.roll = result.roll;
+    return { status: 200, payload };
+  }
+
+  if (action === 'open-held') {
+    const now = new Date(state.clock);
+    const crateId = String(body.crate || '');
+    const rng = mulberry32(hashString(`${spoop.name}|held|${now.toISOString()}|${crateId}|${spoop.heldCrates && spoop.heldCrates[crateId]}|${Math.random()}`));
+    const result = openHeldCrate(spoop, crateId, now, rng);
+    if (!result.ok) return { status: 400, payload: { error: result.error } };
+    const saved = await save(state, state.clock);
+    if (!saved) return { status: 409, payload: { error: 'The world moved. Try again.' } };
+    if (await publishEvents([{
       name: spoop.name,
       text: result.text,
       discord: result.discord,
