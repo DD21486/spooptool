@@ -4,8 +4,8 @@
 const PACE = 0.55;
 const TOURNEY = {
   titleIn: 550, titleHold: 5000, titleOut: 700, entrance: 2000, bye: 900, hold: 15000,
-  versus: 2900, intro: 2000, call: 720, win: 1800, advance: 2000, after: 400,
-  bestFlash: 1400, score: 3000, bracketHold: 3000, crown: 20000, ko: 3500,
+  versus: 2900, intro: 2000, call: 720, win: 1800, advance: 2000,
+  bestFlash: 1400, score: 3000, bracketHold: 3000, between: 4000, crown: 20000, ko: 3500,
 };
 const FIELD = { open: 6000, results: 14000 };
 const DUEL = { versus: 2900, intro: 2000, slack: 1500 };
@@ -61,7 +61,10 @@ export function planTournament(last) {
     if (index === matches.length - 1) {
       push('bracket', TOURNEY.bracketHold, { tourney, played: matches.length });
       push('crown', TOURNEY.crown, { tourney, cast, results: last.results || [], pot: last.pot });
-    } else push('gap', TOURNEY.after);
+    } else {
+      // The winner has flown up. Leave the bracket up before the next duel.
+      push('bracket', TOURNEY.between, { tourney, played: index + 1 });
+    }
   });
   if (!matches.length) {
     push('bracket', TOURNEY.bracketHold, { tourney, played: 0 });
