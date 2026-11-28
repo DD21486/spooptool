@@ -312,6 +312,37 @@
 .r3d-card-body .is-dim { color: #9a9280; }
 .r3d-card-body ul { margin: 6px 0 0; padding: 0; list-style: none; text-align: left; columns: 2; column-gap: 16px; }
 .r3d-card-body li { break-inside: avoid; display: flex; justify-content: space-between; gap: 8px; }
+.r3d-purse {
+  margin: 10px 0 2px;
+  padding-top: 8px;
+  border-top: 1px solid #6a5530;
+}
+.r3d-purse span {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #f0d878;
+}
+.r3d-purse strong {
+  display: block;
+  margin-top: 2px;
+  font-family: "RuneScape Bold 12", "RuneScape", sans-serif;
+  font-size: 28px;
+  font-weight: normal;
+  line-height: 1;
+  color: #ffff00;
+  text-shadow: 2px 2px 0 #000;
+}
+.r3d-purse em {
+  display: block;
+  margin-top: 3px;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c8a050;
+}
 
 /* Raid frames: one tile per spoop, five to a column, colored by combat style. */
 .r3d-party {

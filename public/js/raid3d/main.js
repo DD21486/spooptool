@@ -1294,6 +1294,12 @@ function planRaid(last) {
   return { segs, total, startAt, raid, nodes, map, clock: 0, playing: true, room: -1, seg: null, view: {} };
 }
 
+function purseLine(gold) {
+  const n = Math.floor(Number(gold) || 0);
+  if (n <= 0) return '';
+  return '<p class="r3d-purse"><span>Prize pool</span><strong>' + n.toLocaleString('en-US') + '</strong><em>gold</em></p>';
+}
+
 function showCard(kicker, title, body, board) {
   cardEl.querySelector('.r3d-card-kicker').textContent = kicker || '';
   cardEl.querySelector('.r3d-card-title').textContent = title || '';
@@ -2114,7 +2120,7 @@ async function watchLive() {
       const left = Math.max(0, specialAt - now);
       const mm = Math.floor(left / 60000);
       const ss = Math.floor((left % 60000) / 1000);
-      const purse = specialTourney && card.special.pot ? '<p class="is-dim">' + Number(card.special.pot).toLocaleString('en-US') + ' gold on the line.</p>' : '';
+      const purse = specialTourney ? purseLine(card.special.pot) : '';
       const specialBoard = specialTourney && card.special.odds
         ? Object.assign({ night: card.special.at, trail: [] }, card.special.odds)
         : null;
@@ -2133,7 +2139,9 @@ async function watchLive() {
       const nextBoard = card.nextKind === 'tournament' && card.odds
         ? Object.assign({ night: card.nextAt, trail: card.oddsTrail || [] }, card.odds)
         : null;
+      const purse = card.nextKind === 'tournament' ? purseLine(card.pot && card.pot.gold) : '';
       showCard(card.nextTitle || 'Arena', card.nextLabel || 'Next fight', '<p>' + (left > 0 ? 'In ' + mm + ':' + String(ss).padStart(2, '0') : 'Any second now') + '</p>' +
+        purse +
         (card.nextDetail ? '<p class="is-dim">' + esc(card.nextDetail) + '</p>' : ''), nextBoard);
       if (!bout || preview) showPreview(card.nextKind && card.nextKind !== 'raid' ? 'pit' : 'grass');
       livePoll = window.setTimeout(watchLive, left > 60000 ? 15000 : 4000);
